@@ -67,6 +67,34 @@ Nie deklarujemy, że samo pip install albo doinstalowanie MSVC zamyka temat.
 upstream oraz dokumentację venv. Nie wykonano kompilacji lub testu na Windowsie.
 Przygotowanie zwykłych bibliotek Python nie oznacza gotowego środowiska solvera.
 
+## 2026-09-28 — antenna_solver_gpt, wybór openEMS i konkretne środowisko Windows
+
+**Powód:** użytkownik wybrał ogólną nazwę `antenna_solver_gpt`, wykluczył
+NEC2++ z przyszłej implementacji, potwierdził Python 3.14.0 x64 i podał
+ścieżkę paczki openEMS: `C:\dev\openems\openEMS`.
+
+**Zmiana:** zaktualizowano nazwę projektu w README i instrukcjach, wybór
+solvera w wymaganiach oraz architekturze, plan integracji i instrukcję Windows.
+Wyjaśniono rolę `.venv`; polecenia używają konkretnego interpretera i ścieżki
+użytkownika oraz lokalnych modułów z paczki openEMS 0.37.0-rc3 MSVC.
+Użytkownik zmienił nazwę repozytorium GitHub; potwierdzono odczyt gałęzi main
+pod adresem `analityk/antenna_solver_gpt`. Zaktualizowano odnośniki i polecenia Git.
+
+**Wpływ na fizykę i wyniki:** nie zmieniono wymiarów ani nie wykonano symulacji.
+Zmiana solvera wymaga osobnego projektu dyskretyzacji, źródła, reflektora
+i odczytu danych. Samo przemianowanie nie daje równoważności modeli.
+
+**Wpływ na architekturę i formaty:** openEMS jest wybranym solverem; NEC2++
+nie będzie implementowany. Szczegółowe kontrakty M0 związane z NEC zostały
+oznaczone w `goal.md` jako nieaktywne i wymagające migracji przed implementacją.
+Nie deklarujemy, że obecne schematy lub `model.nec` opisują wejście openEMS.
+Nazwa wewnętrznego pakietu `antenna_lab` pozostaje niezależna od nazwy repozytorium.
+
+**Sprawdzenie:** sprawdzono instrukcję Python z oficjalnej paczki openEMS,
+dokumentację venv i zgodność zapisanych ścieżek oraz odsyłaczy. Nie wykonywano
+benchmarków ani testów na komputerze użytkownika. Import openEMS nie został
+jeszcze potwierdzony. Repozytorium pozostaje na etapie specyfikacji.
+
 ## Wzór kolejnego wpisu
 
 - Data i krótka nazwa zmiany.

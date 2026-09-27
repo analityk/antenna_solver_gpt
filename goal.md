@@ -1,6 +1,25 @@
 # Cel projektu
 
-Wersja wymagań: 0.2. Data: 2026-09-28, Europe/Warsaw.
+Wersja wymagań: 0.3. Data: 2026-09-28, Europe/Warsaw.
+
+## Bieżąca decyzja o solverze i status kontraktów
+
+Nazwa projektu: `antenna_solver_gpt`. Wybrany solver: **openEMS**.
+NEC2++ / PyNEC został wycofany z planu implementacji. Ta decyzja zastępuje
+odnoszące się do NEC zapisy wcześniejszego M0, również w instrukcjach lokalnych.
+
+Nadal obowiązują wymiary Quadosa, częstotliwość 1420 MHz, modułowość,
+normalizacja i wymagania dotyczące kontroli fizycznej oraz wizualizacji.
+Przed implementacją trzeba zastąpić szkic modelu cienkoprzewodowego,
+siatki reflektora, źródła NEC i pliku `model.nec` kontraktem openEMS.
+Dotyczy to dalszych sekcji tego dokumentu, `docs/quados8-geometry.md`,
+`outcomes/README.md`, `parameters/quados8_1420mhz.json`, powiązanych schematów
+i `src/antenna_lab/solvers/AGENTS.md`. Ich szczegóły zależne od NEC są obecnie
+**nieaktywne**, a konfiguracja nie jest gotowym wejściem openEMS.
+Migracja ma jawnie opisać geometrię materiałów, siatkę FDTD, port,
+granice obszaru, odczyt prądów i pól oraz odtwarzalne wejście solvera.
+Ta zmiana zapisuje decyzję i instrukcję instalacji, nie deklaruje zakończenia
+migracji kontraktów ani implementacji adaptera.
 
 ## Cel użytkownika
 
@@ -15,15 +34,16 @@ jej automatycznie na dokładną częstotliwość spoczynkową linii wodoru.
 ## Platforma docelowa
 
 Program ma działać lokalnie i natywnie na Windows 11. Użytkownik posiada Git,
-Python i VS Code; wersja oraz architektura interpretera nie są jeszcze znane.
+Python i VS Code; potwierdzony interpreter to CPython 3.14.0, 64-bit AMD64.
 Podstawowa ścieżka instalacji: PowerShell, `venv` i `python -m pip`.
 WSL, Linux i uv nie mogą być warunkiem korzystania z programu.
 Instrukcja przygotowania: `docs/windows-setup.md`.
 
 Warunkiem odbioru integracji solvera M2 jest działający import lub uruchomienie
 solvera oraz przypadek kontrolny na natywnym Windowsie. Zbudowanie lub test
-na Linuxie nie zalicza tego wymagania. Pierwsza ścieżka do sprawdzenia to
-PyNEC; ewentualny inny sposób wywołania NEC2++ musi zachować kontrakt wyników.
+na Linuxie nie zalicza tego wymagania. Ścieżka instalacji używa gotowej paczki
+openEMS dla Windows i zgodnych z nią modułów Pythona. Lokalizacja użytkownika:
+`C:\dev\openems\openEMS`. Import nie został jeszcze potwierdzony.
 
 ## Zakres pierwszej wersji symulatora
 
@@ -118,7 +138,7 @@ i porównywanymi modelami, przy tej samej normalizacji mocy.
 | --- | --- | --- |
 | M0 | Instrukcje, wymagania, historia, moduły, parametry i kontrakt outcomes | Zakończone w tym commicie |
 | M1 | Generator geometrii odtwarza topologię, długości, symetrię i port; pokazuje model do kontroli | Planowane |
-| M2 | NEC2++ liczy prądy, impedancję i pole dalekie; referencja kontrolna i sprawdzenie zbieżności | Planowane |
+| M2 | openEMS liczy prądy, impedancję i pole dalekie; referencja kontrolna i sprawdzenie zbieżności | Planowane po migracji kontraktów |
 | M3 | Zespolone E/H, maski, przekroje i animacje fazy oraz komplet outcomes | Planowane |
 | M4 | Lokalny interfejs, porównywanie wariantów i przegląd zapisanych wyników | Planowane |
 

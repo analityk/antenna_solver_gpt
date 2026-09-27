@@ -1,73 +1,92 @@
-# Środowisko lokalne — Windows 11
+# Środowisko lokalne — Windows 11 i openEMS
 
-Stan: instrukcja przygotowania podstawowego środowiska. Repozytorium jest
-na etapie M0; aplikacja i natywny adapter solvera nie są jeszcze gotowe.
-Użytkownik ma już Git, Python i VS Code. Korzystamy z PowerShella.
+Projekt: `antenna_solver_gpt`. Stan: M0, przed implementacją modelu i adaptera.
+Użytkownik ma Git, VS Code oraz CPython 3.14.0, 64-bit AMD64.
+Poniższe polecenia są przeznaczone dla PowerShella.
 
-## 1. Odczyt interpretera
+## 1. Paczka openEMS
+
+Używamy [oficjalnej paczki openEMS 0.37.0-rc3 MSVC dla Windows x64](https://github.com/thliebig/openEMS-Project/releases/tag/v0.37.0-rc3).
+To wydanie RC z gotowymi modułami Pythona cp314.
+Podana przez użytkownika lokalizacja to `C:\dev\openems\openEMS`.
+W tym katalogu powinny znajdować się `openEMS.exe`, `CSXCAD.dll`
+oraz podkatalog `python` z plikami `.whl`.
+
+## 2. Folder projektu
+
+Jeśli lokalna kopia jeszcze nie istnieje, w wybranym katalogu roboczym:
 
 ```powershell
-py -c "import sys, struct; print(sys.version); print('bits:', struct.calcsize('P') * 8); print(sys.executable)"
-py -m pip --version
+git clone https://github.com/analityk/antenna_solver_gpt.git
+Set-Location antenna_solver_gpt
 ```
 
-Pierwsze polecenie pokazuje dokładną wersję i architekturę interpretera,
-drugie przypisany do niego pip. Samo `pip list` nie określa tych danych.
-Docelowy solver wymaga 64-bitowego Pythona. Metadane PyNEC 2.3.4 wymagają
-Pythona co najmniej 3.11; zgodność konkretnej wersji z naszym pakietem Windows
-musi zostać potwierdzona. Python 3.12 pozostaje kandydatem, nie powodem do
-usuwania lub podmieniania istniejącego interpretera.
-
-## 2. Kopia repozytorium
-
-Jeśli projekt nie został jeszcze pobrany, w wybranym katalogu roboczym:
+Jeśli kopia istnieje, otwórz jej katalog w VS Code i użyj terminala w tym katalogu.
+Nazwa lokalnego folderu jest niezależna od nazwy repozytorium na GitHubie.
+W istniejącej kopii zaktualizuj adres zdalny po zmianie nazwy:
 
 ```powershell
-git clone https://github.com/analityk/quados_nec2-.git
-Set-Location quados_nec2-
+git remote set-url origin https://github.com/analityk/antenna_solver_gpt.git
 ```
 
-Jeśli już istnieje, otwórz jego katalog w VS Code. Kolejne polecenia wykonuj
-w katalogu repozytorium, po ustaleniu właściwego interpretera.
+## 3. Co oznacza .venv
 
-## 3. Oddzielne środowisko
+`.venv` jest katalogiem z osobnym środowiskiem Pythona dla tego projektu.
+Powstaje na bazie zainstalowanego Pythona i ma własny zestaw pakietów.
+Instalacja bibliotek w tym środowisku nie zmienia globalnej listy pakietów
+użytkownika. W Windows interpreter środowiska znajduje się pod
+`.venv\Scripts\python.exe`, a biblioteki w `.venv\Lib\site-packages`.
+
+Środowisko jest lokalne i pomijane przez Git. Nie umieszczaj w nim kodu projektu.
+Gdy zmieni się ścieżka lokalnego folderu projektu, środowisko należy odtworzyć
+w nowym miejscu. Sama zmiana nazwy repozytorium na GitHubie go nie przenosi.
+
+## 4. Utworzenie środowiska i instalacja modułów
+
+W katalogu projektu:
 
 ```powershell
-py -m venv .venv
+py -3.14 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install --upgrade pip
-.\.venv\Scripts\python.exe -m pip install numpy matplotlib pillow pytest jsonschema
+.\.venv\Scripts\python.exe -m pip install numpy h5py matplotlib
+.\.venv\Scripts\python.exe -m pip install --no-index --find-links "C:\dev\openems\openEMS\python" openEMS
 ```
 
-Polecenia korzystają bezpośrednio z interpretera `.venv`; aktywacja skryptem
-PowerShell nie jest potrzebna. W VS Code wybierz `Python: Select Interpreter`
-i wskaż `.venv\Scripts\python.exe`.
+Ostatnie polecenie instaluje openEMS i CSXCAD z tej samej paczki co biblioteki
+DLL. `pip` wybiera właściwe moduły dla interpretera. Zależności instalujemy
+wcześniej, ponieważ `--no-index` ogranicza ostatni krok do plików lokalnych.
+Polecenia z pełną ścieżką do `python.exe` działają bez aktywowania środowiska.
+W VS Code wybierz `Python: Select Interpreter` → `.venv\Scripts\python.exe`.
 
-To przygotowanie bibliotek pomocniczych, bez solvera. Zestaw wersji nie jest
-jeszcze zamrożony; plik zależności projektu powstanie wraz z implementacją.
-Pillow obecne w globalnej instalacji nie jest automatycznie obecne w `.venv`.
-Nie trzeba kopiować pozostałych globalnych pakietów do tego projektu.
+To zestaw do uruchomienia silnika. Pełny plik zależności aplikacji i przypięte
+wersje powstaną przy implementacji. Nie kopiujemy globalnego `pip list`.
 
-## 4. Natywny solver — zadanie integracyjne
+## 5. Lokalizacja bibliotek DLL
 
-PyNEC 2.3.4 ma gotowe pakiety dla Linuxa i macOS ARM64, ale wydanie sprawdzone
-2026-09-28 nie ma wheel Windows. Metadane mówią o Pythonie >= 3.11.
-Obecny `setup.py` upstream ma flagi GCC `-fPIC` i `-lstdc++`; jego obecność
-w źródłach nie stanowi potwierdzenia kompilacji przez MSVC.
+```powershell
+$env:CSXCAD_INSTALL_PATH = "C:\dev\openems\openEMS"
+setx CSXCAD_INSTALL_PATH "C:\dev\openems\openEMS"
+```
 
-Do samodzielnego budowania natywnego kodu przewidujemy Microsoft C++ Build
-Tools z MSVC i Windows SDK, a zależnie od ścieżki również CMake oraz SWIG.
-Nie jest to jeszcze sprawdzona recepta instalacji PyNEC. Celem integracji M2
-jest dostarczenie powtarzalnej ścieżki instalacji dla ustalonego Pythona.
-Gotowy pakiet binarny powinien ograniczyć wymagania narzędziowe użytkownika.
+Pierwsze polecenie ustawia zmienną w bieżącym terminalu. Drugie zapisuje ją
+dla przyszłych sesji użytkownika. Uruchom ponownie VS Code, aby nowe procesy
+uruchamiane z edytora odziedziczyły zapisane ustawienie.
+Ścieżka ma wskazywać katalog z `CSXCAD.dll`, a nie jego podkatalog `python`.
 
-Potwierdzenie samego importu nie kończy M2: po nim potrzebny jest przypadek
-kontrolny solvera. Nie prowadzimy benchmarków.
+## 6. Sprawdzenie importu
+
+```powershell
+.\.venv\Scripts\python.exe -c "import openEMS, CSXCAD; print('openEMS:', openEMS.__version__); print('CSXCAD: OK')"
+```
+
+Oczekiwany wynik to wersja openEMS i `CSXCAD: OK`. Wynik tego polecenia
+na komputerze użytkownika nie został jeszcze otrzymany. Potwierdzenie importu
+nie jest potwierdzeniem poprawności modelu anteny; kontrola fizyczna należy do M2.
+Nie wykonujemy benchmarków.
 
 ## Źródła
 
-- [Python venv](https://docs.python.org/3/library/venv.html)
-- [PyNEC 2.3.4 — pliki i metadane](https://pypi.org/project/PyNEC/2.3.4/)
-- [Upstream setup.py](https://github.com/tmolteno/python-necpp/blob/master/PyNEC/setup.py),
-  sprawdzony blob `e6b489c0c467fb6d5fe16054eabe9c822a2831c3`.
-- [Upstream pyproject.toml](https://github.com/tmolteno/python-necpp/blob/master/PyNEC/pyproject.toml),
-  sprawdzony blob `841e02ee1fd32fdef6e04c1ef060dfad2bb60856`.
+- [Python 3.14 — venv](https://docs.python.org/3.14/library/venv.html)
+- [openEMS 0.37.0-rc3 — wydanie Windows](https://github.com/thliebig/openEMS-Project/releases/tag/v0.37.0-rc3)
+- [Instrukcja Python dołączona do tego wydania](https://github.com/thliebig/openEMS-Project/blob/v0.37.0-rc3/.github/windows-package/python/README.txt),
+  sprawdzony blob `1a60d93b2a61d182f66f7d7a50b3f7227cec6031`.

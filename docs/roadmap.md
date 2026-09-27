@@ -1,9 +1,12 @@
 # Kolejność implementacji
 
+Najbliższa praca przygotowawcza: migracja szczegółowych kontraktów M0 z NEC
+na openEMS zgodnie z `goal.md`. Nie implementować wycofanych założeń NEC.
+
 1. **M1 — model geometryczny.** Typy rdzenia, odczyt konfiguracji, generator
    Quadosa, eksport geometrii i podgląd. Sprawdzenie długości, portu, symetrii
    i połączeń. Bez wyników elektromagnetycznych na tym etapie.
-2. **M2 — pierwsze obliczenia.** Adapter NEC2++, kontrolny dipol, port,
+2. **M2 — pierwsze obliczenia.** Adapter openEMS, kontrolny dipol, port,
    dyskretyzacja, prądy, impedancja i charakterystyka. Sprawdzenie zbieżności
    Quadosa i jawne oznaczenie niepewności rekonstrukcji.
 3. **M3 — pola i dokumentacja wyniku.** Kompleksowe E/H, maski, stałe skale
@@ -15,4 +18,3 @@ Kolejne anteny, pełniejszy reflektor i balun są rozszerzeniami po osiągnięci
 użytecznej wersji dla Quadosa. Decyzje o frameworku GUI, instalacji na systemie
 użytkownika i dystrybucji solvera podejmujemy w odpowiednim etapie, bez
 dodawania zależności na zapas. Nie wykonujemy benchmarków.
-

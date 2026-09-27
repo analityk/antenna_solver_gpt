@@ -34,31 +34,28 @@ API z funkcjami zwracającymi atrapy danych.
 
 ## Pierwszy adapter
 
-NEC2++ / PyNEC jest bazą pierwszego modelu drutowego. Wersja zależności ma być
-przypięta podczas uruchomienia adaptera; działanie konkretnego builda musi
-zostać potwierdzone. Istniejący eksperyment używał PyNEC 2.3.4, ale nie stanowi
-to testu integracji z tym nowym projektem. FR w tym wrapperze przyjmuje MHz;
-na zewnątrz adaptera zawsze używamy Hz i sprawdzamy częstotliwość w wyniku.
+Pierwszym i obecnie jedynym wybranym solverem jest openEMS. NEC2++ / PyNEC
+nie będzie implementowany. Biblioteki openEMS i CSXCAD pozostają w adapterze;
+rdzeń oraz generatory anten nie zależą bezpośrednio od ich API.
 
-openEMS jest możliwym przyszłym adapterem dla pełniejszej geometrii i
-dielektryków, bez zobowiązania do jego implementacji w pierwszej wersji.
-Nie zakładamy, że wyniki dwóch metod są równoważne bez porównania modeli.
+Przed implementacją trzeba przenieść wcześniejsze kontrakty M0 na model
+openEMS: geometrię materiałów, siatkę FDTD, port, granice obszaru, odczyt
+prądów i pól oraz odtwarzalne pliki wejściowe. Lista nieaktywnych kontraktów
+NEC jest w `goal.md`. Samo zastąpienie nazwy biblioteki nie kończy tej migracji.
 
 ## Lokalna praca i zasoby
 
 Docelowe obliczenia mają działać na komputerze użytkownika. Zgłoszona
 konfiguracja: Ryzen 7 7800X3D, 32 GB RAM, GeForce GTX 1660 Ti 6 GB.
 System docelowy: natywny Windows 11. Użytkownik posiada Git, Python i VS Code.
-Stosujemy PowerShell oraz projektowe `.venv` z pip. Dokładna wersja Pythona
-i jego architektura wymagają potwierdzenia; nie przenosimy do projektu całej
-listy pakietów z globalnego środowiska użytkownika. WSL i uv nie są wymagane.
+Stosujemy PowerShell oraz projektowe `.venv` z pip. Użytkownik potwierdził
+CPython 3.14.0, 64-bit AMD64. Nie przenosimy do projektu całej listy pakietów
+z globalnego środowiska użytkownika. WSL i uv nie są wymagane.
 
-Instalacja adaptera na Windowsie jest otwartym zadaniem M2. Wydanie PyNEC
-2.3.4 na PyPI nie udostępnia wheel dla Windowsa. Sprawdzony upstream
-`PyNEC/setup.py` zawiera flagi `-fPIC` i `-lstdc++`, więc sama obecność MSVC
-nie dowodzi, że standardowa kompilacja pakietu się powiedzie. Sposób budowania
-i dystrybucji trzeba potwierdzić na Windowsie i przypiąć do wersji kodu.
-Instrukcja podstawowego środowiska: [Windows 11](windows-setup.md).
+Instrukcja instalacji korzysta z oficjalnej paczki openEMS 0.37.0-rc3 MSVC
+z modułami cp314 dla Windows x64. To wydanie RC. Podana lokalizacja paczki:
+`C:\dev\openems\openEMS`. Import i działanie adaptera na komputerze użytkownika
+wymagają jeszcze potwierdzenia. Instrukcja: [Windows 11](windows-setup.md).
 
 Pierwszy adapter używa CPU. Obsługa GPU i dobór optymalnej liczby procesów
 są poza bieżącym zakresem. Przyszłe serie obliczeń powinny mieć ograniczenie

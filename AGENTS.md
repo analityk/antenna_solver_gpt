@@ -1,4 +1,4 @@
-# Instrukcje pracy nad Antenna Lab
+# Instrukcje pracy nad antenna_solver_gpt
 
 ## Cel i stan pracy
 
@@ -9,9 +9,16 @@ dodania innych anten bez zmiany zasad działania rdzenia.
 
 Platforma docelowa użytkownika: natywny Windows 11. Instrukcje uruchamiania
 mają używać PowerShella i środowiska `.venv`. Git, Python i VS Code są już
-zainstalowane; dokładna wersja i architektura interpretera wymagają ustalenia.
+zainstalowane. Użytkownik potwierdził CPython 3.14.0, 64-bit AMD64.
+Wybrany solver to openEMS. Lokalizacja paczki podana przez użytkownika:
+`C:\dev\openems\openEMS`. Instrukcja instalacji: `docs/windows-setup.md`.
 Nie wymagaj WSL, zmiany systemu ani uv. Obsługę solvera na Windowsie trzeba
 potwierdzić osobno; nie utożsamiaj działającego pakietu Linux z wersją Windows.
+
+NEC2++ / PyNEC nie jest częścią planowanej implementacji. Wcześniejsze kontrakty
+M0 związane z NEC są wycofanym szkicem, wymagającym migracji opisanej w `goal.md`.
+Nie implementuj ich jako aktualnych wymagań. Potwierdzenie ścieżki i wersji
+Pythona nie jest potwierdzeniem poprawnego importu openEMS na komputerze użytkownika.
 
 Repozytorium na etapie M0 zawiera wymagania, strukturę i kontrakty danych.
 Nie przedstawiaj szkieletu jako działającego symulatora ani pustych katalogów
@@ -19,7 +26,7 @@ jako zaimplementowanych modułów. Stan każdego etapu jest w `goal.md`.
 
 ## Zasady architektury
 
-- `core` nie zna Quadosa, PyNEC ani interfejsu graficznego.
+- `core` nie zna Quadosa, API openEMS ani interfejsu graficznego.
 - Modele anten generują geometrię i porty; nie uruchamiają solvera.
 - Adapter solvera przelicza jednostki i konwencje we własnej granicy.
 - Parametry nie są zaszyte w kodzie. Każdy wynik zawiera ich rozwiązaną kopię.
