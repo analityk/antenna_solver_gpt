@@ -48,14 +48,15 @@ NEC jest w `goal.md`. Samo zastąpienie nazwy biblioteki nie kończy tej migracj
 Docelowe obliczenia mają działać na komputerze użytkownika. Zgłoszona
 konfiguracja: Ryzen 7 7800X3D, 32 GB RAM, GeForce GTX 1660 Ti 6 GB.
 System docelowy: natywny Windows 11. Użytkownik posiada Git, Python i VS Code.
-Stosujemy PowerShell oraz projektowe `.venv` z pip. Użytkownik potwierdził
+Stosujemy CMD lub PowerShell oraz projektowe `.venv` z pip. Użytkownik potwierdził
 CPython 3.14.0, 64-bit AMD64. Nie przenosimy do projektu całej listy pakietów
 z globalnego środowiska użytkownika. WSL i uv nie są wymagane.
 
 Instrukcja instalacji korzysta z oficjalnej paczki openEMS 0.37.0-rc3 MSVC
 z modułami cp314 dla Windows x64. To wydanie RC. Podana lokalizacja paczki:
-`C:\dev\openems\openEMS`. Import i działanie adaptera na komputerze użytkownika
-wymagają jeszcze potwierdzenia. Instrukcja: [Windows 11](windows-setup.md).
+`C:\dev\openems\openEMS`. Użytkownik potwierdził import openEMS 0.37.0rc3
+i CSXCAD w CMD dnia 2026-09-28. Adapter i obliczeniowy przypadek kontrolny
+pozostają do implementacji oraz sprawdzenia. Instrukcja: [Windows 11](windows-setup.md).
 
 Pierwszy adapter używa CPU. Obsługa GPU i dobór optymalnej liczby procesów
 są poza bieżącym zakresem. Przyszłe serie obliczeń powinny mieć ograniczenie

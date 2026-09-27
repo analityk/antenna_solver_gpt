@@ -95,6 +95,30 @@ dokumentację venv i zgodność zapisanych ścieżek oraz odsyłaczy. Nie wykony
 benchmarków ani testów na komputerze użytkownika. Import openEMS nie został
 jeszcze potwierdzony. Repozytorium pozostaje na etapie specyfikacji.
 
+## 2026-09-28 — potwierdzony import openEMS na Windowsie użytkownika
+
+**Powód:** użytkownik przesłał log udanej instalacji pakietów i wynik importu
+z lokalnego CMD w projektowym `.venv`.
+
+**Zmiana:** zapisano działający import openEMS 0.37.0rc3 i CSXCAD oraz wersje
+pakietów z logu instalacji. Uzupełniono instrukcję Windows o składnię CMD,
+aktualny katalog repozytorium i wyjaśnienie podfolderu tworzonego przez klonowanie.
+Zaktualizowano stan instalacji w instrukcjach, wymaganiach i architekturze.
+
+**Sprawdzenie:** użytkownik wykonał `import openEMS, CSXCAD` i otrzymał
+`openEMS: 0.37.0rc3` oraz `CSXCAD: OK`. Polecenie działało z interpretera
+`.venv` w `C:\dev\antenna_solver_gpt\antenna_solver_gpt`.
+Źródłem potwierdzenia jest log użytkownika, nie wykonanie na innym komputerze.
+Sprawdzono spójność aktualizacji dokumentacji.
+
+**Wpływ na fizykę i wyniki:** brak zmian modelu oraz danych symulacyjnych.
+Potwierdzono instalację i ładowanie modułów; nie uruchomiono przypadku
+obliczeniowego, symulacji Quadosa ani benchmarków. Etap M2 pozostaje otwarty.
+
+**Wpływ na odtwarzalność:** udokumentowano konkretne wersje środowiska;
+formaty wyników i konfiguracje anten nie zmieniły się. Pełny plik zależności
+aplikacji powstanie przy jej implementacji.
+
 ## Wzór kolejnego wpisu
 
 - Data i krótka nazwa zmiany.

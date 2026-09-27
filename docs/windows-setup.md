@@ -2,7 +2,9 @@
 
 Projekt: `antenna_solver_gpt`. Stan: M0, przed implementacją modelu i adaptera.
 Użytkownik ma Git, VS Code oraz CPython 3.14.0, 64-bit AMD64.
-Poniższe polecenia są przeznaczone dla PowerShella.
+Instalację i import potwierdzono w CMD dnia 2026-09-28 na podstawie logu
+przesłanego przez użytkownika. Polecenia Pythona i Git działają także
+w PowerShellu; różnice składni powłok oznaczono poniżej.
 
 ## 1. Paczka openEMS
 
@@ -14,20 +16,30 @@ oraz podkatalog `python` z plikami `.whl`.
 
 ## 2. Folder projektu
 
-Jeśli lokalna kopia jeszcze nie istnieje, w wybranym katalogu roboczym:
+Jeśli lokalna kopia jeszcze nie istnieje, w wybranym katalogu nadrzędnym:
 
 ```powershell
 git clone https://github.com/analityk/antenna_solver_gpt.git
-Set-Location antenna_solver_gpt
+cd antenna_solver_gpt
+```
+
+`git clone` tworzy nowy podfolder; po pobraniu trzeba do niego wejść.
+Potwierdzona lokalna kopia użytkownika znajduje się w
+`C:\dev\antenna_solver_gpt\antenna_solver_gpt`. W CMD przechodzi się do niej tak:
+
+```bat
+cd /d C:\dev\antenna_solver_gpt\antenna_solver_gpt
 ```
 
 Jeśli kopia istnieje, otwórz jej katalog w VS Code i użyj terminala w tym katalogu.
 Nazwa lokalnego folderu jest niezależna od nazwy repozytorium na GitHubie.
-W istniejącej kopii zaktualizuj adres zdalny po zmianie nazwy:
+W kopii pobranej ze starego adresu zaktualizuj adres zdalny po zmianie nazwy:
 
 ```powershell
 git remote set-url origin https://github.com/analityk/antenna_solver_gpt.git
 ```
+
+Klonowanie z aktualnego adresu już ustawia właściwy `origin`.
 
 ## 3. Co oznacza .venv
 
@@ -63,6 +75,15 @@ wersje powstaną przy implementacji. Nie kopiujemy globalnego `pip list`.
 
 ## 5. Lokalizacja bibliotek DLL
 
+W CMD:
+
+```bat
+set "CSXCAD_INSTALL_PATH=C:\dev\openems\openEMS"
+setx CSXCAD_INSTALL_PATH "C:\dev\openems\openEMS"
+```
+
+Albo w PowerShellu:
+
 ```powershell
 $env:CSXCAD_INSTALL_PATH = "C:\dev\openems\openEMS"
 setx CSXCAD_INSTALL_PATH "C:\dev\openems\openEMS"
@@ -79,10 +100,35 @@ uruchamiane z edytora odziedziczyły zapisane ustawienie.
 .\.venv\Scripts\python.exe -c "import openEMS, CSXCAD; print('openEMS:', openEMS.__version__); print('CSXCAD: OK')"
 ```
 
-Oczekiwany wynik to wersja openEMS i `CSXCAD: OK`. Wynik tego polecenia
-na komputerze użytkownika nie został jeszcze otrzymany. Potwierdzenie importu
-nie jest potwierdzeniem poprawności modelu anteny; kontrola fizyczna należy do M2.
+Użytkownik otrzymał w CMD 2026-09-28:
+
+```text
+openEMS: 0.37.0rc3
+CSXCAD: OK
+```
+
+Potwierdza to import modułów wraz z wymaganymi przy imporcie bibliotekami
+natywnymi w projektowym `.venv`. Nie wykonano jeszcze obliczeniowego przypadku
+kontrolnego ani symulacji Quadosa. Kontrola fizyczna należy do M2.
 Nie wykonujemy benchmarków.
+
+## Potwierdzone środowisko
+
+Wersje z logu instalacji i wyniku importu przesłanych przez użytkownika:
+
+| Składnik | Wersja |
+| --- | --- |
+| CPython | 3.14.0, 64-bit AMD64 |
+| openEMS | 0.37.0rc3 |
+| CSXCAD | 0.7.0rc3 |
+| pip | 26.2.1 |
+| NumPy | 2.5.3 |
+| h5py | 3.16.0 |
+| Matplotlib | 3.11.2 |
+
+To zapis zaobserwowanej konfiguracji, a nie pełny plik z zamrożonymi
+zależnościami aplikacji. Instalacja binarna openEMS znajduje się poza repozytorium;
+moduły Pythona zainstalowano w `.venv` lokalnej kopii projektu.
 
 ## Źródła
 

@@ -8,17 +8,19 @@ Bieżący cel: parametryczna symulacja Quadosa 8 przy 1420 MHz, z możliwością
 dodania innych anten bez zmiany zasad działania rdzenia.
 
 Platforma docelowa użytkownika: natywny Windows 11. Instrukcje uruchamiania
-mają używać PowerShella i środowiska `.venv`. Git, Python i VS Code są już
-zainstalowane. Użytkownik potwierdził CPython 3.14.0, 64-bit AMD64.
+mają używać środowiska `.venv` i składni aktualnej powłoki użytkownika.
+Instalacja i import zostały potwierdzone w CMD; PowerShell również jest dostępny.
+Git, Python i VS Code są już zainstalowane. Interpreter: CPython 3.14.0, 64-bit AMD64.
 Wybrany solver to openEMS. Lokalizacja paczki podana przez użytkownika:
 `C:\dev\openems\openEMS`. Instrukcja instalacji: `docs/windows-setup.md`.
-Nie wymagaj WSL, zmiany systemu ani uv. Obsługę solvera na Windowsie trzeba
-potwierdzić osobno; nie utożsamiaj działającego pakietu Linux z wersją Windows.
+Nie wymagaj WSL, zmiany systemu ani uv. Użytkownik potwierdził import
+openEMS 0.37.0rc3 i CSXCAD na Windowsie 2026-09-28. Pełny przypadek obliczeniowy
+pozostaje do sprawdzenia; sam import nie kończy integracji M2.
 
 NEC2++ / PyNEC nie jest częścią planowanej implementacji. Wcześniejsze kontrakty
 M0 związane z NEC są wycofanym szkicem, wymagającym migracji opisanej w `goal.md`.
-Nie implementuj ich jako aktualnych wymagań. Potwierdzenie ścieżki i wersji
-Pythona nie jest potwierdzeniem poprawnego importu openEMS na komputerze użytkownika.
+Nie implementuj ich jako aktualnych wymagań. Potwierdzone środowisko i zakres
+sprawdzenia zapisano w `docs/windows-setup.md` oraz `history.md`.
 
 Repozytorium na etapie M0 zawiera wymagania, strukturę i kontrakty danych.
 Nie przedstawiaj szkieletu jako działającego symulatora ani pustych katalogów

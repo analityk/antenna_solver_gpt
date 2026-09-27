@@ -35,7 +35,7 @@ jej automatycznie na dokładną częstotliwość spoczynkową linii wodoru.
 
 Program ma działać lokalnie i natywnie na Windows 11. Użytkownik posiada Git,
 Python i VS Code; potwierdzony interpreter to CPython 3.14.0, 64-bit AMD64.
-Podstawowa ścieżka instalacji: PowerShell, `venv` i `python -m pip`.
+Ścieżka instalacji: CMD lub PowerShell, `venv` i `python -m pip`.
 WSL, Linux i uv nie mogą być warunkiem korzystania z programu.
 Instrukcja przygotowania: `docs/windows-setup.md`.
 
@@ -43,7 +43,9 @@ Warunkiem odbioru integracji solvera M2 jest działający import lub uruchomieni
 solvera oraz przypadek kontrolny na natywnym Windowsie. Zbudowanie lub test
 na Linuxie nie zalicza tego wymagania. Ścieżka instalacji używa gotowej paczki
 openEMS dla Windows i zgodnych z nią modułów Pythona. Lokalizacja użytkownika:
-`C:\dev\openems\openEMS`. Import nie został jeszcze potwierdzony.
+`C:\dev\openems\openEMS`. Użytkownik potwierdził poprawny import openEMS
+0.37.0rc3 i CSXCAD w projektowym `.venv` dnia 2026-09-28.
+Obliczeniowy przypadek kontrolny i integracja modelu pozostają do wykonania.
 
 ## Zakres pierwszej wersji symulatora
 
