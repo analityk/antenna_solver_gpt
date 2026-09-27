@@ -48,7 +48,17 @@ Nie zakładamy, że wyniki dwóch metod są równoważne bez porównania modeli.
 
 Docelowe obliczenia mają działać na komputerze użytkownika. Zgłoszona
 konfiguracja: Ryzen 7 7800X3D, 32 GB RAM, GeForce GTX 1660 Ti 6 GB.
-System operacyjny nie został ustalony; dokumentacja nie zakłada Windows ani Linux.
+System docelowy: natywny Windows 11. Użytkownik posiada Git, Python i VS Code.
+Stosujemy PowerShell oraz projektowe `.venv` z pip. Dokładna wersja Pythona
+i jego architektura wymagają potwierdzenia; nie przenosimy do projektu całej
+listy pakietów z globalnego środowiska użytkownika. WSL i uv nie są wymagane.
+
+Instalacja adaptera na Windowsie jest otwartym zadaniem M2. Wydanie PyNEC
+2.3.4 na PyPI nie udostępnia wheel dla Windowsa. Sprawdzony upstream
+`PyNEC/setup.py` zawiera flagi `-fPIC` i `-lstdc++`, więc sama obecność MSVC
+nie dowodzi, że standardowa kompilacja pakietu się powiedzie. Sposób budowania
+i dystrybucji trzeba potwierdzić na Windowsie i przypiąć do wersji kodu.
+Instrukcja podstawowego środowiska: [Windows 11](windows-setup.md).
 
 Pierwszy adapter używa CPU. Obsługa GPU i dobór optymalnej liczby procesów
 są poza bieżącym zakresem. Przyszłe serie obliczeń powinny mieć ograniczenie
@@ -61,4 +71,3 @@ Git przechowuje kod, wymagania, konfiguracje i schematy. Duże outcomes są
 lokalnymi artefaktami przebiegów. Każdy przebieg ma manifest ze skrótami plików,
 wersją solvera i rewizją kodu. Zmiana schematu nie może po cichu zmieniać
 interpretacji już zapisanych pól, osi lub fazy.
-

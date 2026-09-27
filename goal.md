@@ -1,6 +1,6 @@
 # Cel projektu
 
-Wersja wymagań: 0.1. Data: 2026-09-28, Europe/Warsaw.
+Wersja wymagań: 0.2. Data: 2026-09-28, Europe/Warsaw.
 
 ## Cel użytkownika
 
@@ -11,6 +11,19 @@ i charakterystykę anteny. Kolejne anteny korzystają ze wspólnego rdzenia.
 
 Dokładnie 1420 MHz jest częstotliwością aktualnego wymagania. Nie podmieniaj
 jej automatycznie na dokładną częstotliwość spoczynkową linii wodoru.
+
+## Platforma docelowa
+
+Program ma działać lokalnie i natywnie na Windows 11. Użytkownik posiada Git,
+Python i VS Code; wersja oraz architektura interpretera nie są jeszcze znane.
+Podstawowa ścieżka instalacji: PowerShell, `venv` i `python -m pip`.
+WSL, Linux i uv nie mogą być warunkiem korzystania z programu.
+Instrukcja przygotowania: `docs/windows-setup.md`.
+
+Warunkiem odbioru integracji solvera M2 jest działający import lub uruchomienie
+solvera oraz przypadek kontrolny na natywnym Windowsie. Zbudowanie lub test
+na Linuxie nie zalicza tego wymagania. Pierwsza ścieżka do sprawdzenia to
+PyNEC; ewentualny inny sposób wywołania NEC2++ musi zachować kontrakt wyników.
 
 ## Zakres pierwszej wersji symulatora
 

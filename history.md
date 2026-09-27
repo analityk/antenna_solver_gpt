@@ -46,6 +46,27 @@ komputera użytkownika pozostają informacją projektową, bez prognoz czasów
 i bez obietnicy użycia wszystkich rdzeni lub GPU przez pojedyncze obliczenie.
 Kontrola poprawności fizycznej przyszłych wyników nadal jest wymagana.
 
+## 2026-09-28 — platforma docelowa: natywny Windows 11
+
+**Powód:** użytkownik potwierdził Windows 11 oraz istniejące instalacje Git,
+Pythona i VS Code. Zmiana systemu nie jest rozwiązaniem dla tego projektu.
+
+**Zmiana:** wymaganie zapisano w AGENTS.md, goal.md 0.2 i architekturze.
+Dodano instrukcję podstawowego środowiska w PowerShellu z venv i pip.
+Dokładna wersja i architektura Pythona pozostają do odczytania u użytkownika.
+
+**Wpływ na fizykę i dane:** brak zmiany modelu, wymiarów i formatów outcomes.
+Zmienia się wymaganie instalacyjne i kryterium odbioru adaptera solvera.
+
+**Wpływ na integrację:** potwierdzono brak wheel Windows w wydaniu PyNEC
+2.3.4 na PyPI. Upstream setup.py ma ustawienia GCC; wymagane jest opracowanie
+i sprawdzenie natywnego pakietu lub innego adaptera NEC2++ dla Windowsa.
+Nie deklarujemy, że samo pip install albo doinstalowanie MSVC zamyka temat.
+
+**Sprawdzenie:** przejrzano metadane wydania, setup.py, pyproject.toml i build.sh
+upstream oraz dokumentację venv. Nie wykonano kompilacji lub testu na Windowsie.
+Przygotowanie zwykłych bibliotek Python nie oznacza gotowego środowiska solvera.
+
 ## Wzór kolejnego wpisu
 
 - Data i krótka nazwa zmiany.

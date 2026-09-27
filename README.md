@@ -33,6 +33,7 @@ W tym repozytorium nie ma jeszcze wyników symulacji Quadosa.
 - [Konstrukcja geometrii Quadosa](docs/quados8-geometry.md)
 - [Kontrakt plików wynikowych](outcomes/README.md)
 - [Kolejność implementacji](docs/roadmap.md)
+- [Przygotowanie środowiska Windows 11](docs/windows-setup.md)
 - [Źródła i pochodzenie danych](docs/sources.md)
 
 Konfiguracja `parameters/quados8_1420mhz.json` zawiera jawne, przeskalowane

@@ -7,6 +7,12 @@ Najpierw przeczytaj `goal.md`, `history.md` i `docs/architecture.md`.
 Bieżący cel: parametryczna symulacja Quadosa 8 przy 1420 MHz, z możliwością
 dodania innych anten bez zmiany zasad działania rdzenia.
 
+Platforma docelowa użytkownika: natywny Windows 11. Instrukcje uruchamiania
+mają używać PowerShella i środowiska `.venv`. Git, Python i VS Code są już
+zainstalowane; dokładna wersja i architektura interpretera wymagają ustalenia.
+Nie wymagaj WSL, zmiany systemu ani uv. Obsługę solvera na Windowsie trzeba
+potwierdzić osobno; nie utożsamiaj działającego pakietu Linux z wersją Windows.
+
 Repozytorium na etapie M0 zawiera wymagania, strukturę i kontrakty danych.
 Nie przedstawiaj szkieletu jako działającego symulatora ani pustych katalogów
 jako zaimplementowanych modułów. Stan każdego etapu jest w `goal.md`.
@@ -58,4 +64,3 @@ Instrukcje użytkownika mają pierwszeństwo. Dokumentacja dla użytkownika jest
 po polsku, nazwy w kodzie po angielsku. Zachowuj istniejące zmiany użytkownika.
 Nie twórz autonomicznie nowych agentów ani rozbudowanych procesów pracy.
 W katalogach z własnym `AGENTS.md` obowiązują również instrukcje lokalne.
-
