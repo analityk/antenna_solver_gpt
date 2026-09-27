@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "model": "quados8",
+  "author": "Dragoslav Dobricic, YU1AW",
+  "source_kind": "user_supplied_dimension_drawing",
+  "source_image_sha256": "c84f40bcc8ef0f75ecfaf04f340219e44654b82950c097e1c4757742daa4d23a",
+  "related_article_url": "https://www.qsl.net/yu1aw/ANT_VHF/quados.pdf",
+  "source_band_description": "2.4 GHz WLAN",
+  "verified_optimization_frequency_hz": null,
+  "dimensions_mm": {
+    "A": 19.7,
+    "B": 40.2,
+    "C": 41.3,
+    "D": 44.3,
+    "E": 37.5,
+    "F": 41.6,
+    "G": 11.4,
+    "H": 13.7,
+    "wire_diameter": 2.0,
+    "reflector_length": 720.0,
+    "reflector_width": 73.0,
+    "reflector_thickness": 1.5
+  },
+  "definitions": {
+    "G": "wire-axis to wire-axis spacing",
+    "H": "radiator wire-axis to front reflector surface"
+  },
+  "wire_branches": 4,
+  "branch_length_mm": 449.6,
+  "note": "The article contains several Quados variants; this dimension set is from the supplied Quados 8 drawing."
+}

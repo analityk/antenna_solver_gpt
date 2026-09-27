@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Quados 8 parameters v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "sections",
+    "dimensions_m"
+  ],
+  "properties": {
+    "sections": {
+      "const": 8
+    },
+    "dimensions_m": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        "F",
+        "G",
+        "H",
+        "wire_diameter",
+        "reflector_length",
+        "reflector_width",
+        "reflector_thickness"
+      ],
+      "properties": {
+        "A": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "B": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "C": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "D": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "E": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "F": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "G": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "H": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "wire_diameter": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "reflector_length": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "reflector_width": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "reflector_thickness": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    }
+  },
+  "$comment": "Also validate G > diameter, H > radius, F > G/2 + E/sqrt(2), connections and intersections geometrically."
+}
