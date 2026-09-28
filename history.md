@@ -458,6 +458,24 @@ bilans powierzchni, nie powtarza całkowania HDF5. Nie ma map E/H ani animacji.
 Progi zbieżności i definicja pomiaru portu nadal wymagają osobnej pracy.
 Wcześniejsze symulacje nie wymagają ponownego przeliczenia do użycia raportu.
 
+## 2026-09-28 — wczytywanie parametrów w edytorze
+
+**Powód i zakres:** użytkownik poprosił wyłącznie o otwieranie zapisanych
+parametrów z widoku anteny. Dodano przycisk „Wczytaj parametry…” obok zapisu.
+Poprawny JSON aktualizuje pola, podgląd i ścieżkę; staje się też bazą przycisku
+„Przywróć początkowe”. Anulowanie lub błąd pliku zachowuje bieżącą edycję.
+Wczytywana jest cała konfiguracja, wraz z ustawieniami solvera.
+
+**Wpływ:** bez zmian solvera, siatki, formatów i danych wynikowych. Samo
+otwarcie pliku nie uruchamia obliczeń. Zaktualizowano opis przycisków.
+
+**Sprawdzenie:** kontrola odczytu poprawnego JSON, synchronizacji pól,
+zachowania ustawień solvera i bazy przywracania oraz anulowania i błędnego
+JSON przy niezastosowanych wpisach. Dwa dotychczasowe testy stanu edytora
+przechodzą; klasa testów natywnego Tk pominięta z powodu braku biblioteki.
+Kontrolę obsługi przycisku wykonano bez natywnego okna; Windows GUI nie
+uruchamiano w tym środowisku.
+
 ## Wzór kolejnego wpisu
 
 - Data i krótka nazwa zmiany.

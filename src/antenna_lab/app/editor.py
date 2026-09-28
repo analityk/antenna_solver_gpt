@@ -4,7 +4,7 @@ from copy import deepcopy
 from pathlib import Path
 
 from antenna_lab.antennas import build_model
-from antenna_lab.core.config import ConfigurationError, ROOT, modified_config, write_json
+from antenna_lab.core.config import ConfigurationError, ROOT, load_config, modified_config, write_json
 from antenna_lab.core.geometry import check_geometry
 from antenna_lab.visualization.plots import draw_geometry
 from .actions import export_geometry
@@ -134,8 +134,10 @@ class GeometryEditor:
         row += 1
         ttk.Separator(form).grid(row=row, column=0, columnspan=2, sticky="ew", pady=12)
         row += 1
+        self.load_button = ttk.Button(form, text="Wczytaj parametry…", command=self.load)
+        self.load_button.grid(row=row, column=0, sticky="ew", padx=(0, 5))
         self.save_button = ttk.Button(form, text="Zapisz parametry (.json)…", command=self.save)
-        self.save_button.grid(row=row, column=0, columnspan=2, sticky="ew")
+        self.save_button.grid(row=row, column=1, sticky="ew")
         row += 1
         ttk.Label(form, text="Plik ustawień do ponownej edycji\nlub uruchomienia obliczeń.",
                   foreground="#45566b").grid(row=row, column=0, columnspan=2, sticky="w", pady=(5, 0))
@@ -256,6 +258,27 @@ class GeometryEditor:
                 self._show_metrics()
             except (ValueError, OverflowError) as exc:
                 self._message(str(exc), error=True)
+
+    def load(self):
+        from tkinter import filedialog
+        path = filedialog.askopenfilename(title="Wczytaj parametry anteny — plik JSON",
+                                         initialdir=str(ROOT / "parameters"),
+                                         filetypes=[("Parametry JSON", "*.json")], parent=self.root)
+        if not path:
+            return
+        try:
+            # Validate the whole file and geometry before replacing any edits.
+            candidate = EditorState(load_config(path))
+        except (OSError, ValueError, OverflowError) as exc:
+            self._message(f"Nie wczytano parametrów: {exc}", error=True)
+            return
+        self.state = candidate
+        self._sync_fields()
+        self._draw()
+        self.artifact.set(str(Path(path).resolve()))
+        self.root.title(f"antenna_solver_gpt — Quados 8 — {Path(path).name}")
+        self._show_metrics()
+        self._message("Wczytano parametry z pliku. " + self.status.get())
 
     def save(self):
         from tkinter import filedialog

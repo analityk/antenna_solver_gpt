@@ -40,12 +40,14 @@ Kolory oznaczają odcinki A–F, nie rozkład prądu. Edytor nie uruchamia FDTD.
 
 | Przycisk | Co zapisuje | Do czego służy |
 | --- | --- | --- |
+| **Wczytaj parametry…** | Nic; odczytuje wybrany JSON | Zastępuje pola i podgląd zapisanym wariantem; błędny plik lub anulowanie zachowuje bieżącą edycję |
 | **Zapisz parametry (.json)…** | Jeden plik ustawień w wybranym miejscu | Ponowna edycja lub obliczenia tego wariantu przez opcję --config |
 | **Eksportuj geometrię** | Nowy folder z modelem, rysunkiem PNG, parametrami i dokumentacją przebiegu | Obejrzenie i zachowanie konkretnej konstrukcji; bez obliczeń openEMS |
 
-Oba przyciski najpierw zatwierdzają bieżące pola. Błędny lub niekompletny
+Zapis i eksport najpierw zatwierdzają bieżące pola. Błędny lub niekompletny
 wpis blokuje zapis; program nie zapisuje wówczas poprzedniego modelu jako nowego.
 Po sukcesie ścieżkę można skopiować z pola pod komunikatem.
+Po wczytaniu pliku **Przywróć początkowe** wraca do wczytanego wariantu.
 
 ## Polecenia
 
