@@ -182,6 +182,10 @@ def spectrum_frequencies(settings, mesh):
 
 def install_monitors(engine, csx, geometry, axes, mesh, config, run):
     layout = monitor_layout(geometry, axes, mesh, config["solver"]["power_diagnostics"])
+    if config["solver"]["power_diagnostics"].get("source_edge_work", False):
+        from .source_work import edge_probe_layout, install_edge_probes
+        layout["source_edge_work"] = edge_probe_layout(axes, layout["voltage_probes"])
+        install_edge_probes(csx, layout["source_edge_work"])
     for box in layout["boxes"][1:]:
         # Reuse the native surface recorder; do NOT transform the feed box to far field.
         engine.CreateNF2FFBox(name=box["name"], start=box["start_m"], stop=box["stop_m"],
@@ -246,6 +250,10 @@ def finish_diagnostics(config, run):
             delta = np.diff(axes[axis])
             ratios[axis] = float(np.max(np.maximum(delta[1:] / delta[:-1], delta[:-1] / delta[1:])))
     result["mesh_max_adjacent_cell_ratio"] = ratios
+    if "source_edge_work" in layout:
+        from .source_work import finish_edge_work
+        result["source_edge_work"] = finish_edge_work(
+            run.path, layout["source_edge_work"], frequencies, accepted, target, voltage, current, boxes)
     write_json(run.path / "power_balance.json", result)
     for item in boxes:
         print(f"Bilans {item['name']} @ {item['frequency_hz']/1e6:g} MHz: "
@@ -262,6 +270,12 @@ def pack_diagnostics(path):
              "openems/port_ut_1", "openems/port_it_1", "openems/et", "openems/ht"]
     paths = [root / name for name in names]
     paths.extend(sorted((root / "openems").glob("power_[ui]_*")))
+    import json
+    layout = json.loads((root / "power_monitor_layout.json").read_text(encoding="utf-8"))
+    if "source_edge_work" in layout:
+        paths.append(root / "source_work_spectra.npz")
+        paths.extend(root / "openems" / edge[kind]["name"]
+                     for edge in layout["source_edge_work"]["edges"] for kind in ("voltage", "current"))
     bundle = root / "power_diagnostics.zip"
     with zipfile.ZipFile(bundle, "x", zipfile.ZIP_DEFLATED) as archive:
         for path in paths:

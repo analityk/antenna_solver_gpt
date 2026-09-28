@@ -237,6 +237,47 @@ identyczność wszystkich linii siatki nowej konfiguracji z jego mesh.npz.
 Nie wykonano nowego FDTD ani benchmarków. Natywne dodatkowe monitory wymagają
 uruchomienia na Windowsie użytkownika; wyniki pozostają unverified.
 
+## 2026-09-28 — wyniki kontroli pasywnej i lokalna praca źródła
+
+**Powód:** użytkownik dostarczył `power_diagnostics.zip`; należy wyjaśnić
+rozbieżność mocy przed strojeniem geometrii i dalszymi raportami.
+
+**Ustalenia:** pasywna kontrola na Windowsie odtwarza pierwszą impedancję,
+zysk i stosunek Prad/Pacc do zapisanej precyzji. Wszystkie linie siatki są
+identyczne. Strumienie całej anteny wynoszą 0,878490162 i 0,878968878 względem
+1 W portu (różnica 0,0545%). Lokalny monitor przy źródle daje 0,840440439;
+przecina przewody i nie jest wzorcem mocy. Amplitudy 25 całek U różnią się
+do 16,8%, fazy do 10,8°. Port nie ma jednorodnego przekroju napięcia.
+Hipoteza błędu pojedynczego U·I jako miary mocy rozłożonego źródła jest
+uzasadniona, ale jej ilościowe potwierdzenie wymaga lokalnych iloczynów.
+
+**Zmiana:** osobna konfiguracja source_work i moduł solvers/source_work.py
+dodają 450 par pasywnych U/I, po jednej dla każdej krawędzi elektrycznej
+obszaru elementu zasilającego. Odczyt kontroluje rzeczywiste indeksy sond
+z nagłówków oraz odtworzenie dotychczasowych całek U/I przez sumy lokalne.
+Zapisuje podpisane wkłady pracy, ich sumę i różnice wobec strumieni powierzchni.
+
+**Wpływ na fizykę:** geometria, dyskretyzacja, źródło, impuls, PML i kryterium
+końca pozostają identyczne. Nie zmieniono normalizacji, impedancji ani zysku.
+Praca lokalna oznacza wkład netto do pola, po lokalnym pochłanianiu, nie moc
+generatora przed oporem zasilania. Skończony zapis jest nadal ograniczeniem.
+Znana wada przejść siatki i walidacja zbieżności pozostają otwarte.
+
+**Formaty i odtwarzalność:** kompatybilne rozszerzenie konfiguracji v2
+o source_edge_work, nowy source_work_spectra.npz i pola diagnostycznych JSON.
+Paczka ZIP obejmuje nowe surowe sondy i widma. Stare przebiegi i konfiguracje
+pozostają bez zmian. Cel projektu 0.6 zapisuje stan tej kontroli.
+
+**Sprawdzenie:** 23 testy przeszły; klasa GUI pominięta z powodu braku Tk.
+Nowe przypadki obejmują znaki i czynny wkład dla analitycznego pola, ujemną
+pracę, błędne składanie sond, przesunięty kontur oraz dokładnie 450 unikalnych
+krawędzi na niezmienionej siatce. Sprawdzono przypięte źródła openEMS dotyczące
+obiegów H, indeksów, przyciągania do siatki i rozkładu elementu skupionego.
+
+**Ograniczenia:** pierwszy zestaw monitorów jest potwierdzony natywnym wynikiem
+użytkownika; nowy zestaw lokalny nie był jeszcze wykonany w openEMS na Windowsie.
+Nie ogłaszamy naprawy ani zamknięcia bilansu. Nie wykonano benchmarków.
+
 ## Wzór kolejnego wpisu
 
 - Data i krótka nazwa zmiany.

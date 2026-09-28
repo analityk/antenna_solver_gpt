@@ -221,6 +221,7 @@
           "additionalProperties": false,
           "required": ["inner_box_fraction", "feed_margin_diameters", "port_spectrum_hz"],
           "properties": {
+            "source_edge_work": {"type": "boolean"},
             "inner_box_fraction": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1},
             "feed_margin_diameters": {"type": "number", "exclusiveMinimum": 0},
             "port_spectrum_hz": {

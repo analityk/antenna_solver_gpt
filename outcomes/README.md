@@ -37,6 +37,7 @@ pozostają w katalogu. Nie przedstawiamy ich jako ukończonego wyniku.
 | `power_monitor_layout.json` | prepare/run z diagnostyką: położenia pasywnych powierzchni i sond, bez zmian siatki |
 | `power_balance.json` | run z diagnostyką: strumienie przez każdą ścianę trzech powierzchni, niezależna kontrola Prad i nierównomierność siatki |
 | `port_probe_spectra.npz` | run z diagnostyką: zespolone widma dodatkowych U/I i położenia pomiaru; osie [częstotliwość, sonda] |
+| `source_work_spectra.npz` | opcjonalne source_edge_work: sparowane widma lokalnych U/I, indeksy krawędzi i podpisane wkłady pracy czynnej |
 | `impedance_dense.csv` | run z diagnostyką: gęsty odczyt portu, częstotliwość i odniesienie w kolumnach; bez ponownego FDTD |
 | `power_diagnostics.zip` | run z diagnostyką: mała paczka danych, ustawień, kodu i logu do analizy; pełne HDF5 pozostają w openems/ |
 
@@ -48,6 +49,15 @@ pomiarowych nie oznaczają implementacji przekrojów i animacji M3. Strumień
 `power_feed` nie jest mocą promieniowania anteny ani podstawą wyznaczania zysku.
 Mała paczka nie zawiera końcowego manifestu (jego lista skrótów obejmuje tę
 paczkę); kompletny manifest i surowe powierzchnie zostają w katalogu przebiegu.
+Gdy włączono `source_edge_work`, paczka zawiera także lokalne sondy
+`openems/power_edge_u_*`, `openems/power_edge_i_*` i `source_work_spectra.npz`.
+Ich położenia i oczekiwane indeksy są w `power_monitor_layout.json`, a suma
+pracy i kontrola odtworzenia całek U/I w `power_balance.json.source_edge_work`.
+Składowe `edge_active_work_w` mają osie [częstotliwość, krawędź],
+`edge_indices` — [krawędź, xyz], `net_active_work_w` — [częstotliwość].
+Są przeliczone tym samym współczynnikiem mocy co pierwotny port; nie zmieniają
+`accepted_power_w`, impedancji, zysku ani statusu walidacji. Surowe widma
+pozostają transformatami impulsu, nie amplitudami sinusoidalnymi.
 
 ## Konwencje danych
 

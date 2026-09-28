@@ -8,6 +8,8 @@ i skończonym reflektorem. Silnik obliczeniowy: **openEMS** na Windows 11.
 Adapter openEMS oraz odczyt impedancji i pola dalekiego są zaimplementowane;
 użytkownik ukończył pierwszy przebieg na Windowsie. Jego bilans mocy PEC
 wykazuje deficyt 12,15%; przyczyna i walidacja fizyczna pozostają otwarte (M2).
+Pasywna kontrola wskazała niejednorodne napięcie w obszarze zasilania;
+następny wariant mierzy lokalną pracę źródła bez zmiany geometrii i siatki.
 Nie ma jeszcze zweryfikowanych wyników anteny, map E/H, prądów ani animacji.
 
 ## Pierwsze uruchomienie — CMD
@@ -76,11 +78,12 @@ i zbieżności siatki. Nie wykonujemy benchmarków.
 ## Model i dokumentacja
 
 Przed zmianą skali anteny wykonujemy kontrolę bilansu mocy.
-Konfiguracja diagnostyczna zachowuje wymiary, port, siatkę i impuls pierwszego
-przebiegu; dodaje pasywne pomiary, nie zmienia rozwiązania przez normalizację.
+Pierwsza kontrola z dodatkowymi powierzchniami i sondami została ukończona.
+Następna konfiguracja zachowuje wymiary, port, siatkę i impuls pierwszego
+przebiegu; dodaje lokalne pary U/I do pomiaru pracy rozłożonego źródła.
 
 ```bat
-.\.venv\Scripts\python.exe -m antenna_lab run --config parameters\quados8_1420mhz_power_audit.json
+.\.venv\Scripts\python.exe -m antenna_lab run --config parameters\quados8_1420mhz_source_work.json
 ```
 
 To nowy przebieg FDTD. Zamiast raportu HTML zapisuje `power_balance.json`,

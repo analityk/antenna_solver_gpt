@@ -1,6 +1,6 @@
 # Cel projektu
 
-Wersja wymagań: 0.5. Data: 2026-09-28, Europe/Warsaw.
+Wersja wymagań: 0.6. Data: 2026-09-28, Europe/Warsaw.
 
 ## Bieżący stan
 
@@ -12,6 +12,10 @@ dalekiego. Użytkownik potwierdził udane prepare oraz zapis XML na natywnym
 Windowsie 2026-09-28 i ukończył pierwszy FDTD. Stwierdzony deficyt mocy PEC
 12,15% wymaga wyjaśnienia przed skalowaniem anteny. Niezależne całkowanie
 surowych NF2FF odtwarza wynik; walidacja fizyczna pozostaje otwarta.
+Pasywny przebieg z dodatkowymi sondami ukończono na Windowsie: dwie powierzchnie
+całej anteny są zgodne do 0,055%, a przekrój źródła ma niejednorodne napięcie.
+Do rozstrzygnięcia hipotezy błędnego pomiaru mocy rozłożonego źródła dodano
+osobny wariant z lokalnymi parami U/I; nie został jeszcze wykonany natywnie.
 Nie ma jeszcze zweryfikowanego wyniku obliczeń Quadosa.
 Prądy, mapy E/H, animacje oraz kontrola zbieżności pozostają do wykonania.
 
@@ -141,6 +145,8 @@ i porównywanymi modelami, przy tej samej normalizacji mocy.
 Priorytet przed strojeniem: wyjaśnić rozbieżność mocy portu i NF2FF. Wariant
 diagnostyczny dodaje wyłącznie pasywne pomiary do pierwotnego modelu i siatki,
 zapisuje strumienie trzech zamkniętych powierzchni oraz rozkład odczytów portu.
+Druga kontrola sumuje lokalną pracę 450 krawędzi źródła i sprawdza odtworzenie
+całek U/I z pomiarów lokalnych; zachowuje tę samą geometrię i siatkę.
 Nie dopuszcza się wymuszenia bilansu przez przeskalowanie pola. Zgodność
 bilansu sama nie zastępuje zbieżności impedancji i zysku. Tryb diagnostyczny
 zapisuje dane bez raportu; opis: `docs/power-audit.md`.

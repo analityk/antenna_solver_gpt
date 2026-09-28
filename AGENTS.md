@@ -26,6 +26,11 @@ Adapter openEMS, impedancja i pole dalekie są kodem eksperymentalnym:
 Użytkownik ukończył przebieg 20260928T004231Z_902d497594 na Windowsie.
 Bilans mocy PEC wykazuje deficyt 12,15%; niezależne całkowanie surowych NF2FF
 potwierdza odczyt, ale przyczyna fizyczna/numeryczna pozostaje otwarta.
+Ukończony pasywny przebieg odtwarza pierwotne wyniki. Dwie powierzchnie
+całej anteny są zgodne do 0,055%; napięcie przekroju portu różni się do 16,8%
+amplitudy i 10,8° fazy. Podejrzenie dotyczy utożsamienia pojedynczego U·I
+z mocą przestrzennie rozłożonego źródła. Kontrola source_work dodaje 450 par
+lokalnych sond bez zmiany modelu; jej wykonanie natywne pozostaje otwarte.
 Najpierw diagnostyka mocy (docs/power-audit.md), potem skalowanie i zbieżność.
 Nie przedstawiaj M2 jako zakończonego. Prądy promiennika i mapy E/H są
 jeszcze niezaimplementowane; żądanie tych danych musi kończyć się jawnym błędem.

@@ -63,15 +63,75 @@ i zakres odczytu portu są zapisane w `solver.power_diagnostics`.
 Włączenie diagnostyki pomija generowanie raportu i wykresów wynikowych.
 Pierwotne wyniki pozostają w swoim katalogu bez zmian.
 
-## Interpretacja następnego wyniku
+## Wynik pasywnej kontroli na Windowsie
 
-Jeżeli trzy strumienie będą bliskie 0,8785 względem pierwotnego pomiaru
-portu, podejrzenie będzie koncentrować się na definicji/pomiarze mocy źródła.
-Jeśli strumień zmieni się istotnie wraz z powierzchnią, trzeba zbadać
-interpolację, dyskretyzację i granice domeny. Lokalny monitor jest blisko
-przewodów i również ma błąd dyskretyzacji; sam nie stanowi wzorca prawdy.
-Profile U/I pokażą, na ile port zachowuje się jak jeden element skupiony.
-Z żadnego z tych przypadków nie wynika jeszcze automatycznie pełna walidacja.
+Użytkownik dostarczył `power_diagnostics.zip` z zakończonego przebiegu.
+Wszystkie linie siatki są identyczne z pierwotnymi. Z przy 1420 MHz,
+zysk i stosunek Prad/Pacc odtwarzają pierwszy wynik do zapisanej precyzji;
+dodatkowe sondy nie zmieniły rozwiązania. Ponownie osiągnięto EndCriteria.
+
+| Pomiar | Wartość przy pierwotnej normalizacji do 1 W portu |
+| --- | ---: |
+| Port, jedna linia U i jeden przekrój I | 1,000000 W |
+| `nf2ff`, zewnętrzna powierzchnia całej anteny | 0,878490162 W |
+| `power_inner`, bliższa powierzchnia całej anteny | 0,878968878 W |
+| `power_feed`, mała powierzchnia przy źródle | 0,840440439 W |
+
+Powierzchnie całej anteny różnią się o 0,0545% względem zewnętrznego strumienia.
+Nie wskazuje to na narastającą utratę 12% pomiędzy tymi powierzchniami.
+Nie wyklucza wspólnego błędu próbek, błędu przy źródle ani wpływu PML na samo
+rozwiązanie. Lokalna powierzchnia przecina przewody i obejmuje silne pole
+reaktywne; jej odczyt nie jest niezależnym wzorcem mocy źródła.
+
+Wśród 25 linii U amplituda sięga 1,16801 amplitudy linii środkowej,
+a względne przesunięcie fazy sięga −10,8259°. To ilościowa wskazówka,
+że przekrój źródła nie ma jednego napięcia. Uśrednienie napięć i pomnożenie
+przez środkowy prąd dałoby 0,941817 wartości pierwotnej — nie 0,87849.
+Nie wolno stosować takiego uśrednienia jako arbitralnej poprawki.
+
+Prądy w 16 wewnętrznych przekrojach dają iloczyn z pierwotnym U od 0,97766
+do 1,00000 wartości portu. Dwa skrajne przekroje przy metalowych zakończeniach
+dają około 2,07759 i różnią się fazą o około −32,77°. Są to diagnostyczne
+iloczyny różnych sond, nie 18 alternatywnych pomiarów mocy anteny. Samo
+przesunięcie płaszczyzny I wewnątrz portu nie wyjaśnia deficytu.
+
+## Następna kontrola: lokalna praca źródła
+
+Pierwszy zestaw sond przechowuje całki U przez całą długość i I przez cały
+przekrój. Nie da się z nich odtworzyć iloczynów lokalnych: suma U razy suma I
+nie zastępuje sumy odpowiednio sparowanych U·I. Brakuje danych potrzebnych
+do bezpośredniego obliczenia pracy rozłożonego źródła.
+
+Konfiguracja `parameters/quados8_1420mhz_source_work.json` dodaje opcję
+`solver.power_diagnostics.source_edge_work=true`. Zapisuje 450 par sond:
+18 krawędzi wzdłuż x × 5 × 5 w przekroju. Każda para mierzy napięcie na jednej
+krawędzi elektrycznej i obieg H wokół przyporządkowanej jej ściany siatki dualnej.
+To nadal tylko pasywne pomiary na tej samej siatce, bez zmiany źródła.
+
+```bat
+.\.venv\Scripts\python.exe -m antenna_lab run --config parameters\quados8_1420mhz_source_work.json
+```
+
+Przy przyjętym znaku U = −całka E·dl sumujemy 0,5 Re(U_edge · conj(I_edge)).
+Jest to praca netto wprowadzana do pola w obszarze źródła, obejmująca ujemny
+wkład pochłaniania w oporze zasilania. Nie jest samą mocą generatora przed
+odjęciem strat w tym oporze. I zawiera także prąd przesunięcia; w ustalonym
+stanie harmonicznym w bezstratnej komórce jego wkład czynny znika. Skończony
+zapis impulsu pozostaje źródłem błędu. Wkładów ujemnych nie zerujemy.
+
+Program kontroluje indeksy siatki faktycznie zapisane w nagłówkach sond.
+Suma 18 lokalnych U musi odtworzyć każdą dawną linię U, a suma 25 lokalnych I
+każdy dawny przekrój I. Odchyłka maksymalna powyżej 1e-4 względem największej
+amplitudy odniesienia dla danej częstotliwości przerywa odczyt. Ten próg
+sprawdza składanie pomiarów; nie jest progiem akceptacji bilansu fizycznego.
+
+Jeżeli suma pracy da około 0,8785 wartości pierwotnego portu, będzie to
+bezpośredni argument za błędem utożsamienia jego pojedynczego U·I z mocą
+całego źródła. Jeżeli da około 1, trzeba dalej badać dyskretyzację/pola i bilans
+między obszarem źródła a otoczeniem. Wynik pośredni wymaga analizy udziałów
+lokalnych oraz pozostałego błędu. Żadnego z tych wyników nie przewidziano
+ani nie wpisano do programu. Korekta modelu portu i sprawdzenie zbieżności
+będą oddzielnym krokiem po tej kontroli.
 
 Nie mnożymy pola przez współczynnik wymuszający bilans 1:1. Nie zmieniamy
 odniesienia zysku na moc promieniowaną pod tą samą nazwą. Nie skalujemy anteny
@@ -83,7 +143,10 @@ Całkowanie sprawdzono na analitycznym polu o znanej dywergencji i na danych
 użytkownika. Testy obejmują niejednorodną siatkę, znaki normalnych, brak ściany,
 niezgodne siatki E/H oraz sondy przesunięte w czasie. Potwierdzono identyczność
 wszystkich linii siatki konfiguracji kontrolnej z plikiem `mesh.npz` starego
-przebiegu. To nie jest wykonanie nowego FDTD ani sprawdzenie dodatków na Windowsie.
+przebiegu. Użytkownik potwierdził działanie pierwszego zestawu dodatkowych
+monitorów na Windowsie, dostarczając powyższe wyniki. Nowe 450 par lokalnych
+sond sprawdzono testami znaków pracy, analitycznego strumienia, składania
+pomiarów i indeksów; wymagają jeszcze wykonania natywnego przebiegu.
 
 Czytnik obsługuje sprawdzony zespolony format HDF5 NXYZ openEMS 0.37.0rc3.
 Inne formaty są odrzucane. Brak plików którejkolwiek ściany jest błędem także
@@ -93,3 +156,7 @@ Implementacja źródłowa używana do porównania:
 [całkowanie NF2FF](https://github.com/thliebig/openEMS/blob/67d378488ee40de815eed00f8aaa808f0a9e3c6d/nf2ff/nf2ff_calc.cpp),
 [pomiar portu](https://github.com/thliebig/openEMS/blob/67d378488ee40de815eed00f8aaa808f0a9e3c6d/python/openEMS/ports.py),
 [zapis pól w dziedzinie częstotliwości](https://github.com/thliebig/openEMS/blob/67d378488ee40de815eed00f8aaa808f0a9e3c6d/Common/processfields_fd.cpp).
+
+Dla pracy lokalnej: [całka prądu i obieg H](https://github.com/thliebig/openEMS/blob/67d378488ee40de815eed00f8aaa808f0a9e3c6d/Common/processcurrent.cpp),
+[przyciąganie sond do siatki](https://github.com/thliebig/openEMS/blob/67d378488ee40de815eed00f8aaa808f0a9e3c6d/FDTD/operator.cpp),
+[rozkład elementu skupionego na krawędzie](https://github.com/thliebig/openEMS/blob/67d378488ee40de815eed00f8aaa808f0a9e3c6d/FDTD/extensions/operator_ext_lumpedRLC.cpp).
