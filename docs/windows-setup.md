@@ -150,6 +150,41 @@ Ctrl+C przerywa przebieg. Nie uruchamiaj kilku obliczeń naraz na tym etapie.
 Zapisany raport i wyniki będą oznaczone jako unverified; nie wykonano jeszcze
 kontroli dipola ani zbieżności Quadosa. Opis modelu: [openEMS](openems-model.md).
 
+## Wiele sond i limit otwartych plików
+
+Wariant source_work tworzy 945 plików sond. Próba
+`20260928T101020Z_78b86cdbac` zgłosiła pierwszy `Can't open file:`
+dla `power_edge_i_0253`: 507 wcześniejszych plików lokalnych sond + 2 pliki
+portu + 3 standardowe strumienie dają domyślny limit 512 biblioteki MSVC/UCRT.
+Nie jest to kompletny wynik diagnostyczny. Kontynuowanie takiego przebiegu
+nie odtworzy niezapisanych próbek.
+
+Adapter przed Run liczy sondy z zapisanego XML i wywołuje `_setmaxstdio`
+w procesie, w którym działa natywny openEMS. Dla 945 sond ustawia 2048,
+chyba że limit już jest wyższy. Nie zmienia ustawień systemowych, nie wymaga
+administratora i nie wpływa na inne procesy. Następnie równocześnie otwiera
+i zamyka 945 strumieni `fopen` na urządzeniu NUL. To sprawdzenie zasobów
+przed obliczeniem, nie benchmark. Oczekiwany komunikat:
+
+```text
+Kontrola plików sond: 945; limit UCRT 512 -> 2048; otwarcie strumieni OK.
+```
+
+Zmiana dotyczy wspieranego wydania MSVC z dynamicznym CRT. Sama zmiana
+limitu w nadrzędnym terminalu lub w innym procesie Pythona nie wystarcza.
+Niezależnie od kontroli, komunikat natywnego `Can't open file:` natychmiast
+zatrzymuje pracownika, zapisując stan failed i zachowując istniejące pliki.
+Rzeczywiste wykonanie tej poprawki w Windowsie pozostaje do potwierdzenia.
+
+Po zatrzymaniu wadliwego przebiegu aktualizacja i nowa próba w CMD:
+
+```bat
+git pull --ff-only
+.\.venv\Scripts\python.exe -m antenna_lab run --config parameters\quados8_1420mhz_source_work.json
+```
+
+Nie używaj ponownie katalogu niekompletnego przebiegu. Polecenie tworzy nowy.
+
 ## Potwierdzone przygotowanie modelu
 
 Użytkownik przesłał 2026-09-28 log udanego prepare z Windows 11:
@@ -184,6 +219,8 @@ moduły Pythona zainstalowano w `.venv` lokalnej kopii projektu.
 
 ## Źródła
 
+- [Microsoft — _setmaxstdio: domyślne 512, maksymalnie 8192 strumienie](https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/setmaxstdio?view=msvc-170).
+- [Konfiguracja dynamicznego CRT paczki openEMS](https://github.com/thliebig/openEMS-Project/blob/v0.37.0-rc3/.github/vcpkg-triplets/x64-windows-openems.cmake).
 - [Python 3.14 — venv](https://docs.python.org/3.14/library/venv.html)
 - [openEMS 0.37.0-rc3 — wydanie Windows](https://github.com/thliebig/openEMS-Project/releases/tag/v0.37.0-rc3)
 - [Instrukcja Python dołączona do tego wydania](https://github.com/thliebig/openEMS-Project/blob/v0.37.0-rc3/.github/windows-package/python/README.txt),

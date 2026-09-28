@@ -109,6 +109,9 @@ def port_quantities(voltage, current, reference, accepted_power):
 
 def solve(prepared, config, run):
     engine, csx, port, nf, native_path = prepared
+    from .native_io import prepare_native_io
+    run.manifest["solver"]["native_io"] = prepare_native_io(native_path / "model.xml")
+    run.save()
     cwd = Path.cwd()
     try:
         result = engine.Run(str(native_path), cleanup=False, numThreads=config["solver"]["threads"])

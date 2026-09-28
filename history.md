@@ -278,6 +278,43 @@ obiegów H, indeksów, przyciągania do siatki i rozkładu elementu skupionego.
 użytkownika; nowy zestaw lokalny nie był jeszcze wykonany w openEMS na Windowsie.
 Nie ogłaszamy naprawy ani zamknięcia bilansu. Nie wykonano benchmarków.
 
+## 2026-09-28 — limit plików sond Windows i przerywanie błędnego zapisu
+
+**Powód:** log użytkownika z `20260928T101020Z_78b86cdbac` zawiera 436 błędów
+otwierania sond, począwszy od power_edge_i_0253. Wariant wymaga 945 plików,
+a pierwszy błąd wypada dokładnie po 507 lokalnych sondach, 2 sondach portu
+i 3 standardowych strumieniach, zgodnie z domyślnymi 512 strumieniami UCRT.
+Poprzednia implementacja nie uwzględniała tego ograniczenia Windows.
+
+**Zmiana:** dodano przygotowanie limitu w procesie pracownika przed Run.
+Adapter liczy sondy w XML, rezerwuje zapas 128 strumieni, podnosi limit
+_setmaxstdio do 2048 dla obecnego modelu i sprawdza równoczesne otwarcie
+945 strumieni przez natywne fopen. Nie obniża już wyższego limitu, kontroluje
+odmowę zwiększenia i zamyka wszystkie otwarte strumienie także przy błędzie.
+Nadrzędny proces przerywa pracownika przy pierwszym `Can't open file:`;
+nie dopuszcza dalszego FDTD i raportu z niekompletnym zapisem.
+
+**Wpływ na fizykę:** brak zmian geometrii, siatki, źródła, sond, normalizacji
+i kryterium końca. To poprawka obsługi plików, nie wyjaśnienie deficytu mocy.
+Poprzednie pliki są zachowane, a nowa próba tworzy osobny katalog.
+
+**Formaty i odtwarzalność:** manifest.solver.native_io zapisuje stan limitu
+i kontrolę strumieni. Rozszerzenie mieści się w istniejącym schemacie v2.
+Wymagania 0.7 obejmują wykrywanie błędów zapisu przed obliczeniem i w jego trakcie.
+Nie dodano zależności pip ani zmiany ustawień systemowych; limit jest lokalny
+dla procesu ze wspieraną dynamiczną biblioteką UCRT paczki MSVC.
+
+**Sprawdzenie:** zestaw unittest zakończył się sukcesem (31 testów w liczniku,
+pominięty test rzeczywistego UCRT oraz klasa Tk). Nowe kontrole obejmują
+945 strumieni przy limicie 512, odmowę zwiększenia, sprzątanie po częściowej
+odmowie otwarcia, zachowanie wyższego limitu, odczyt XML i zatrzymanie procesu
+na rzeczywistym komunikacie z logu. Zwykłe ostrzeżenie o nieużytej kuli
+nie przerywa obliczeń. Sprawdzono dokumentację Microsoft i źródła paczki MSVC.
+
+**Ograniczenia:** tutaj nie uruchomiono Windows ani natywnego openEMS.
+Preflight UCRT i poprawne zapisanie kompletu sond wymagają potwierdzenia
+na komputerze użytkownika. Nie wykonano benchmarków. Bilans PEC pozostaje otwarty.
+
 ## Wzór kolejnego wpisu
 
 - Data i krótka nazwa zmiany.

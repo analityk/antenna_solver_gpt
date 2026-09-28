@@ -31,6 +31,10 @@ całej anteny są zgodne do 0,055%; napięcie przekroju portu różni się do 16
 amplitudy i 10,8° fazy. Podejrzenie dotyczy utożsamienia pojedynczego U·I
 z mocą przestrzennie rozłożonego źródła. Kontrola source_work dodaje 450 par
 lokalnych sond bez zmiany modelu; jej wykonanie natywne pozostaje otwarte.
+Pierwsza próba source_work ujawniła limit 512 strumieni UCRT przy 945 sondach.
+Przed Run adapter przygotowuje limit w tym samym procesie i sprawdza otwarcie
+strumieni. Błąd natywnego otwarcia pliku ma natychmiast zatrzymywać pracownika.
+Poprawka obsługi plików czeka na potwierdzenie użytkownika na Windowsie.
 Najpierw diagnostyka mocy (docs/power-audit.md), potem skalowanie i zbieżność.
 Nie przedstawiaj M2 jako zakończonego. Prądy promiennika i mapy E/H są
 jeszcze niezaimplementowane; żądanie tych danych musi kończyć się jawnym błędem.

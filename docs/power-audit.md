@@ -108,6 +108,12 @@ Konfiguracja `parameters/quados8_1420mhz_source_work.json` dodaje opcję
 krawędzi elektrycznej i obieg H wokół przyporządkowanej jej ściany siatki dualnej.
 To nadal tylko pasywne pomiary na tej samej siatce, bez zmiany źródła.
 
+Pierwsza próba `20260928T101020Z_78b86cdbac` wykazała błąd otwierania plików
+po osiągnięciu domyślnego limitu 512 strumieni UCRT. Komplet 945 sond nie został
+zapisany. Adapter przygotowuje teraz limit i sprawdza zasoby przed Run,
+a błąd otwarcia natychmiast zatrzymuje pracownika. Wymagana jest nowa próba;
+opis: [obsługa strumieni Windows](windows-setup.md#wiele-sond-i-limit-otwartych-plików).
+
 ```bat
 .\.venv\Scripts\python.exe -m antenna_lab run --config parameters\quados8_1420mhz_source_work.json
 ```

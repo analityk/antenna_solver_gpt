@@ -59,6 +59,31 @@ def _worker(args):
         return 1
 
 
+def _stop_worker(process):
+    if process is not None and process.poll() is None:
+        process.terminate()
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait()
+
+
+def _read_worker_log(process, log):
+    try:
+        for line in process.stdout:
+            log.write(line)
+            log.flush()
+            print(line, end="", flush=True)
+            if "Can't open file:" in line:
+                # Upstream only prints this failure and keeps solving. Stop our
+                # worker immediately: a missing probe cannot be recovered later.
+                _stop_worker(process)
+                raise RuntimeError("Przerwano openEMS po błędzie otwarcia pliku: " + line.strip())
+    finally:
+        process.stdout.close()
+
+
 def _native_job(config, output, mode):
     from antenna_lab.app.actions import start_record
     from antenna_lab.core.runs import RunRecord
@@ -72,11 +97,7 @@ def _native_job(config, output, mode):
         with (record.path / "solver.log").open("w", encoding="utf-8") as log:
             process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                        text=True, encoding="utf-8", errors="replace", env=environment)
-            for line in process.stdout:
-                log.write(line)
-                log.flush()
-                print(line, end="", flush=True)
-            process.stdout.close()
+            _read_worker_log(process, log)
             exit_code = process.wait()
         record = RunRecord.open(record.path)
         if exit_code != 0:
@@ -92,18 +113,13 @@ def _native_job(config, output, mode):
         print(f"Katalog: {record.path}")
         return 0
     except KeyboardInterrupt:
-        if process is not None and process.poll() is None:
-            process.terminate()
-            try:
-                process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                process.kill()
-                process.wait()
+        _stop_worker(process)
         record = RunRecord.open(record.path)
         record.finish("cancelled", "Przerwano przez użytkownika.")
         print(f"Przerwano. Zachowane pliki: {record.path}")
         return 130
     except Exception as exc:
+        _stop_worker(process)
         record = RunRecord.open(record.path)
         record.finish("failed", exc)
         raise

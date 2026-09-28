@@ -43,6 +43,10 @@ pozostają w katalogu. Nie przedstawiamy ich jako ukończonego wyniku.
 
 Geometria ani prepare nie tworzą pól, impedancji lub zysku. Manifest zawsze
 ma `validation_status=unverified`. Sukces testów geometrii tego nie zmienia.
+Przed Run manifest.solver.native_io zapisuje liczbę sond, poprzedni i aktywny
+limit UCRT oraz wynik kontroli strumieni. Na innych platformach zawiera
+not_applicable. Błąd natywnego otwarcia pliku oznacza failed i zachowanie
+częściowych danych, bez raportu ani kompletnej paczki diagnostycznej.
 
 Diagnostyka mocy jest opcjonalnym rozszerzeniem v2. Składowe pól na powierzchniach
 pomiarowych nie oznaczają implementacji przekrojów i animacji M3. Strumień

@@ -1,6 +1,6 @@
 # Cel projektu
 
-Wersja wymagań: 0.6. Data: 2026-09-28, Europe/Warsaw.
+Wersja wymagań: 0.7. Data: 2026-09-28, Europe/Warsaw.
 
 ## Bieżący stan
 
@@ -15,7 +15,8 @@ surowych NF2FF odtwarza wynik; walidacja fizyczna pozostaje otwarta.
 Pasywny przebieg z dodatkowymi sondami ukończono na Windowsie: dwie powierzchnie
 całej anteny są zgodne do 0,055%, a przekrój źródła ma niejednorodne napięcie.
 Do rozstrzygnięcia hipotezy błędnego pomiaru mocy rozłożonego źródła dodano
-osobny wariant z lokalnymi parami U/I; nie został jeszcze wykonany natywnie.
+osobny wariant z lokalnymi parami U/I. Pierwsza próba wykazała limit otwartych
+strumieni na Windowsie; kompletnego wyniku tej kontroli jeszcze nie uzyskano.
 Nie ma jeszcze zweryfikowanego wyniku obliczeń Quadosa.
 Prądy, mapy E/H, animacje oraz kontrola zbieżności pozostają do wykonania.
 
@@ -46,6 +47,9 @@ openEMS dla Windows i zgodnych z nią modułów Pythona. Lokalizacja użytkownik
 Przygotowanie modelu XML jest potwierdzone logiem użytkownika. Obliczeniowy
 przebieg Quadosa zakończył się osiągnięciem EndCriteria; przypadek referencyjny
 i walidacja fizyczna pozostają do wykonania.
+Przed Run należy przygotować i sprawdzić pojemność natywnego zapisu sond
+w procesie solvera. Błąd otwarcia pliku ma przerywać przebieg, zamiast pozwalać
+na dalsze kosztowne obliczenia z niekompletnym zapisem.
 
 ## Zakres pierwszej wersji symulatora
 

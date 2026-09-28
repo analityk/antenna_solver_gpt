@@ -15,6 +15,7 @@ i domyślne parametry. Samodzielna dystrybucja wheel nie jest jeszcze obsługiwa
 | `solvers/openems.py` | Materiały, port, FDTD XML, impedancja i NF2FF | Główny adapter natywnego API |
 | `solvers/power.py` | Pasywne sondy, odczyt HDF5, strumień mocy, widmo portu | Diagnostyka adaptera; bez wymuszania bilansu |
 | `solvers/source_work.py` | Lokalne pary U/I, kontrola indeksów i sumowania, praca źródła | Pasywna diagnostyka siatki; bez korekty portu |
+| `solvers/native_io.py` | Limit UCRT i sprawdzenie równoczesnego otwierania plików sond | Obsługa procesu Windows; bez zmian modelu |
 | `app/` | Formularz Tk/ttk, podgląd Matplotlib, zapis parametrów i eksport | Sterowanie geometrią |
 | `visualization/` | Rysunki, wykresy CSV/NPZ i HTML | Bez wywołań solvera |
 | `cli.py` | Polecenia i proces potomny solvera | Log, przerwanie i stan przebiegu |
@@ -40,6 +41,10 @@ Nie zapisujemy środowiska procesu, danych kont ani całego katalogu roboczego.
 
 Proces główny przechwytuje log, kod wyjścia i Ctrl+C. Po zakończeniu zapisuje
 stan oraz skróty plików. Zakończone przebiegi nie są używane ponownie do solve.
+Przed Run pracownik liczy sondy w XML, podnosi w razie potrzeby limit strumieni
+UCRT i sprawdza otwarcie odpowiedniej liczby strumieni C. Wynik zapisuje
+w manifest.solver.native_io. Natywny komunikat `Can't open file:` powoduje
+natychmiastowe zakończenie pracownika i status failed; częściowe pliki zostają.
 Wersja 2 rozdziela etap (`geometry`, `openems_input`, `simulation`), stan
 wykonania i status fizycznej walidacji. `completed` nie oznacza `passed`.
 
@@ -52,7 +57,8 @@ Użytkownik ukończył pierwszy FDTD na Windowsie; deficyt mocy PEC 12,15% jest
 potwierdzony surowymi danymi. Przypadek referencyjny, wyjaśnienie deficytu
 i sprawdzenie zbieżności pozostają otwarte.
 Pierwszy pasywny przebieg diagnostyczny również wykonano na Windowsie;
-kontrola pracy lokalnej z dodatkowych 450 par sond czeka na wykonanie natywne.
+kontrola pracy lokalnej z 450 parami sond wymaga powtórzenia po błędzie
+limitu strumieni Windows. Poprawka obsługi plików czeka na potwierdzenie natywne.
 Mapy E/H i prądy wymagają dalszej implementacji; adapter odrzuca ich żądanie.
 
 CPU Ryzen 7 7800X3D, RAM 32 GB, Windows 11. Instrukcje używają CMD i `.venv`.
