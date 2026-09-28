@@ -10,6 +10,7 @@ i domyślne parametry. Samodzielna dystrybucja wheel nie jest jeszcze obsługiwa
 | `core/config.py` | JSON Schema v2, wartości skończone, warianty, skalowanie | Bez nazw wymiarów konkretnej anteny |
 | `core/geometry.py` | Wire, Plate, Port, Geometry, topologia i kolizje | Geometria SI, bez siatki FDTD |
 | `core/runs.py` | RunRecord, konfiguracja, schematy, kod i skróty artefaktów | Bez wyników zastępczych |
+| `core/catalog.py` | Czytelne nazwy wariantów i wyszukiwanie ukończonych obliczeń po geometrii | Bez solvera i bez modyfikacji historycznych wyników |
 | `antennas/` | Rejestr modeli i deterministyczny generator Quados8 | Bez importu openEMS |
 | `solvers/mesh.py` | Niejednorodna siatka kartezjańska, PML, kontrola limitu | Bez zmian wymiarów anteny |
 | `solvers/feed.py` | Granice portu i audyt pokrycia krawędzi przez box wymuszenia | Korekta zaokrągleń w adapterze; bez zmiany siatki |
@@ -42,13 +43,21 @@ zapisuje ostrzeżenie i nie zmienia udanego FDTD na `failed`.
 Osobne `report` czyta wcześniejsze wyniki i zapisuje nowy HTML poza katalogiem
 przebiegu (`outcomes/reports`). Nie zmienia starych manifestów ani raportów.
 `--latest` wybiera tylko `simulation/completed`, na podstawie czasu manifestu.
+Podanie pliku JSON wariantu wybiera wyniki zgodnej geometrii, modelu
+fizycznego i częstotliwości. Preferowane są identyczne ustawienia symulacji
+i solvera; wybór innych ustawień jest jawnie komunikowany. Katalogowanie
+czyta zapisane konfiguracje, dzięki czemu obsługuje również starsze przebiegi.
 Widmo pochodzi z gęstego CSV, zwykłego CSV lub summary; przy pojedynczym
 punkcie i dostępnych surowych sondach portu może użyć ich DFT. To czysty
 odczyt NumPy z `solvers/power.py`, bez przygotowania modelu i bez Run.
 CSS/JS są częścią modułu Python, więc trafiają również do `source.zip`.
 
-Każdy przebieg otrzymuje unikalny katalog. Zawiera rozwiązaną konfigurację,
-schematy, archiwum kodu źródłowego, wersję Git (jeśli jest dostępna), geometrię
+Każdy przebieg otrzymuje unikalny katalog. Jego nazwa zaczyna się od nazwy
+pliku wariantu, dalej zawiera czas UTC
+i losowy identyfikator. Manifest dodaje opcjonalne `variant_name` oraz
+`geometry_sha256`; stare manifesty v2 pozostają obsługiwane.
+Katalog zawiera rozwiązaną konfigurację, schematy, archiwum kodu źródłowego,
+wersję Git (jeśli jest dostępna), geometrię
 i manifest. Kopia konfiguracji nie zależy od późniejszych zmian w edytorze.
 Nie zapisujemy środowiska procesu, danych kont ani całego katalogu roboczego.
 

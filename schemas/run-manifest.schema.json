@@ -35,6 +35,14 @@
         "simulation"
       ]
     },
+    "variant_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "geometry_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
     "status": {
       "enum": [
         "running",

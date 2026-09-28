@@ -2,7 +2,19 @@
 
 Każdy przebieg tworzy nowy katalog `outcomes/runs/<run_id>/`, pomijany przez Git.
 ID zawiera czas UTC i losowy identyfikator. Po zakończeniu danych nie nadpisujemy.
+Nowe ID mają dodatkowo prefiks nazwy pliku wariantu, np.
+`quados8_variant_sz4__20260928T221500Z_0123456789`. Wariant jest przekazywany
+z `--config` lub ostatniego pliku wczytanego/zapisanego w edytorze. Nie jest
+wyznaczany z odziedziczonego `id` konfiguracji, jeśli znana jest nazwa pliku.
 Status wykonania jest niezależny od kontroli fizycznej.
+
+Manifest v2 ma dwa nowe opcjonalne pola: `variant_name` i `geometry_sha256`.
+Skrót obejmuje model anteny, parametry oraz ośrodek, przewodnik, reflektor
+i model zasilania. Liczby parametrów kanonizowane są do 12 miejsc po przecinku
+(dla długości SI: 1 pm). Nie obejmuje nazwy pliku, `id`, opisów ani ścieżek
+schematów. Częstotliwości i ustawienia solvera porównuje się osobno.
+`report wariant.json` wyszukuje również stare przebiegi po ich zapisanych
+parametrach, bez zmiany nazw, manifestów i skrótów istniejących plików.
 
 | Etap | Stan po sukcesie | Co rzeczywiście wykonano |
 | --- | --- | --- |

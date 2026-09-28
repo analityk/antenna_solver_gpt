@@ -68,7 +68,7 @@ class EditorState:
 
 
 class GeometryEditor:
-    def __init__(self, root, config, output_root):
+    def __init__(self, root, config, output_root, variant_name=None):
         # Lazy imports: CLI geometry/export and headless checks do not require Tk.
         import tkinter as tk
         from tkinter import ttk
@@ -77,6 +77,7 @@ class GeometryEditor:
 
         self.root, self.output_root = root, output_root
         self.state = EditorState(config)
+        self.variant_name = variant_name or config["id"]
         self.syncing = True
         self.dirty = False
         self.fields = {}
@@ -273,6 +274,7 @@ class GeometryEditor:
             self._message(f"Nie wczytano parametrów: {exc}", error=True)
             return
         self.state = candidate
+        self.variant_name = Path(path).stem
         self._sync_fields()
         self._draw()
         self.artifact.set(str(Path(path).resolve()))
@@ -291,6 +293,7 @@ class GeometryEditor:
         if path:
             try:
                 write_json(path, self.state.config)
+                self.variant_name = Path(path).stem
                 self.artifact.set(str(Path(path).resolve()))
                 self._message("Zapisano parametry anteny w pliku JSON. Ścieżka poniżej.")
             except (OSError, ValueError) as exc:
@@ -303,7 +306,7 @@ class GeometryEditor:
         self._message("Zapisywanie geometrii, rysunku i dokumentacji…")
         self.root.update_idletasks()
         try:
-            path = export_geometry(self.state.config, self.output_root)
+            path = export_geometry(self.state.config, self.output_root, variant_name=self.variant_name)
             self.artifact.set(str(path))
             self._message("Zapisano model, rysunek PNG i dokumentację w nowym folderze.\nTo eksport geometrii; obliczenia openEMS nie zostały uruchomione.")
         except Exception as exc:
@@ -312,14 +315,14 @@ class GeometryEditor:
             self.export_button.state(["!disabled"])
 
 
-def show_editor(config, output_root):
+def show_editor(config, output_root, variant_name=None):
     try:
         import tkinter as tk
     except ImportError as exc:
         raise ConfigurationError("Edytor wymaga tkinter, dołączonego do standardowej instalacji Python dla Windows.") from exc
     root = tk.Tk()
     try:
-        editor = GeometryEditor(root, config, output_root)
+        editor = GeometryEditor(root, config, output_root, variant_name=variant_name)
         root.mainloop()
         return editor
     finally:

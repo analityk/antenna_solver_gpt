@@ -11,6 +11,7 @@ import zipfile
 
 from antenna_lab import __version__
 from .config import ROOT, write_json
+from .catalog import geometry_key, variant_slug
 
 
 def sha256(path):
@@ -38,9 +39,10 @@ class RunRecord:
         record.manifest = json.loads((record.path / "manifest.json").read_text(encoding="utf-8"))
         return record
 
-    def __init__(self, root, stage, config, geometry, validation):
+    def __init__(self, root, stage, config, geometry, validation, *, variant_name=None):
         stamp = datetime.now(timezone.utc)
-        run_id = stamp.strftime("%Y%m%dT%H%M%SZ") + "_" + uuid.uuid4().hex[:10]
+        variant_name = variant_name or config.get("id") or config["antenna"]["model"]
+        run_id = variant_slug(variant_name) + "__" + stamp.strftime("%Y%m%dT%H%M%SZ") + "_" + uuid.uuid4().hex[:10]
         self.path = Path(root).resolve() / run_id
         self.path.mkdir(parents=True, exist_ok=False)
         resolved = deepcopy(config)
@@ -58,6 +60,7 @@ class RunRecord:
                     archive.write(item, item.relative_to(ROOT).as_posix())
             archive.write(ROOT / "pyproject.toml", "pyproject.toml")
         self.manifest = {"schema_version": 2, "run_id": run_id, "stage": stage, "status": "running",
+                         "variant_name": variant_name, "geometry_sha256": geometry_key(config),
                          "created_at": stamp.isoformat(), "code": code_revision(),
                          "configuration_sha256": sha256(self.path / "parameters.resolved.json"),
                          "frequency_hz": config["simulation"]["frequency_hz"], "solver": None,

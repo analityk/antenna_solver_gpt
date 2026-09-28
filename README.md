@@ -60,6 +60,7 @@ W poniższych poleceniach używaj `.\.venv\Scripts\python.exe`:
 | `-m antenna_lab geometry` | Nowy katalog z geometrią, konfiguracją i PNG |
 | `-m antenna_lab prepare` | Import openEMS i zapis pełnego XML, bez obliczeń FDTD |
 | `-m antenna_lab run` | Eksperymentalne FDTD oraz zapis impedancji i pola dalekiego |
+| `-m antenna_lab report wariant_01.json --open` | HTML z obliczeń zapisanej geometrii; działa także ze starszymi wynikami |
 | `-m antenna_lab report --latest --open` | Interaktywny HTML z najnowszej ukończonej symulacji, bez FDTD |
 
 Przykłady wariantów:
@@ -78,6 +79,9 @@ Pierwszy krok integracji na komputerze użytkownika to `prepare`. Sukces
 potwierdza utworzenie wejścia, nie poprawność elektromagnetyczną modelu.
 Polecenie `run` działa w osobnym procesie; **Ctrl+C** przerywa obliczenie.
 Każde uruchomienie zapisuje osobny katalog `outcomes/runs/<run_id>/`.
+Nazwa nowego katalogu zaczyna się od nazwy pliku wariantu, np.
+`quados8_variant_sz4__20260928T221500Z_0123456789`. Data UTC i końcowy
+identyfikator rozróżniają ponowne obliczenia bez nadpisywania wyników.
 Wyniki pozostają **unverified** do kontroli źródła, przypadku referencyjnego
 i zbieżności siatki. Nie wykonujemy benchmarków.
 

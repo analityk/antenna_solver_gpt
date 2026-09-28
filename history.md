@@ -476,6 +476,39 @@ przechodzą; klasa testów natywnego Tk pominięta z powodu braku biblioteki.
 Kontrolę obsługi przycisku wykonano bez natywnego okna; Windows GUI nie
 uruchamiano w tym środowisku.
 
+## 2026-09-29 — wyniki i raporty wybierane po geometrii
+
+**Powód:** katalogi nazwane wyłącznie datą i losowym ID utrudniały wybór
+wcześniejszych iteracji. Użytkownik wymaga obsługi nazw swoich wariantów.
+
+**Zmiana:** nowe przebiegi mają nazwę `wariant__czasUTC_id`, wyprowadzoną
+z nazwy pliku `--config` lub pliku wczytanego/zapisanego w edytorze.
+`report quados8_variant_sz4.json` szuka pliku także w `parameters/` i dobiera
+ukończony przebieg według rzeczywistej geometrii, modelu fizycznego
+i częstotliwości. Działa na starych zapisanych konfiguracjach; nie wymaga
+zmiany nazw historycznych folderów. Nazwa wariantu trafia też do nowego HTML.
+Przy wielu wynikach preferuje najnowszy o identycznych ustawieniach symulacji
+i solvera. Fallback na zgodną geometrię z innymi ustawieniami jest jawny.
+Brak zgodnej geometrii nie uruchamia obliczeń i nie wybiera innej anteny.
+
+**Wpływ na fizykę:** bez zmian geometrii, siatki, portu i solvera, bez FDTD
+i benchmarków. Wyszukiwanie ignoruje odziedziczone `id`, opisy i ścieżki
+schematów; parametry liczbowe porównuje po kanonizacji do 12 miejsc po
+przecinku (długości SI: 1 pm). Stan fizycznej walidacji nie zmienia się.
+
+**Format i odtwarzalność:** manifest v2 rozszerzono o opcjonalne
+`variant_name` oraz `geometry_sha256`. Odczyt starszych manifestów pozostaje
+zgodny. Czas i losowy sufiks zapobiegają nadpisaniu kolejnej iteracji;
+dotychczasowych plików wynikowych i manifestów nie modyfikujemy.
+Wymagania podniesiono do 0.11, zaktualizowano instrukcje i kontrakt outcomes.
+
+**Sprawdzenie:** 55 testów unittest; dwa pominięcia środowiskowe dla Tk
+i Windows UCRT. Nowe przypadki sprawdzają stare katalogi, wspólne `id`
+różnych geometrii, brak zmian w plikach podczas wyszukiwania, rozróżnienie
+częstotliwości i reflektora, preferencję ustawień solvera, unikalne nazwy
+i manifesty oraz CLI z nazwą JSON bez prefiksu `parameters/` i etykietę HTML.
+Natywnego FDTD ani interfejsu Windows nie uruchamiano.
+
 ## Wzór kolejnego wpisu
 
 - Data i krótka nazwa zmiany.

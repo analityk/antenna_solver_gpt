@@ -69,6 +69,9 @@ Pasywne sondy portu i powierzchnie diagnostyczne nie zaliczają M3.
   błąd prezentacji nie może unieważnić udanego FDTD. Suwak impedancji nie
   zmienia częstotliwości bilansu ani pola dalekiego. Nie zatwierdzaj modelu
   automatycznie na podstawie zgodności bilansu i nie koryguj Z/zysku.
+- Nowe katalogi wyników mają prefiks nazwy pliku wariantu. `report wariant.json`
+  wyszukuje ukończone obliczenia po zapisanej geometrii i częstotliwościach,
+  także w starych katalogach. Nie identyfikuj geometrii samym polem `id`.
 - Dodanie nowej anteny nie powinno wymagać specjalnych warunków w rdzeniu.
 - Na początek jeden pakiet Pythona; solver działa w lokalnym procesie potomnym.
   Nie dodawaj

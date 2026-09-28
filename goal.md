@@ -1,6 +1,6 @@
 # Cel projektu
 
-Wersja wymagań: 0.10. Data: 2026-09-28, Europe/Warsaw.
+Wersja wymagań: 0.11. Data: 2026-09-29, Europe/Warsaw.
 
 ## Bieżący stan
 
@@ -30,6 +30,13 @@ dostępna charakterystyka kierunkowa i jawne braki danych. Diagnostyka mocy
 i pole dalekie mają własne częstotliwości, niezależne od suwaka impedancji.
 Raport nie może zatwierdzać modelu, korygować Z/zysku ani nadpisywać
 zakończonych przebiegów. Szczegóły: `docs/reports.md`.
+
+Wyniki mają być rozpoznawalne po wariancie geometrii: nazwa nowego katalogu
+zaczyna się od nazwy pliku parametrów. Raport musi akceptować JSON wariantu
+i wyszukać właściwe ukończone obliczenia także w historycznych katalogach.
+Wyszukiwanie porównuje wymiary, model fizyczny i częstotliwości; jednakowe
+`id` lub nazwy plików nie mogą zastępować sprawdzenia geometrii. Kolejne
+przebiegi zachowują niezależne wyniki i nie nadpisują poprzednich.
 
 ## Cel użytkownika
 

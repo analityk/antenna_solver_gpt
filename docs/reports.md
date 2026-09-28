@@ -4,6 +4,31 @@ Raport działa z zapisanymi wynikami. Nie potrzebuje openEMS/CSXCAD, serwera,
 internetu, konta ani klucza API. Nie uruchamia FDTD i nie zużywa tokenów.
 Wystarcza środowisko projektu z NumPy, Matplotlib, jsonschema i h5py.
 
+## Raport wybranego wariantu — także z dawnych obliczeń
+
+```bat
+.\.venv\Scripts\python.exe -m antenna_lab report quados8_variant_sz4.json --start-mhz 1200 --stop-mhz 1650 --step-mhz 0.25 --open
+```
+
+Podaj plik wariantu. Sama nazwa jest szukana najpierw w bieżącym katalogu,
+a następnie w `parameters/`; można też podać pełną ścieżkę. Program odczytuje
+`parameters.resolved.json` ukończonych symulacji i dopasowuje faktyczną
+geometrię, model fizyczny oraz częstotliwości. Nie polega na polu `id`, które
+we wcześniejszych wariantach mogło mieć tę samą wartość.
+
+Gdy jest kilka pasujących wyników, wybiera najnowszy z takimi samymi
+ustawieniami symulacji i solvera. Jeśli takich nie ma, wybiera najnowszą
+zgodną geometrię i częstotliwości, wypisując ostrzeżenie o innych ustawieniach.
+Wybrany katalog zawsze pojawia się w terminalu. Brak zgodnej geometrii
+oznacza błąd; program nie podstawi innej anteny ani nie uruchomi solve.
+Po zmianie wymiarów w JSON należy użyć kopii pasującej do starych obliczeń.
+
+To działa również z dotychczasowymi katalogami nazwanymi samą datą i ID.
+Ich pliki i manifesty pozostają niezmienione. Nowy HTML otrzymuje nazwę
+wybranego wariantu. Nazwy nowych katalogów obliczeń mają postać
+`quados8_variant_sz4__20260928T221500Z_0123456789`; czas i ID zachowują
+niezależność kolejnych obliczeń tej samej geometrii.
+
 ## Najnowsza ukończona symulacja — Windows CMD
 
 ```bat

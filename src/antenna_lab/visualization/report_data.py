@@ -1,6 +1,5 @@
 """Read-only postprocessing for reports; no native openEMS imports or solves."""
 
-from datetime import datetime, timezone
 import json
 from pathlib import Path
 import re
@@ -17,23 +16,11 @@ def read_json(path, default=None):
 
 def latest_run(runs_path):
     """Ignore prepared, partial and geometry-only jobs, even if newer."""
-    candidates = []
-    for folder in Path(runs_path).glob("*/manifest.json"):
-        try:
-            manifest = read_json(folder)
-            if manifest.get("stage") != "simulation" or manifest.get("status") != "completed":
-                continue
-            if not (folder.parent / "summary.json").is_file():
-                continue
-            created = datetime.fromisoformat(manifest["created_at"].replace("Z", "+00:00"))
-            if created.tzinfo is None:
-                created = created.replace(tzinfo=timezone.utc)
-            candidates.append((created.timestamp(), folder.parent.name, folder.parent))
-        except (OSError, ValueError, KeyError, TypeError):
-            continue
+    from antenna_lab.core.catalog import completed_simulations
+    candidates = completed_simulations(runs_path)
     if not candidates:
         raise ValueError(f"Brak ukończonej symulacji w {runs_path}. Możesz podać katalog wyników bezpośrednio.")
-    return max(candidates)[2]
+    return candidates[0][2]
 
 
 def matching_index(frequencies, target):
@@ -134,6 +121,7 @@ def load_report_data(run_path, *, start_mhz=None, stop_mhz=None, step_mhz=None,
     data = {"root": root, "summary": summary, "config": config, "mesh": mesh,
             "manifest": manifest, "spectrum": spectrum, "reference": reference,
             "target_mhz": target, "run_id": manifest.get("run_id", root.name),
+            "variant_name": manifest.get("variant_name", config.get("id", root.name)),
             "execution_status": "completed" if simulation_completed else manifest.get("status", "brak manifestu"),
             "warnings": warnings, "native_warnings": native_warnings, "end_energy_db": end_energy,
             "last_energy_line": energy_lines[-1] if energy_lines else None,

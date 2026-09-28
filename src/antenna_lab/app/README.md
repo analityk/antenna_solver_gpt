@@ -8,6 +8,7 @@ ostatniej poprawnej konfiguracji. Zmiana częstotliwości i skalowanie są odrę
 - Wczytaj parametry: wybór JSON, walidacja i odświeżenie pól oraz podglądu.
   Wczytany wariant zastępuje bieżące pola i staje się punktem przywracania.
   Anulowanie lub błędny plik zachowuje dotychczasowe ustawienia i wpisy.
+  Nazwa wybranego pliku służy także jako etykieta kolejnego eksportu geometrii.
 - Zapisz parametry (.json): jeden plik ustawień do ponownego wczytania lub użycia przez --config.
 - Eksportuj geometrię: nowy folder z modelem, PNG, parametrami i dokumentacją.
   Eksport nie uruchamia openEMS. Zapis i eksport uwzględniają niezastosowane pola.

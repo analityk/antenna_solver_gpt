@@ -207,7 +207,7 @@ def _metadata(data):
     manifest, config = data["manifest"], data["config"]
     simulation = config.get("simulation", {})
     rows = [("Stan wykonania", data["execution_status"]), ("Walidacja fizyczna", data["summary"].get("validation_status", "brak danych")),
-            ("Wariant", config.get("id", "brak danych")), ("Model", config.get("antenna", {}).get("model", "brak danych")),
+            ("Wariant", data["variant_name"]), ("Model", config.get("antenna", {}).get("model", "brak danych")),
             ("Data przebiegu", manifest.get("created_at", "brak manifestu")), ("Commit obliczeń", manifest.get("code", {}).get("commit_sha", "brak danych")),
             ("Przewodnik / ośrodek", f"{simulation.get('conductor_model', '?')} / {simulation.get('medium', '?')}"),
             ("Reflektor / zasilanie", f"{simulation.get('reflector_model', '?')} / {simulation.get('feed_model', '?')}"),
@@ -257,6 +257,7 @@ def render_html(data, *, plots_path=None):
 <html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{escape(title)}</title><style>{CSS}</style></head><body><main>
 <header><div class="eyebrow">Antenna Solver GPT · raport lokalny</div><h1>Antena pod lupą</h1>
+<p class="run">Wariant: <strong>{escape(data['variant_name'])}</strong></p>
 <p class="run">Przebieg: <strong>{escape(data['run_id'])}</strong></p>
 <p class="muted">Widmo, charakterystyka i bilans mocy z zapisanych danych. Ten plik działa samodzielnie, bez internetu.</p></header>
 <div class="status"><strong>Wynik roboczy — raport nie zatwierdza modelu.</strong><br>{note}</div>
@@ -285,10 +286,12 @@ Odczyt i interpretacja według jawnych reguł; bez AI, usług sieciowych i ponow
 </main><script id="report-data" type="application/json">{encoded}</script><script>{JS}</script></body></html>'''
 
 
-def generate_report(run_path, output=None, *, automatic=False, start_mhz=None, stop_mhz=None, step_mhz=None):
+def generate_report(run_path, output=None, *, automatic=False, start_mhz=None, stop_mhz=None, step_mhz=None,
+                    variant_name=None):
     root = Path(run_path).resolve()
     if output is None:
-        safe_id = re.sub(r"[^a-zA-Z0-9_.-]+", "_", root.name)[:100]
+        label = f"{variant_name}__{root.name}" if variant_name else root.name
+        safe_id = re.sub(r"[^a-zA-Z0-9_.-]+", "_", label)[:100]
         stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S_%fZ")
         output = root / "report.html" if automatic else ROOT / "outcomes" / "reports" / f"{safe_id}_{stamp}.html"
     output = Path(output).resolve()
@@ -300,6 +303,8 @@ def generate_report(run_path, output=None, *, automatic=False, start_mhz=None, s
         raise ValueError(f"Raport już istnieje: {output}. Podaj nową nazwę; istniejące pliki nie są nadpisywane.")
     data = load_report_data(root, start_mhz=start_mhz, stop_mhz=stop_mhz, step_mhz=step_mhz,
                             simulation_completed=automatic)
+    if variant_name:
+        data["variant_name"] = variant_name
     if automatic and data["manifest"].get("status") != "running":
         raise ValueError("Raport automatyczny wolno zapisać tylko przed zamknięciem nowego przebiegu.")
     html = render_html(data, plots_path=root / "plots" if automatic else None)

@@ -30,7 +30,7 @@ def parser():
         reflector.add_argument("--reflector", dest="reflector", action="store_true")
         command.set_defaults(reflector=None)
     report = commands.add_parser("report", help="Lokalny HTML z zapisanych wyników; bez FDTD")
-    report.add_argument("run_dir", nargs="?", type=Path, help="Katalog wyników symulacji")
+    report.add_argument("run_dir", nargs="?", type=Path, help="Katalog wyników albo plik JSON wariantu (wyszukanie po geometrii)")
     report.add_argument("--latest", action="store_true", help="Najnowsza ukończona symulacja")
     report.add_argument("--runs-dir", type=Path, default=ROOT / "outcomes" / "runs")
     report.add_argument("--output", type=Path, help="Nowy plik .html; domyślnie outcomes/reports")
@@ -93,10 +93,10 @@ def _read_worker_log(process, log):
         process.stdout.close()
 
 
-def _native_job(config, output, mode):
+def _native_job(config, output, mode, *, variant_name=None):
     from antenna_lab.app.actions import start_record
     from antenna_lab.core.runs import RunRecord
-    record = start_record(config, output, "openems_input" if mode == "prepare" else "simulation")
+    record = start_record(config, output, "openems_input" if mode == "prepare" else "simulation", variant_name=variant_name)
     print(f"Wyniki: {record.path}", flush=True)
     command = [sys.executable, "-m", "antenna_lab", "_worker", "--run-dir", str(record.path), "--mode", mode]
     environment = dict(os.environ, PYTHONUNBUFFERED="1", PYTHONIOENCODING="utf-8", MPLBACKEND="Agg")
@@ -148,11 +148,24 @@ def _report(args):
     from antenna_lab.visualization.report import generate_report
     from antenna_lab.visualization.report_data import latest_run
     if bool(args.run_dir) == bool(args.latest):
-        raise ConfigurationError("Podaj katalog wyników albo --latest (jedną z tych opcji).")
+        raise ConfigurationError("Podaj plik wariantu JSON, katalog wyników albo --latest (jedną z tych opcji).")
+    variant_name = None
     run_path = latest_run(args.runs_dir) if args.latest else args.run_dir
+    if not args.latest and not run_path.is_dir() and run_path.suffix.lower() == ".json":
+        from antenna_lab.core.catalog import find_geometry_run
+        config_path = run_path
+        if not config_path.exists() and config_path.parent == Path("."):
+            config_path = ROOT / "parameters" / config_path.name
+        config = load_config(config_path)
+        variant_name = config_path.stem
+        run_path, count, same_settings = find_geometry_run(config, args.runs_dir)
+        print(f"Wariant: {variant_name}; ukończone przebiegi tej geometrii i częstotliwości: {count}.", flush=True)
+        if not same_settings:
+            print("Uwaga: geometria i częstotliwości są zgodne, ale ustawienia symulacji lub solvera różnią się. "
+                  "Raport pokazuje zapisany przebieg, nie przelicza nowych ustawień.", flush=True)
     print(f"Odczyt zapisanych wyników: {run_path}", flush=True)
     path = generate_report(run_path, args.output, start_mhz=args.start_mhz,
-                           stop_mhz=args.stop_mhz, step_mhz=args.step_mhz)
+                           stop_mhz=args.stop_mhz, step_mhz=args.step_mhz, variant_name=variant_name)
     print(f"Raport HTML: {path}", flush=True)
     if args.open:
         import webbrowser
@@ -181,7 +194,7 @@ def main(argv=None):
         config = modified_config(load_config(args.config), overrides, args.frequency_mhz, args.reflector, args.scale_to_mhz)
         if args.command == "preview":
             from antenna_lab.app.editor import show_editor
-            show_editor(config, args.output)
+            show_editor(config, args.output, variant_name=args.config.stem)
         elif args.command == "check":
             from antenna_lab.antennas import build_model
             from antenna_lab.core.geometry import check_geometry
@@ -190,9 +203,9 @@ def main(argv=None):
             print(json.dumps({"geometry": check_geometry(geometry), "mesh": make_mesh(geometry, config)[1]}, indent=2, ensure_ascii=False))
         elif args.command == "geometry":
             from antenna_lab.app.actions import export_geometry
-            print(export_geometry(config, args.output))
+            print(export_geometry(config, args.output, variant_name=args.config.stem))
         else:
-            return _native_job(config, args.output, args.command)
+            return _native_job(config, args.output, args.command, variant_name=args.config.stem)
         return 0
     except (ConfigurationError, OSError, ValueError, RuntimeError) as exc:
         print(f"Błąd: {exc}", file=sys.stderr)
