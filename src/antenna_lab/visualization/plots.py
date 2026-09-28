@@ -1,8 +1,5 @@
-from html import escape
-import json
 from pathlib import Path
 
-import matplotlib.pyplot as plt
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.figure import Figure
 from matplotlib.patches import Rectangle
@@ -57,45 +54,6 @@ def geometry_plot(geometry, filename):
 
 
 def render_results(run_path):
-    """Read saved CSV/NPZ only. Plotting can never trigger a new FDTD solve."""
-    root = Path(run_path)
-    summary = json.loads((root / "summary.json").read_text(encoding="utf-8"))
-    data = np.atleast_1d(np.genfromtxt(root / "impedance.csv", delimiter=",", names=True))
-    fig, ax = plt.subplots(figsize=(9, 4))
-    ax.plot(data["frequency_hz"] / 1e6, data["resistance_ohm"], "o-", label="R")
-    ax.plot(data["frequency_hz"] / 1e6, data["reactance_ohm"], "o-", label="X")
-    ax.set(xlabel="Częstotliwość [MHz]", ylabel="Impedancja [Ω]", title="Impedancja wejściowa — wynik niezweryfikowany")
-    ax.grid(alpha=0.25)
-    ax.legend()
-    fig.tight_layout()
-    fig.savefig(root / "plots" / "impedance.png", dpi=150)
-    plt.close(fig)
-    images = ["geometry.png", "impedance.png"]
-    if (root / "far_field.npz").exists():
-        with np.load(root / "far_field.npz", allow_pickle=False) as field:
-            theta, phi = field["theta_deg"], field["phi_deg"]
-            angle = np.r_[-theta[:0:-1], theta]
-            fig, ax = plt.subplots(figsize=(10, 4))
-            for forward, backward, label in ((0, 180, "xz"), (90, 270, "yz")):
-                a, b = np.where(phi == forward)[0][0], np.where(phi == backward)[0][0]
-                gain = np.r_[field["gain_linear"][0, :0:-1, b], field["gain_linear"][0, :, a]]
-                ax.plot(angle, 10 * np.log10(np.maximum(gain, 1e-12)), label=label)
-            f = field["frequency_hz"][0] / 1e6
-            ax.set(xlabel="Kąt od +z [°]", ylabel="Zysk [dBi], moc przyjęta przez port", title=f"Przekroje przy {f:g} MHz — wynik niezweryfikowany")
-            ax.grid(alpha=0.25)
-            ax.legend()
-            fig.tight_layout()
-            fig.savefig(root / "plots" / "pattern_cuts.png", dpi=150)
-            plt.close(fig)
-            images.append("pattern_cuts.png")
-    body = "".join(f'<figure><img src="plots/{name}" alt="{name}"></figure>' for name in images)
-    rows = "".join(f"<tr><td>{float(row['frequency_hz'])/1e6:g}</td><td>{row['resistance_ohm']:.6g}</td>"
-                   f"<td>{row['reactance_ohm']:.6g}</td><td>{row['swr']:.6g}</td></tr>" for row in data)
-    page = ("<!doctype html><html lang='pl'><meta charset='utf-8'><title>Wynik anteny</title>"
-            "<style>body{font:16px system-ui;max-width:1100px;margin:40px auto;padding:20px;color:#172333}"
-            "img{max-width:100%}td,th{padding:10px;text-align:right;border-bottom:1px solid #ddd}"
-            ".status{background:#fff3d6;padding:16px;border-radius:8px}</style>"
-            f"<h1>Wynik {escape(root.name)}</h1><p class='status'>{escape(summary['note'])}</p>"
-            "<p>PEC, wolna przestrzeń, idealny port różnicowy. Balun i kabel poza modelem.</p>"
-            f"<table><tr><th>MHz</th><th>R [Ω]</th><th>X [Ω]</th><th>SWR</th></tr>{rows}</table>{body}</html>")
-    (root / "report.html").write_text(page, encoding="utf-8")
+    """Compatibility entry point for a new run, before its manifest is closed."""
+    from .report import generate_report
+    return generate_report(run_path, automatic=True)

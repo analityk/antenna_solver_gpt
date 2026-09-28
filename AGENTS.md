@@ -63,6 +63,12 @@ Pasywne sondy portu i powierzchnie diagnostyczne nie zaliczają M3.
 - Adapter solvera przelicza jednostki i konwencje we własnej granicy.
 - Parametry nie są zaszyte w kodzie. Każdy wynik zawiera ich rozwiązaną kopię.
 - Wizualizacja czyta zapisane wyniki. Zmiana fazy animacji nie uruchamia solvera.
+- `report` tworzy samodzielny HTML offline z istniejących wyników; opis
+  w `docs/reports.md`. Ręczne raporty zapisuj poza ukończonym przebiegiem.
+  Automatyczny raport powstaje przed zamknięciem manifestu nowego `run`;
+  błąd prezentacji nie może unieważnić udanego FDTD. Suwak impedancji nie
+  zmienia częstotliwości bilansu ani pola dalekiego. Nie zatwierdzaj modelu
+  automatycznie na podstawie zgodności bilansu i nie koryguj Z/zysku.
 - Dodanie nowej anteny nie powinno wymagać specjalnych warunków w rdzeniu.
 - Na początek jeden pakiet Pythona; solver działa w lokalnym procesie potomnym.
   Nie dodawaj

@@ -29,6 +29,15 @@ def parser():
         reflector.add_argument("--no-reflector", dest="reflector", action="store_false")
         reflector.add_argument("--reflector", dest="reflector", action="store_true")
         command.set_defaults(reflector=None)
+    report = commands.add_parser("report", help="Lokalny HTML z zapisanych wyników; bez FDTD")
+    report.add_argument("run_dir", nargs="?", type=Path, help="Katalog wyników symulacji")
+    report.add_argument("--latest", action="store_true", help="Najnowsza ukończona symulacja")
+    report.add_argument("--runs-dir", type=Path, default=ROOT / "outcomes" / "runs")
+    report.add_argument("--output", type=Path, help="Nowy plik .html; domyślnie outcomes/reports")
+    report.add_argument("--open", action="store_true", help="Otwórz HTML w domyślnej przeglądarce")
+    report.add_argument("--start-mhz", type=float, help="Opcjonalny początek widma z surowych sond portu")
+    report.add_argument("--stop-mhz", type=float, help="Opcjonalny koniec widma z surowych sond portu")
+    report.add_argument("--step-mhz", type=float, help="Krok widma; wymaga obu granic i zapisanych sond")
     worker = commands.add_parser("_worker", help=argparse.SUPPRESS)
     worker.add_argument("--run-dir", type=Path, required=True)
     worker.add_argument("--mode", choices=["prepare", "run"], required=True)
@@ -87,7 +96,6 @@ def _read_worker_log(process, log):
 def _native_job(config, output, mode):
     from antenna_lab.app.actions import start_record
     from antenna_lab.core.runs import RunRecord
-    from antenna_lab.visualization.plots import render_results
     record = start_record(config, output, "openems_input" if mode == "prepare" else "simulation")
     print(f"Wyniki: {record.path}", flush=True)
     command = [sys.executable, "-m", "antenna_lab", "_worker", "--run-dir", str(record.path), "--mode", mode]
@@ -106,8 +114,7 @@ def _native_job(config, output, mode):
             if config["solver"].get("power_diagnostics"):
                 from antenna_lab.solvers.power import pack_diagnostics
                 print(f"Paczka diagnostyczna: {pack_diagnostics(record.path)}", flush=True)
-            else:
-                render_results(record.path)
+            _write_run_report(record)
         record.finish("prepared" if mode == "prepare" else "completed")
         print("Wejście openEMS przygotowane." if mode == "prepare" else "Obliczenie zakończone. Wynik roboczy: wymagane sprawdzenie zbieżności.")
         print(f"Katalog: {record.path}")
@@ -125,6 +132,35 @@ def _native_job(config, output, mode):
         raise
 
 
+def _write_run_report(record):
+    """A presentation failure must not discard a successful expensive solve."""
+    try:
+        from antenna_lab.visualization.report import generate_report
+        path = generate_report(record.path, automatic=True)
+        print(f"Raport HTML: {path}", flush=True)
+    except Exception as exc:
+        warning = f"Nie utworzono raportu HTML: {type(exc).__name__}: {exc}. Wyniki FDTD są zachowane; użyj polecenia report."
+        record.manifest.setdefault("warnings", []).append(warning)
+        print(warning, file=sys.stderr, flush=True)
+
+
+def _report(args):
+    from antenna_lab.visualization.report import generate_report
+    from antenna_lab.visualization.report_data import latest_run
+    if bool(args.run_dir) == bool(args.latest):
+        raise ConfigurationError("Podaj katalog wyników albo --latest (jedną z tych opcji).")
+    run_path = latest_run(args.runs_dir) if args.latest else args.run_dir
+    print(f"Odczyt zapisanych wyników: {run_path}", flush=True)
+    path = generate_report(run_path, args.output, start_mhz=args.start_mhz,
+                           stop_mhz=args.stop_mhz, step_mhz=args.step_mhz)
+    print(f"Raport HTML: {path}", flush=True)
+    if args.open:
+        import webbrowser
+        if not webbrowser.open(path.as_uri()):
+            print("Przeglądarka nie została otwarta. Otwórz zapisany plik HTML ręcznie.")
+    return 0
+
+
 def main(argv=None):
     arguments = sys.argv[1:] if argv is None else argv
     args = parser().parse_args(arguments or ["preview"])
@@ -134,6 +170,8 @@ def main(argv=None):
             matplotlib.use("Agg")
         if args.command == "_worker":
             return _worker(args)
+        if args.command == "report":
+            return _report(args)
         overrides = {}
         for entry in args.set_mm:
             if "=" not in entry:

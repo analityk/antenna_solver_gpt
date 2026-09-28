@@ -411,6 +411,53 @@ powierzchni pochodzą z jej power_balance.json, nie z ponownego całkowania
 HDF5 tutaj. Pomiar portu, referencja i zbieżność pozostają otwarte. Dane
 mają nadal status unverified; nie korygowano impedancji mnożnikiem mocy.
 
+## 2026-09-28 — lokalny interaktywny raport HTML
+
+**Powód:** użytkownik chce samodzielnie oglądać i interpretować wyniki,
+bez przesyłania kolejnych paczek i zużywania tokenów. Wzorcem jest wcześniej
+przygotowany HTML z suwakiem częstotliwości i wyborem odniesienia impedancji.
+
+**Zmiana:** dodano `report <katalog>` i `report --latest --open`, samodzielny
+HTML bez sieci, interaktywne R/X, SWR, S11, stratę niedopasowania, minimum,
+przejścia X przez zero i eksport CSV. Raport pokazuje zapisane przekroje
+kierunkowe, moc portu, lokalną pracę, strumienie, podpisane wkłady krawędzi,
+stan wykonania i ostrzeżenia. Pole dalekie i bilans zachowują własne etykiety
+częstotliwości. Brak pliku daje informację o braku danych. Dodano opcjonalną
+DFT istniejących sond portu oraz instrukcje CMD, wymagania 0.10 i kontrakt
+raportów. Nowe `run` tworzą raport również przy włączonej diagnostyce mocy.
+
+**Wpływ na fizykę:** żaden. Nie zmieniono anteny, źródła, siatki, solvera ani
+normalizacji, nie uruchamiano FDTD i benchmarków. Raport nie zatwierdza M2,
+nie stroi geometrii i nie poprawia impedancji mnożnikiem. Porównanie zysku
+względem lokalnej pracy jest jawnie diagnostyczne. Gęsta DFT nie zwiększa
+fizycznej rozdzielczości przebiegu. Zref przelicza dopasowanie, nie balun.
+
+**Architektura i odtwarzalność:** odczyt i prezentacja są w `visualization/`;
+CSS/JS w module Python trafiają do snapshotu kodu. Bez nowych zależności.
+Ręczne raporty zapisują się poza niezmiennymi wynikami, w `outcomes/reports/`
+albo nowym pliku wskazanym przez użytkownika. Raport automatyczny jest częścią
+końcowego spisu artefaktów. Błąd samego raportu zapisuje ostrzeżenie, bez
+unieważnienia ukończonego solve. Nie zmieniono wersji surowych formatów v2.
+
+**Sprawdzenie:** 49 testów unittest, 2 pominięcia dla niedostępnego natywnego
+Tk i Windows UCRT. Nowe testy obejmują niezmienność wyników, wybór ukończonej
+symulacji, wejścia częściowe i błędne, dwa mianowniki bilansu, znaki pracy,
+osobne znaczniki czasu U/I, granice widma, polecenie CLI i błąd raportowania.
+Wygenerowano HTML z trzech rzeczywistych zestawów użytkownika: pierwotnego
+przebiegu (1001 punktów 1300–1550 MHz), starej kontroli source_work oraz
+aligned_feed (161 punktów 1400–1440 MHz). Dla ostatniego raport wyznacza
+5,085446% różnicy port/praca i 0,100896% różnicy praca/strumień oraz
+450 dodatnich wkładów, zero ujemnych. Obejrzano wygenerowane obrazy widma
+i charakterystyki. Logikę JS sprawdzono w lokalnym środowisku Node z atrapą
+DOM: suwak, Zref, kliknięcie wykresu, przycisk celu, CSV, jeden punkt,
+idealne dopasowanie oraz ujemna rezystancja.
+
+**Ograniczenia:** nie uruchomiono natywnej przeglądarki Windows ani openEMS.
+Kontrola JS nie jest testem renderowania w przeglądarce. Raport czyta gotowy
+bilans powierzchni, nie powtarza całkowania HDF5. Nie ma map E/H ani animacji.
+Progi zbieżności i definicja pomiaru portu nadal wymagają osobnej pracy.
+Wcześniejsze symulacje nie wymagają ponownego przeliczenia do użycia raportu.
+
 ## Wzór kolejnego wpisu
 
 - Data i krótka nazwa zmiany.

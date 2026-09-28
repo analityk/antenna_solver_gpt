@@ -12,6 +12,7 @@ dist/
 .env.*
 !.env.example
 outcomes/runs/*
+outcomes/reports/*
 outcomes/cache/*
 *.log
 .DS_Store

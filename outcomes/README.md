@@ -33,8 +33,8 @@ pozostają w katalogu. Nie przedstawiamy ich jako ukończonego wyniku.
 | `impedance.csv` | run: frequency_hz, resistance_ohm, reactance_ohm, reference_ohm, s11_real, s11_imag, swr |
 | `far_field.npz` | run, gdy zażądano: zespolone pole dalekie, zysk i kierunkowość |
 | `summary.json` | run: impedancja, SWR, opcjonalnie zysk +z i bilans mocy |
-| `plots/impedance.png`, `plots/pattern_cuts.png` | run bez diagnostyki mocy: impedancja i opcjonalne przekroje xz/yz pierwszej częstotliwości |
-| `report.html` | run bez diagnostyki mocy: lokalny raport z zapisanych danych |
+| `plots/impedance.png`, `plots/pattern_cuts.png` | run: impedancja i dostępne przekroje xz/yz częstotliwości najbliższej pierwszej częstotliwości konfiguracji |
+| `report.html` | run, również z diagnostyką mocy: samodzielny interaktywny raport lokalny z zapisanych danych |
 | `power_monitor_layout.json` | prepare/run z diagnostyką: położenia pasywnych powierzchni i sond, bez zmian siatki |
 | `power_balance.json` | run z diagnostyką: strumienie przez każdą ścianę trzech powierzchni, niezależna kontrola Prad i nierównomierność siatki |
 | `port_probe_spectra.npz` | run z diagnostyką: zespolone widma dodatkowych U/I i położenia pomiaru; osie [częstotliwość, sonda] |
@@ -44,6 +44,17 @@ pozostają w katalogu. Nie przedstawiamy ich jako ukończonego wyniku.
 
 Geometria ani prepare nie tworzą pól, impedancji lub zysku. Manifest zawsze
 ma `validation_status=unverified`. Sukces testów geometrii tego nie zmienia.
+Raport i wykresy powstają przed końcowym spisem SHA-256. Niepowodzenie samego
+raportu zapisuje ostrzeżenie, zachowując status udanej symulacji; można
+ponowić `report` z zapisanych danych. To nie dotyczy błędów solvera.
+
+Ręczne `report` zapisuje nowy HTML w `outcomes/reports/<run_id>_<czas>.html`
+(poza niezmiennym przebiegiem), albo pod jawnym `--output`. Nie nadpisuje
+istniejących plików i nie zmienia manifestu. HTML osadza obrazy, dane widma,
+CSS i JavaScript; do otwarcia nie potrzeba serwera ani internetu. Raport
+identyfikuje pliki wejściowe sumami SHA-256, ale nie jest pełnym audytem
+manifestu. Automatyczny raport pomija skrót jeszcze niezamkniętego manifestu.
+Nowy raport nie wymaga zmiany wersji surowych formatów outcomes.
 Przed Run manifest.solver.native_io zapisuje liczbę sond, poprzedni i aktywny
 limit UCRT oraz wynik kontroli strumieni. Na innych platformach zawiera
 not_applicable. Błąd natywnego otwarcia pliku oznacza failed i zachowanie

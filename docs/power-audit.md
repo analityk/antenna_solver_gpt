@@ -61,7 +61,9 @@ zapisu NF2FF 1420 MHz, impuls i EndCriteria 1e-5. Dodaje:
 Współrzędne dodatkowych powierzchni są wybierane z istniejących linii;
 żadna linia nie jest przesuwana ani dopisywana. Parametry położenia monitorów
 i zakres odczytu portu są zapisane w `solver.power_diagnostics`.
-Włączenie diagnostyki pomija generowanie raportu i wykresów wynikowych.
+Włączenie diagnostyki zapisuje również lokalny raport HTML i dostępne
+wykresy wynikowe. Dla wcześniejszych przebiegów raport można utworzyć
+poleceniem `report --latest --open`, bez FDTD; zobacz [raporty](reports.md).
 Pierwotne wyniki pozostają w swoim katalogu bez zmian.
 
 ## Wynik pasywnej kontroli na Windowsie

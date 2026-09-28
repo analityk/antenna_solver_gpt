@@ -19,6 +19,8 @@ i domyślne parametry. Samodzielna dystrybucja wheel nie jest jeszcze obsługiwa
 | `solvers/native_io.py` | Limit UCRT i sprawdzenie równoczesnego otwierania plików sond | Obsługa procesu Windows; bez zmian modelu |
 | `app/` | Formularz Tk/ttk, podgląd Matplotlib, zapis parametrów i eksport | Sterowanie geometrią |
 | `visualization/` | Rysunki, wykresy CSV/NPZ i HTML | Bez wywołań solvera |
+| `visualization/report_data.py` | Odczyt wyników, wybór ukończonego przebiegu, opcjonalna DFT portu | Bez importu natywnego openEMS |
+| `visualization/report.py`, `report_assets.py` | Samodzielny HTML, wykresy, lokalne sterowanie i diagnostyka | Bez sieci, API, zmiany danych i automatycznego zatwierdzania fizyki |
 | `cli.py` | Polecenia i proces potomny solvera | Log, przerwanie i stan przebiegu |
 
 Konfiguracja przechodzi przez generator anteny do geometrii, następnie przez
@@ -33,7 +35,17 @@ do utworzenia XML, ale nie wywołuje Run. `run` wykonuje FDTD, postprocessing
 i raport. Biblioteki natywne są importowane dopiero w procesie potomnym
 uruchomionym tym samym interpreterem, co polecenie główne.
 Opcjonalne `solver.power_diagnostics` dodaje pasywne monitory i po solve
-zapisuje diagnostykę oraz paczkę ZIP, pomijając raport i wykresy wynikowe.
+zapisuje diagnostykę oraz paczkę ZIP. Zarówno zwykłe, jak i diagnostyczne
+symulacje tworzą raport i wykresy przed zamknięciem manifestu. Błąd raportu
+zapisuje ostrzeżenie i nie zmienia udanego FDTD na `failed`.
+
+Osobne `report` czyta wcześniejsze wyniki i zapisuje nowy HTML poza katalogiem
+przebiegu (`outcomes/reports`). Nie zmienia starych manifestów ani raportów.
+`--latest` wybiera tylko `simulation/completed`, na podstawie czasu manifestu.
+Widmo pochodzi z gęstego CSV, zwykłego CSV lub summary; przy pojedynczym
+punkcie i dostępnych surowych sondach portu może użyć ich DFT. To czysty
+odczyt NumPy z `solvers/power.py`, bez przygotowania modelu i bez Run.
+CSS/JS są częścią modułu Python, więc trafiają również do `source.zip`.
 
 Każdy przebieg otrzymuje unikalny katalog. Zawiera rozwiązaną konfigurację,
 schematy, archiwum kodu źródłowego, wersję Git (jeśli jest dostępna), geometrię

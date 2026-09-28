@@ -189,6 +189,19 @@ git pull --ff-only
 
 Nie używaj ponownie katalogu niekompletnego przebiegu. Polecenie tworzy nowy.
 
+## Raport z istniejących wyników
+
+```bat
+cd /d C:\dev\antenna_solver_gpt\antenna_solver_gpt
+git pull --ff-only
+.\.venv\Scripts\python.exe -m antenna_lab report --latest --open
+```
+
+W istniejącym `.venv` nie trzeba instalować nowych zależności. Powstaje
+samodzielny HTML w `outcomes/reports/`, bez FDTD, API i przesyłania plików.
+Kolejne symulacje tworzą raport automatycznie, również z diagnostyką mocy.
+Wybór przebiegu, widma i opis interpretacji: [raporty HTML](reports.md).
+
 ## Potwierdzone przygotowanie modelu
 
 Użytkownik przesłał 2026-09-28 log udanego prepare z Windows 11:

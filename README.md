@@ -58,6 +58,7 @@ W poniższych poleceniach używaj `.\.venv\Scripts\python.exe`:
 | `-m antenna_lab geometry` | Nowy katalog z geometrią, konfiguracją i PNG |
 | `-m antenna_lab prepare` | Import openEMS i zapis pełnego XML, bez obliczeń FDTD |
 | `-m antenna_lab run` | Eksperymentalne FDTD oraz zapis impedancji i pola dalekiego |
+| `-m antenna_lab report --latest --open` | Interaktywny HTML z najnowszej ukończonej symulacji, bez FDTD |
 
 Przykłady wariantów:
 
@@ -78,6 +79,25 @@ Każde uruchomienie zapisuje osobny katalog `outcomes/runs/<run_id>/`.
 Wyniki pozostają **unverified** do kontroli źródła, przypadku referencyjnego
 i zbieżności siatki. Nie wykonujemy benchmarków.
 
+## Raport lokalny — także dla wcześniejszych wyników
+
+```bat
+git pull --ff-only
+.\.venv\Scripts\python.exe -m antenna_lab report --latest --open
+```
+
+Polecenie wybiera najnowszą **ukończoną symulację**, tworzy nowy samodzielny
+HTML w `outcomes/reports/` i otwiera go w przeglądarce. Nie uruchamia openEMS,
+nie wysyła danych i nie używa API ani tokenów. Działa z już zainstalowanymi
+zależnościami. Starsze wyniki i ich manifesty pozostają niezmienione.
+
+Raport ma suwak częstotliwości, zmianę Zref, R/X, SWR, S11, CSV, przejścia
+X przez zero, zapisane przekroje kierunkowe, bilans mocy i ostrzeżenia.
+Pola dalekie i diagnostyka mają własne, jawnie podane częstotliwości; suwak
+impedancji ich nie przelicza. Brakujących danych nie zastępuje zerami.
+Kolejne `run` tworzą `report.html` automatycznie, również z diagnostyką mocy.
+Szczegóły i wybór konkretnego przebiegu: [raporty HTML](docs/reports.md).
+
 ## Model i dokumentacja
 
 Przed zmianą skali anteny sprawdzamy zasilanie. Poniższy wariant jest już
@@ -89,7 +109,7 @@ obejmuje wszystkie 450 krawędzi zamiast 270. To zmiana dyskretnego źródła.
 .\.venv\Scripts\python.exe -m antenna_lab run --config parameters\quados8_1420mhz_aligned_feed.json
 ```
 
-To nowy przebieg FDTD. Zamiast raportu HTML zapisuje `power_balance.json`,
+To nowy przebieg FDTD. Oprócz raportu HTML zapisuje `power_balance.json`,
 widmo impedancji 1400–1440 MHz co 0,25 MHz i małą paczkę `power_diagnostics.zip`
 w nowym katalogu wyników. Ten krok częstotliwości dotyczy odczytu przebiegów
 portu, nie dodatkowych symulacji ani deklaracji dokładności. Szczegóły i

@@ -1,6 +1,6 @@
 # Cel projektu
 
-Wersja wymagań: 0.9. Data: 2026-09-28, Europe/Warsaw.
+Wersja wymagań: 0.10. Data: 2026-09-28, Europe/Warsaw.
 
 ## Bieżący stan
 
@@ -21,6 +21,15 @@ odniesieniem; różnica wynosi 5,085% tego odniesienia. Poprawka granic źródł
 i limitu strumieni Windows jest potwierdzona. Pomiar portu pozostaje otwarty.
 Nie ma jeszcze zweryfikowanego wyniku obliczeń Quadosa.
 Prądy, mapy E/H, animacje oraz kontrola zbieżności pozostają do wykonania.
+
+Lokalny raport HTML jest częścią programu: ma działać bez ponownego solve,
+przesyłania danych, API i tokenów. `report` czyta także wcześniejsze wyniki;
+`--latest` wybiera ukończoną symulację, `--open` otwiera plik w przeglądarce.
+Wymagane są interaktywne R/X i SWR, wybór Zref, zapis CSV, bilans mocy,
+dostępna charakterystyka kierunkowa i jawne braki danych. Diagnostyka mocy
+i pole dalekie mają własne częstotliwości, niezależne od suwaka impedancji.
+Raport nie może zatwierdzać modelu, korygować Z/zysku ani nadpisywać
+zakończonych przebiegów. Szczegóły: `docs/reports.md`.
 
 ## Cel użytkownika
 
@@ -166,7 +175,7 @@ Nie wolno zastępować tej kontroli mnożnikiem korygującym impedancję ani
 przedstawiać porównania zysku względem pracy lokalnej jako zbieżności modelu.
 Nie dopuszcza się wymuszenia bilansu przez przeskalowanie pola. Zgodność
 bilansu sama nie zastępuje zbieżności impedancji i zysku. Tryb diagnostyczny
-zapisuje dane bez raportu; opis: `docs/power-audit.md`.
+zapisuje dane i lokalny raport; opis: `docs/power-audit.md`, `docs/reports.md`.
 
 | Etap | Warunek zakończenia | Stan |
 | --- | --- | --- |
@@ -174,7 +183,7 @@ zapisuje dane bez raportu; opis: `docs/power-audit.md`.
 | M1 | Generator geometrii odtwarza topologię, długości, symetrię i port; pokazuje model do kontroli | Zaimplementowane i sprawdzone testami geometrii |
 | M2 | openEMS liczy prądy, impedancję i pole dalekie; referencja kontrolna i sprawdzenie zbieżności | Adapter impedancji/pola dalekiego napisany; prądy i walidacja otwarte |
 | M3 | Zespolone E/H, maski, przekroje i animacje fazy oraz komplet outcomes | Planowane |
-| M4 | Lokalny interfejs, porównywanie wariantów i przegląd zapisanych wyników | Edytor gotowy; porównania i sterowanie obliczeniami otwarte |
+| M4 | Lokalny interfejs, porównywanie wariantów i przegląd zapisanych wyników | Edytor i lokalny raport HTML gotowe; porównania wariantów i sterowanie obliczeniami otwarte |
 
 Kontrola M2 obejmuje dipol jako niezależny przypadek fizyczny oraz przynajmniej
 trzy poziomy dyskretyzacji Quadosa. Wstępne progi stabilności pomiędzy dwoma
