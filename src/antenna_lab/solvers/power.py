@@ -7,6 +7,7 @@ import zipfile
 import numpy as np
 
 from antenna_lab.core.config import ConfigurationError, write_json
+from .feed import nominal_bounds, resolve_feed
 
 
 def require_box_files(folder, name):
@@ -120,7 +121,7 @@ def probe_spectrum(path, frequencies):
     return result
 
 
-def monitor_layout(geometry, axes, mesh, settings):
+def monitor_layout(geometry, axes, mesh, settings, feed=None):
     spectrum_frequencies(settings, mesh)  # Reject invalid ranges before an expensive solve.
     def snap(point):
         return [float(axes[axis][np.argmin(abs(axes[axis] - value))])
@@ -134,10 +135,10 @@ def monitor_layout(geometry, axes, mesh, settings):
             and np.all(inner_low > outer_low) and np.all(inner_high < outer_high)):
         raise ConfigurationError("Wewnętrzna powierzchnia mocy musi otaczać antenę i mieścić się w NF2FF.")
     port = geometry.port
-    center = (np.asarray(port.negative) + np.asarray(port.positive)) / 2
-    half = port.transverse_size_m / 2
-    start = np.array([port.negative[0], center[1] - half, center[2] - half])
-    stop = np.array([port.positive[0], center[1] + half, center[2] + half])
+    if feed is None:
+        start, stop = map(np.asarray, nominal_bounds(port))
+    else:
+        start, stop = np.asarray(feed["start_m"]), np.asarray(feed["stop_m"])
     margin = settings["feed_margin_diameters"] * port.transverse_size_m
     feed_low, feed_high = snap(start - margin), snap(stop + margin)
     if not (np.all(feed_low < start) and np.all(feed_high > stop)
@@ -181,7 +182,8 @@ def spectrum_frequencies(settings, mesh):
 
 
 def install_monitors(engine, csx, geometry, axes, mesh, config, run):
-    layout = monitor_layout(geometry, axes, mesh, config["solver"]["power_diagnostics"])
+    feed = resolve_feed(geometry.port, axes, config["solver"].get("port_mesh_alignment", "legacy"))
+    layout = monitor_layout(geometry, axes, mesh, config["solver"]["power_diagnostics"], feed)
     if config["solver"]["power_diagnostics"].get("source_edge_work", False):
         from .source_work import edge_probe_layout, install_edge_probes
         layout["source_edge_work"] = edge_probe_layout(axes, layout["voltage_probes"])
@@ -269,6 +271,9 @@ def pack_diagnostics(path):
              "summary.json", "solver.log", "source.zip", "openems/model.xml",
              "openems/port_ut_1", "openems/port_it_1", "openems/et", "openems/ht"]
     paths = [root / name for name in names]
+    # Optional for packaging old, already completed runs without this audit.
+    if (root / "feed_grid_coverage.json").is_file():
+        paths.append(root / "feed_grid_coverage.json")
     paths.extend(sorted((root / "openems").glob("power_[ui]_*")))
     import json
     layout = json.loads((root / "power_monitor_layout.json").read_text(encoding="utf-8"))

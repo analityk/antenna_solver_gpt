@@ -2,8 +2,10 @@
 
 **Stan: implementacja eksperymentalna, bez zakończonej walidacji natywnej.**
 API sprawdzono względem źródeł wydania 0.37.0-rc3. Użytkownik potwierdził
-import, przygotowanie XML i pierwszy FDTD na Windowsie. Surowe dane
-potwierdzają deficyt mocy PEC 12,15%; fizyczna kontrola pozostaje otwarta.
+import, przygotowanie XML, FDTD i kontrolę pracy źródła na Windowsie.
+Pozorny deficyt 12,15% wynika głównie z błędnego odniesienia pojedynczego U·I;
+praca lokalna i strumień zewnętrzny są zgodne do 0,102%. Wariant poprawiający
+wykryty błąd granic wymuszenia wymaga natywnego sprawdzenia.
 
 ## Materiały i źródło
 
@@ -19,12 +21,25 @@ kwadratem o boku średnicy drutu, a nie zanikającą linią źródła.
 Ta idealizacja wpływa na lokalne pole i impedancję; wymaga kontroli
 przy zagęszczaniu siatki. 200 Ω nie jest wynikiem obliczenia anteny.
 
+Siatka zaokrągla kotwice do 12 miejsc po przecinku w metrach. Przekazanie
+do AddLumpedPort niezaokrąglonych granic wyklucza w pierwszym modelu dwie
+warstwy wymuszenia: opór jest przyciągany do siatki i obejmuje 450 krawędzi,
+a źródło korzysta z testu punkt-wewnątrz-boxa i obejmuje tylko 270.
+`solver.port_mesh_alignment=mesh_anchors` przekazuje dokładne istniejące
+kotwice do całego portu. Dopuszcza odchyłkę najwyżej 1e-12 m, zapisuje audyt
+i odrzuca większą niezgodność. Geometria anteny i siatka pozostają bez zmian.
+Brak opcji lub `legacy` odtwarza stare granice i zgłasza niepełne pokrycie.
+To zgodność wsteczna do porównań, nie zalecany poprawiony model.
+Konfiguracja kontrolna: `parameters/quados8_1420mhz_aligned_feed.json`.
+
 ## Dyskretyzacja
 
 Siatka FDTD jest kartezjańska i niejednorodna. W aktywnym obszarze krok jest
 ograniczony średnicą drutu i długością fali górnej częstotliwości pasma
 wymuszenia. Zachowujemy węzły, granice materiałów i portu. Poza anteną
-krok rośnie z ograniczeniem growth_ratio. PML ma po 8 komórek na ścianie;
+krok rośnie z ograniczeniem growth_ratio wewnątrz dodawanego otoczenia;
+znane naruszenie limitu na połączeniach przedziałów opisano niżej.
+PML ma po 8 komórek na ścianie;
 jego zewnętrzna część ma stały krok.
 
 Domyślne 3 komórki na średnicę i 20 na długość fali są punktem startowym,
@@ -45,10 +60,14 @@ sinusoidalne w V i A. Impedancja jest ich ilorazem.
 
 Współczynnik pola to sqrt(Pcel / Pnative) razy exp(−j arg(Vport)),
 gdzie Pnative = 0,5 Re(Vport · conj(Iport)). Po jego zastosowaniu pole ma
-amplitudę szczytową przy zadanej mocy przyjętej (domyślnie 1 W);
+amplitudę szczytową przy zadanym odniesieniu pomiaru portu (domyślnie 1 W);
 faza 0° odpowiada dodatniemu maksimum napięcia portu.
 Rekonstrukcja: Re(F · exp(+j · faza)). Skończoność danych i dodatnia moc
 są sprawdzane przed skalowaniem.
+Wynik source_work wykazał, że w starym modelu ta wielkość nie równa się
+lokalnej pracy netto. Nazwa `accepted_power_w` pozostaje w kontrakcie v2,
+ale nie potwierdza poprawności pomiaru mocy ani zysku. Nie przepisano starych
+wyników i nie dopasowano normalizacji do strumienia NF2FF.
 
 Promień odniesienia NF2FF to 1 m. Jest to współczynnik asymptotycznego pola,
 nie twierdzenie, że 1 m leży w strefie dalekiej anteny.

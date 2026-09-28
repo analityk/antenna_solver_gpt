@@ -315,6 +315,55 @@ nie przerywa obliczeń. Sprawdzono dokumentację Microsoft i źródła paczki MS
 Preflight UCRT i poprawne zapisanie kompletu sond wymagają potwierdzenia
 na komputerze użytkownika. Nie wykonano benchmarków. Bilans PEC pozostaje otwarty.
 
+## 2026-09-28 — lokalna praca zamyka bilans; korekta granic wymuszenia
+
+**Powód:** użytkownik dostarczył kompletny wynik source_work po poprawce UCRT.
+Należy rozstrzygnąć deficyt przed strojeniem, bez narzucania sprawności 100%.
+
+**Ustalenia:** zapisano wszystkie 900 lokalnych sond; preflight UCRT 945
+strumieni i limit 512 → 2048 działa na Windowsie. Zakończono do EndCriteria
+−50 dB. Praca netto 0,879386295 W jest zgodna ze strumieniem zewnętrznym
+0,878490162 W do 0,102%, z wewnętrznym 0,878968878 W do 0,0475%. Pojedyncze
+U·I portu przyjęte jako 1 W nie mierzy poprawnie tej pracy. Surowe nagłówki,
+widma i odtworzenie całek U/I są zgodne; siatka i stare wyniki się nie zmieniły.
+
+**Przyczyna w adapterze:** kotwice siatki zaokrąglano do 1e-12 m, granice
+AddLumpedPort pozostawały niezaokrąglone. Skrajne linie y wychodzą poza box
+o 0,324 pm. Opór używa SnapBox2Mesh i obejmuje 450 krawędzi; geometryczny
+test wymuszenia obejmuje tylko 270. Dokładnie te krawędzie dostarczają
+dodatnią pracę +1,434333232 W; pozostałe 180 pochłania −0,554946937 W.
+Ich −Re(I/U) odtwarza konduktancję gałęzi RC z operator.cpp do 3,19e-5.
+Przypięte źródła openEMS i CSXCAD potwierdzają różne reguły doboru krawędzi.
+
+**Zmiana:** solvers/feed.py uzgadnia port z dokładnymi kotwicami w nowym
+trybie mesh_anchors, tylko w tolerancji 1e-12 m. Większa odchyłka jest błędem.
+Audyt przed Run zapisuje nominalne/użyte granice, indeksy i pokrycie boxem.
+Nowa konfiguracja quados8_1420mhz_aligned_feed.json wymaga 450/450 krawędzi.
+Stare konfiguracje bez opcji lub z legacy zachowują dawny model i ostrzegają.
+
+**Wpływ na fizykę:** wymiary anteny, siatka, opór i jego zakończenia, R, impuls,
+PML i EndCriteria pozostają takie same. Dyskretne wymuszenie zmienia się
+270 → 450 krawędzi i wymaga nowego FDTD. Nie przeskalowano geometrii ani
+normalizacji pola. Stary zysk i SWR nie są zatwierdzone; bilans pracy nie
+zastępuje zbieżności ani przypadku referencyjnego. M2 nadal otwarte.
+
+**Formaty i odtwarzalność:** opcjonalne solver.port_mesh_alignment rozszerza
+konfigurację v2, bez zmiany zachowania dawnych plików. Nowy feed_grid_coverage.json
+i manifest.solver.feed dokumentują granice; audyt wchodzi do ZIP. Pakowanie
+starych danych bez audytu pozostaje możliwe. Wymagania 0.8 opisują następny
+przebieg. Dokładną analizę i identyfikację paczki zapisano w docs/power-audit.md.
+
+**Sprawdzenie:** zestaw unittest zakończył się sukcesem (35 testów w liczniku;
+pominięty lokalny test UCRT i klasa Tk). Nowa regresja odtwarza 270/450,
+sprawdza 450/450 po wyrównaniu, identyczność modelu/siatki/lokalnych sond,
+odrzucenie większego przesunięcia i przekazanie granic do natywnego API
+przez adapter z atrapą. Siatkę porównano także z dostarczonym mesh.npz.
+
+**Ograniczenia:** nowego wariantu nie wykonano tutaj ani na komputerze
+użytkownika. Audyt przed Run dotyczy geometrii boxa, nie wyniku FDTD.
+Skończony rozmiar portu może nadal wymagać kontroli. Wada przejść siatki
+i zbieżność pozostają otwarte. Nie wykonano benchmarków.
+
 ## Wzór kolejnego wpisu
 
 - Data i krótka nazwa zmiany.

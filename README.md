@@ -6,10 +6,10 @@ i skończonym reflektorem. Silnik obliczeniowy: **openEMS** na Windows 11.
 
 **Działa generator, edytor wymiarów i eksport geometrii (M1).**
 Adapter openEMS oraz odczyt impedancji i pola dalekiego są zaimplementowane;
-użytkownik ukończył pierwszy przebieg na Windowsie. Jego bilans mocy PEC
-wykazuje deficyt 12,15%; przyczyna i walidacja fizyczna pozostają otwarte (M2).
-Pasywna kontrola wskazała niejednorodne napięcie w obszarze zasilania;
-następny wariant mierzy lokalną pracę źródła bez zmiany geometrii i siatki.
+użytkownik ukończył przebiegi na Windowsie. Lokalny pomiar pracy źródła
+wyjaśnia niemal cały pozorny deficyt mocy 12,15%: różnica względem strumienia
+zewnętrznego wynosi 0,102%. Znaleziono błąd granic wymuszenia na siatce.
+Nowy wariant aligned_feed poprawia go i czeka na sprawdzenie natywne (M2).
 Nie ma jeszcze zweryfikowanych wyników anteny, map E/H, prądów ani animacji.
 
 ## Pierwsze uruchomienie — CMD
@@ -77,13 +77,13 @@ i zbieżności siatki. Nie wykonujemy benchmarków.
 
 ## Model i dokumentacja
 
-Przed zmianą skali anteny wykonujemy kontrolę bilansu mocy.
-Pierwsza kontrola z dodatkowymi powierzchniami i sondami została ukończona.
-Następna konfiguracja zachowuje wymiary, port, siatkę i impuls pierwszego
-przebiegu; dodaje lokalne pary U/I do pomiaru pracy rozłożonego źródła.
+Przed zmianą skali anteny sprawdzamy poprawione zasilanie. Lokalna praca
+źródła została już zmierzona. Nowa konfiguracja zachowuje wymiary, siatkę,
+opór i impuls, ale uzgadnia granice portu z kotwicami siatki: wymuszenie
+obejmie wszystkie 450 krawędzi zamiast 270. To zmiana dyskretnego źródła.
 
 ```bat
-.\.venv\Scripts\python.exe -m antenna_lab run --config parameters\quados8_1420mhz_source_work.json
+.\.venv\Scripts\python.exe -m antenna_lab run --config parameters\quados8_1420mhz_aligned_feed.json
 ```
 
 To nowy przebieg FDTD. Zamiast raportu HTML zapisuje `power_balance.json`,
@@ -91,6 +91,10 @@ widmo impedancji 1400–1440 MHz co 0,25 MHz i małą paczkę `power_diagnostics
 w nowym katalogu wyników. Ten krok częstotliwości dotyczy odczytu przebiegów
 portu, nie dodatkowych symulacji ani deklaracji dokładności. Szczegóły i
 interpretacja: [diagnostyka mocy](docs/power-audit.md).
+Przed Run zapisuje także `feed_grid_coverage.json`; komunikat powinien podać
+450/450 krawędzi. Starsze konfiguracje bez `port_mesh_alignment` zachowują
+wadliwe granice źródła do porównań i zgłaszają ostrzeżenie. Poprawka wymaga
+`mesh_anchors`; nie zmienia wcześniej zapisanych wyników ani normalizacji.
 
 Promiennik jest sumą cylindrów PEC ze złączami kulistymi. Reflektor jest
 pełną płytą PEC o zadanej grubości. Port różnicowy ma odniesienie 200 Ω;

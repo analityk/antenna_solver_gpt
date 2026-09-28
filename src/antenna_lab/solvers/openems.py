@@ -9,6 +9,7 @@ from pathlib import Path
 import numpy as np
 
 from antenna_lab.core.config import ConfigurationError, write_json
+from .feed import resolve_feed
 from .mesh import make_mesh
 
 ETA0 = 376.730313668
@@ -36,6 +37,16 @@ def check_capabilities(config):
 def prepare(geometry, config, run):
     check_capabilities(config)
     axes, meta = make_mesh(geometry, config)
+    feed = resolve_feed(geometry.port, axes, config["solver"].get("port_mesh_alignment", "legacy"))
+    write_json(run.path / "feed_grid_coverage.json", feed)
+    print(f"Granice źródła ({feed['alignment']}): "
+          f"{feed['excitation_box_edge_count']}/{feed['resistor_edge_count']} krawędzi portu w obszarze wymuszenia.",
+          flush=True)
+    if feed["excluded_edge_count"]:
+        warning = ("Odtwarzanie starego portu: wymuszenie pomija część krawędzi oporu. "
+                   "Poprawiony wariant wymaga solver.port_mesh_alignment=mesh_anchors.")
+        run.manifest["warnings"].append(warning)
+        print(warning, flush=True)
     ems_module, csx_module = native_modules()
     settings = config["solver"]
     engine = ems_module.openEMS(NrTS=settings["max_timesteps"], EndCriteria=settings["end_criteria"])
@@ -59,12 +70,7 @@ def prepare(geometry, config, run):
     for plate in geometry.plates:
         reflector = csx.AddMetal(plate.id + "_PEC")
         reflector.AddBox(start=list(plate.start), stop=list(plate.stop), priority=10)
-    p = geometry.port
-    if p.negative[1:] != p.positive[1:] or p.negative[0] >= p.positive[0]:
-        raise ConfigurationError("Adapter wymaga obecnie portu skierowanego w +x.")
-    half = p.transverse_size_m / 2
-    start = [p.negative[0], p.negative[1] - half, p.negative[2] - half]
-    stop = [p.positive[0], p.positive[1] + half, p.positive[2] + half]
+    start, stop = feed["start_m"], feed["stop_m"]
     port = engine.AddLumpedPort(1, config["simulation"]["reference_impedance_ohm"], start, stop, "x", 1.0, priority=5)
     nf = None
     if config["requested_outputs"]["far_field"]:
@@ -87,7 +93,7 @@ def prepare(geometry, config, run):
         csx_version = getattr(csx_module, "__version__", "unknown")
     run.manifest["solver"] = {"name": "openEMS", "version": ems_module.__version__, "csxcad_version": csx_version,
                               "settings": settings, "mesh": meta,
-                              "feed": {"start_m": start, "stop_m": stop, "direction": "+x", "square_caps": True}}
+                              "feed": feed}
     run.save()
     return engine, csx, port, nf, native_path
 

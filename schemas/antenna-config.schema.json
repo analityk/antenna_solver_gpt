@@ -216,6 +216,10 @@
         "name": {
           "const": "openEMS"
         },
+        "port_mesh_alignment": {
+          "enum": ["legacy", "mesh_anchors"],
+          "description": "Missing/legacy preserves the old feed bounds; mesh_anchors aligns the source to existing grid anchors within 1e-12 m."
+        },
         "power_diagnostics": {
           "type": "object",
           "additionalProperties": false,

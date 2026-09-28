@@ -24,18 +24,22 @@ Potwierdzone środowisko zapisano w `docs/windows-setup.md`.
 M1 jest zaimplementowane: generator, walidacja, edytor i eksport geometrii.
 Adapter openEMS, impedancja i pole dalekie są kodem eksperymentalnym:
 Użytkownik ukończył przebieg 20260928T004231Z_902d497594 na Windowsie.
-Bilans mocy PEC wykazuje deficyt 12,15%; niezależne całkowanie surowych NF2FF
-potwierdza odczyt, ale przyczyna fizyczna/numeryczna pozostaje otwarta.
-Ukończony pasywny przebieg odtwarza pierwotne wyniki. Dwie powierzchnie
-całej anteny są zgodne do 0,055%; napięcie przekroju portu różni się do 16,8%
-amplitudy i 10,8° fazy. Podejrzenie dotyczy utożsamienia pojedynczego U·I
-z mocą przestrzennie rozłożonego źródła. Kontrola source_work dodaje 450 par
-lokalnych sond bez zmiany modelu; jej wykonanie natywne pozostaje otwarte.
-Pierwsza próba source_work ujawniła limit 512 strumieni UCRT przy 945 sondach.
-Przed Run adapter przygotowuje limit w tym samym procesie i sprawdza otwarcie
-strumieni. Błąd natywnego otwarcia pliku ma natychmiast zatrzymywać pracownika.
-Poprawka obsługi plików czeka na potwierdzenie użytkownika na Windowsie.
-Najpierw diagnostyka mocy (docs/power-audit.md), potem skalowanie i zbieżność.
+Kontrola source_work z 450 parami sond jest ukończona na Windowsie; poprawka
+limitu UCRT została potwierdzona. Przy pierwotnym odniesieniu portu 1 W praca
+lokalna netto wynosi 0,879386295 W, strumień zewnętrzny 0,878490162 W.
+Pozorny deficyt 12,15% względem pojedynczego U·I maleje do 0,102% względem
+pracy lokalnej. To nie jest jeszcze walidacja impedancji i zysku.
+Znaleziono błąd adaptera: zaokrąglone kotwice siatki leżą minimalnie poza
+niezaokrąglonym boxem źródła; opór obejmuje 450 krawędzi, wymuszenie tylko 270.
+Pozostałe 180 krawędzi ma zmierzony wkład ujemny zgodny z samym oporem.
+Nowy wariant parameters/quados8_1420mhz_aligned_feed.json ustawia
+solver.port_mesh_alignment=mesh_anchors i przekazuje dokładne granice siatki
+do AddLumpedPort. Nie zmienia geometrii anteny ani siatki, ale zmienia dyskretne
+wymuszenie; wymaga nowego FDTD. Tego wariantu nie wykonano jeszcze natywnie.
+Brak opcji/legacy zachowuje stare źródło do odtwarzania; nie traktuj go jako
+poprawionego modelu. Nie wymuszaj bilansu renormalizacją i nie zatwierdzaj
+starego SWR/zysku. Najpierw kontrola poprawionego portu, potem zbieżność
+i strojenie (docs/power-audit.md). Błąd otwarcia pliku zatrzymuje pracownika.
 Nie przedstawiaj M2 jako zakończonego. Prądy promiennika i mapy E/H są
 jeszcze niezaimplementowane; żądanie tych danych musi kończyć się jawnym błędem.
 Pasywne sondy portu i powierzchnie diagnostyczne nie zaliczają M3.

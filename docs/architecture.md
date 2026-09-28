@@ -12,6 +12,7 @@ i domyślne parametry. Samodzielna dystrybucja wheel nie jest jeszcze obsługiwa
 | `core/runs.py` | RunRecord, konfiguracja, schematy, kod i skróty artefaktów | Bez wyników zastępczych |
 | `antennas/` | Rejestr modeli i deterministyczny generator Quados8 | Bez importu openEMS |
 | `solvers/mesh.py` | Niejednorodna siatka kartezjańska, PML, kontrola limitu | Bez zmian wymiarów anteny |
+| `solvers/feed.py` | Granice portu i audyt pokrycia krawędzi przez box wymuszenia | Korekta zaokrągleń w adapterze; bez zmiany siatki |
 | `solvers/openems.py` | Materiały, port, FDTD XML, impedancja i NF2FF | Główny adapter natywnego API |
 | `solvers/power.py` | Pasywne sondy, odczyt HDF5, strumień mocy, widmo portu | Diagnostyka adaptera; bez wymuszania bilansu |
 | `solvers/source_work.py` | Lokalne pary U/I, kontrola indeksów i sumowania, praca źródła | Pasywna diagnostyka siatki; bez korekty portu |
@@ -53,12 +54,12 @@ wykonania i status fizycznej walidacji. `completed` nie oznacza `passed`.
 M1 i podstawowy edytor są zaimplementowane. Adapter M2 jest eksperymentalny;
 nie wykonano tutaj obliczenia natywnym openEMS. Na Windowsie użytkownika
 potwierdzono import CPython 3.14.0/openEMS 0.37.0rc3/CSXCAD 0.7.0rc3.
-Użytkownik ukończył pierwszy FDTD na Windowsie; deficyt mocy PEC 12,15% jest
-potwierdzony surowymi danymi. Przypadek referencyjny, wyjaśnienie deficytu
+Użytkownik ukończył FDTD i kontrolę 450 lokalnych par sond na Windowsie;
+poprawka UCRT działa. Lokalna praca źródła i strumień zewnętrzny różnią się
+o 0,102%, co wyjaśnia niemal cały pozorny deficyt 12,15% względem starego U·I.
+Wariant aligned_feed poprawia wykrytą różnicę granic siatki i wymuszenia;
+nie wykonano go jeszcze natywnie. Przypadek referencyjny, kontrola portu
 i sprawdzenie zbieżności pozostają otwarte.
-Pierwszy pasywny przebieg diagnostyczny również wykonano na Windowsie;
-kontrola pracy lokalnej z 450 parami sond wymaga powtórzenia po błędzie
-limitu strumieni Windows. Poprawka obsługi plików czeka na potwierdzenie natywne.
 Mapy E/H i prądy wymagają dalszej implementacji; adapter odrzuca ich żądanie.
 
 CPU Ryzen 7 7800X3D, RAM 32 GB, Windows 11. Instrukcje używają CMD i `.venv`.

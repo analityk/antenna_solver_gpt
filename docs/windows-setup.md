@@ -174,13 +174,16 @@ Zmiana dotyczy wspieranego wydania MSVC z dynamicznym CRT. Sama zmiana
 limitu w nadrzędnym terminalu lub w innym procesie Pythona nie wystarcza.
 Niezależnie od kontroli, komunikat natywnego `Can't open file:` natychmiast
 zatrzymuje pracownika, zapisując stan failed i zachowując istniejące pliki.
-Rzeczywiste wykonanie tej poprawki w Windowsie pozostaje do potwierdzenia.
+Kompletny wynik source_work dostarczony 2026-09-28 potwierdził powyższy
+komunikat, zapis wszystkich 900 lokalnych sond i brak błędów otwierania.
+Poprawka UCRT jest sprawdzona na komputerze użytkownika.
 
-Po zatrzymaniu wadliwego przebiegu aktualizacja i nowa próba w CMD:
+Następny przebieg dotyczy już korekty źródła opisanej w
+[diagnostyce mocy](power-audit.md), nie limitu plików. W CMD:
 
 ```bat
 git pull --ff-only
-.\.venv\Scripts\python.exe -m antenna_lab run --config parameters\quados8_1420mhz_source_work.json
+.\.venv\Scripts\python.exe -m antenna_lab run --config parameters\quados8_1420mhz_aligned_feed.json
 ```
 
 Nie używaj ponownie katalogu niekompletnego przebiegu. Polecenie tworzy nowy.

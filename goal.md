@@ -1,6 +1,6 @@
 # Cel projektu
 
-Wersja wymagań: 0.7. Data: 2026-09-28, Europe/Warsaw.
+Wersja wymagań: 0.8. Data: 2026-09-28, Europe/Warsaw.
 
 ## Bieżący stan
 
@@ -9,14 +9,13 @@ mają wersję 2; wycofany szkic NEC2++ nie jest obsługiwany.
 Generator Quadosa, edytor wymiarów, eksport i kontrola geometrii są zaimplementowane.
 Adapter openEMS przygotowuje model XML i zawiera odczyt impedancji oraz pola
 dalekiego. Użytkownik potwierdził udane prepare oraz zapis XML na natywnym
-Windowsie 2026-09-28 i ukończył pierwszy FDTD. Stwierdzony deficyt mocy PEC
-12,15% wymaga wyjaśnienia przed skalowaniem anteny. Niezależne całkowanie
-surowych NF2FF odtwarza wynik; walidacja fizyczna pozostaje otwarta.
-Pasywny przebieg z dodatkowymi sondami ukończono na Windowsie: dwie powierzchnie
-całej anteny są zgodne do 0,055%, a przekrój źródła ma niejednorodne napięcie.
-Do rozstrzygnięcia hipotezy błędnego pomiaru mocy rozłożonego źródła dodano
-osobny wariant z lokalnymi parami U/I. Pierwsza próba wykazała limit otwartych
-strumieni na Windowsie; kompletnego wyniku tej kontroli jeszcze nie uzyskano.
+Windowsie 2026-09-28 i ukończył pierwszy FDTD oraz kontrole pasywne.
+Komplet 450 lokalnych par U/I potwierdza pracę źródła 0,879386295 W przy
+pierwotnym odniesieniu pojedynczego U·I równym 1 W. Strumień całej anteny
+0,878490162 W różni się od tej pracy o 0,102%, zamiast wcześniejszych 12,15%.
+Wykryto niespójne granice siatki i wymuszenia: zasilane jest 270 z 450 krawędzi
+oporu portu. Osobny wariant aligned_feed usuwa tę niespójność; wymaga nowego
+przebiegu natywnego. Poprawka limitu strumieni Windows jest potwierdzona.
 Nie ma jeszcze zweryfikowanego wyniku obliczeń Quadosa.
 Prądy, mapy E/H, animacje oraz kontrola zbieżności pozostają do wykonania.
 
@@ -151,6 +150,12 @@ diagnostyczny dodaje wyłącznie pasywne pomiary do pierwotnego modelu i siatki,
 zapisuje strumienie trzech zamkniętych powierzchni oraz rozkład odczytów portu.
 Druga kontrola sumuje lokalną pracę 450 krawędzi źródła i sprawdza odtworzenie
 całek U/I z pomiarów lokalnych; zachowuje tę samą geometrię i siatkę.
+Po zidentyfikowaniu błędu wariant aligned_feed uzgadnia granice AddLumpedPort
+z istniejącymi kotwicami siatki (maksymalnie 1e-12 m). Audyt zapisuje granice,
+indeksy i liczbę krawędzi obejmowanych przez wymuszenie. Kolejny natywny
+przebieg ma sprawdzić rozkład pracy, zgodność obu powierzchni z pracą źródła
+oraz przydatność pojedynczego U·I. Wymiary, opór, siatka i impuls pozostają
+takie same; dyskretny rozkład wymuszenia zmienia się jawnie.
 Nie dopuszcza się wymuszenia bilansu przez przeskalowanie pola. Zgodność
 bilansu sama nie zastępuje zbieżności impedancji i zysku. Tryb diagnostyczny
 zapisuje dane bez raportu; opis: `docs/power-audit.md`.

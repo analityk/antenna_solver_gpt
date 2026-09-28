@@ -25,6 +25,7 @@ pozostają w katalogu. Nie przedstawiamy ich jako ukończonego wyniku.
 | `validation.json` | Wszystkie: kontrola geometrii; elektromagnetyka unverified |
 | `plots/geometry.png` | Wszystkie: widoki xy/yz, bez rozkładu prądu |
 | `mesh.npz`, `mesh.json` | prepare/run: linie x/y/z w m, rozmiar, wymuszenie, PML i NF2FF |
+| `feed_grid_coverage.json` | prepare/run: nominalne i użyte granice portu, tryb wyrównania, indeksy i geometryczne pokrycie krawędzi wymuszeniem |
 | `openems/model.xml` | prepare/run: pełne wejście FDTD i CSXCAD |
 | `solver.log` | prepare/run: komunikaty natywnego procesu i postprocessingu |
 | `openems/` | run: surowe pliki portu i powierzchni NF2FF |
@@ -62,6 +63,14 @@ Składowe `edge_active_work_w` mają osie [częstotliwość, krawędź],
 Są przeliczone tym samym współczynnikiem mocy co pierwotny port; nie zmieniają
 `accepted_power_w`, impedancji, zysku ani statusu walidacji. Surowe widma
 pozostają transformatami impulsu, nie amplitudami sinusoidalnymi.
+
+Nowe paczki zawierają także `feed_grid_coverage.json`; stare przebiegi bez
+tego pliku nadal można spakować. Manifest.solver.feed zachowuje ten sam audyt.
+`excitation_box_edge_count` liczy środki krawędzi E_x znajdujące się w boxie,
+przed zbudowaniem operatora natywnego. To kontrola geometryczna, nie zmierzona
+liczba aktywnych źródeł ani potwierdzenie poprawności pól. Wariant
+`mesh_anchors` musi objąć wszystkie krawędzie oporu; `legacy` może odtwarzać
+niepełne pokrycie. Szczegóły i wynik kontroli: `docs/power-audit.md`.
 
 ## Konwencje danych
 

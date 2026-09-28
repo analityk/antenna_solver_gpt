@@ -29,8 +29,9 @@ NF2FF; nie zależy od kroku kątów charakterystyki 5°. Usunięcie ostatnich
 32 z 323 próbek portu zmienia jego moc przy 1420 MHz o około 0,199%; to
 kontrola wrażliwości portu na ucięcie, nie dowód zbieżności wszystkich pól.
 
-Podejrzenia pozostają w modelu/pomiarze portu, dyskretyzacji i interpolacji
-pól. Port ma 19,669 mm długości (około 0,093 długości fali), obejmuje 18 × 4 × 4
+Pierwsza analiza wskazała model/pomiar portu, dyskretyzację i interpolację
+pól; wynik lokalnej pracy poniżej rozstrzyga główną rozbieżność. Port ma
+19,669 mm długości (około 0,093 długości fali), obejmuje 18 × 4 × 4
 komórki, a pierwotny pomiar używa jednej linii U i jednego przekroju I.
 Sam rozmiar nie dowodzi błędu. Siatka ma skok sąsiednich komórek do 1,8667
 w osi z mimo ustawienia growth_ratio=1,4. Obecny generator ogranicza wzrost
@@ -95,7 +96,7 @@ dają około 2,07759 i różnią się fazą o około −32,77°. Są to diagnost
 iloczyny różnych sond, nie 18 alternatywnych pomiarów mocy anteny. Samo
 przesunięcie płaszczyzny I wewnątrz portu nie wyjaśnia deficytu.
 
-## Następna kontrola: lokalna praca źródła
+## Kontrola lokalnej pracy źródła
 
 Pierwszy zestaw sond przechowuje całki U przez całą długość i I przez cały
 przekrój. Nie da się z nich odtworzyć iloczynów lokalnych: suma U razy suma I
@@ -111,7 +112,8 @@ To nadal tylko pasywne pomiary na tej samej siatce, bez zmiany źródła.
 Pierwsza próba `20260928T101020Z_78b86cdbac` wykazała błąd otwierania plików
 po osiągnięciu domyślnego limitu 512 strumieni UCRT. Komplet 945 sond nie został
 zapisany. Adapter przygotowuje teraz limit i sprawdza zasoby przed Run,
-a błąd otwarcia natychmiast zatrzymuje pracownika. Wymagana jest nowa próba;
+a błąd otwarcia natychmiast zatrzymuje pracownika. Kolejna próba na Windowsie
+zakończyła się kompletnym zapisem: 945 strumieni, limit UCRT 512 → 2048;
 opis: [obsługa strumieni Windows](windows-setup.md#wiele-sond-i-limit-otwartych-plików).
 
 ```bat
@@ -131,13 +133,97 @@ każdy dawny przekrój I. Odchyłka maksymalna powyżej 1e-4 względem najwięks
 amplitudy odniesienia dla danej częstotliwości przerywa odczyt. Ten próg
 sprawdza składanie pomiarów; nie jest progiem akceptacji bilansu fizycznego.
 
-Jeżeli suma pracy da około 0,8785 wartości pierwotnego portu, będzie to
-bezpośredni argument za błędem utożsamienia jego pojedynczego U·I z mocą
-całego źródła. Jeżeli da około 1, trzeba dalej badać dyskretyzację/pola i bilans
-między obszarem źródła a otoczeniem. Wynik pośredni wymaga analizy udziałów
-lokalnych oraz pozostałego błędu. Żadnego z tych wyników nie przewidziano
-ani nie wpisano do programu. Korekta modelu portu i sprawdzenie zbieżności
-będą oddzielnym krokiem po tej kontroli.
+## Wynik pracy lokalnej i zidentyfikowany błąd
+
+Użytkownik dostarczył kompletną paczkę `power_diagnostics(1).zip` dnia
+2026-09-28, SHA-256
+`be912077dbaa06e4809988a6523f12feb18665782d65c2cb51d9ba6e1aff0be3`.
+Jest 900 surowych plików lokalnych sond, a ich indeksy zgadzają się z planem.
+Ponowna DFT odtwarza zapisane widma do około 3e-16 względnej normy.
+Sumy lokalnych U odtwarzają 25 długich linii do 3,96e-13, a sumy I odtwarzają
+18 przekrojów do 2,34e-8. Siatka oraz pierwotne Z, SWR i zysk pozostały identyczne.
+
+| Pomiar przy 1420 MHz | Wartość w pierwotnej normalizacji | Różnica względem pracy lokalnej |
+| --- | ---: | ---: |
+| Pojedyncze U·I portu | 1,000000000 W | — |
+| Suma lokalnej pracy netto źródła | 0,879386295 W | — |
+| Zewnętrzna powierzchnia całej anteny | 0,878490162 W | −0,10190% |
+| Wewnętrzna powierzchnia całej anteny | 0,878968878 W | −0,04747% |
+| Mała powierzchnia przy zasilaniu | 0,840440439 W | −4,42875% |
+
+Niemal cały deficyt 12,15% jest więc skutkiem użycia pojedynczego U·I jako
+miary pracy niejednorodnego źródła. Nie wykazano utraty 12% podczas propagacji.
+Pozostałe około 0,1% nie zostało wyzerowane ani uznane za zbieżność.
+
+Rozkład pracy ujawnił konkretny błąd adaptera. Kotwice w `mesh._axis` są
+zaokrąglane do 12 miejsc po przecinku w metrach, a granice AddLumpedPort
+były przekazywane bez tego zaokrąglenia. Granice w y:
+
+- źródło: ±0,0017253521126760563 m;
+- siatka: ±0,001725352113 m;
+- skrajne linie leżą poza źródłem o około 3,2394e-13 m, czyli 0,324 pm.
+
+Opór portu jest odwzorowany przez `Operator::Calc_LumpedElements()` z użyciem
+`SnapBox2Mesh`, więc obejmuje 18 × 5 × 5 = 450 krawędzi. Wymuszenie sprawdza
+przynależność współrzędnych E do boxa. `CSPrimBox::IsInside` nie używa
+przekazanego argumentu tolerancji, a `CoordInRange` porównuje granice wprost.
+Obie skrajne warstwy y są wykluczone: wymuszenie obejmuje 18 × 3 × 5 = 270
+krawędzi. O rozstrzygnięciu decyduje strona granicy, nie wielkość odchyłki.
+
+W danych dokładnie te 270 krawędzi daje dodatnią pracę +1,434333232 W,
+a pozostałe 180 — ujemną −0,554946937 W. Na ujemnych krawędziach zmierzone
+−Re(I/U) zgadza się z konduktancją rozłożonego oporu do 3,19e-5 względnie.
+Konduktancję wyznaczono z rzeczywistych długości krawędzi i pól dualnych
+według gałęzi równoległej RC w `operator.cpp`; nie według rozszerzenia RLC.
+To niezależne potwierdzenie, że skrajne warstwy działają jako sam opór.
+Podane dodatnie/ujemne sumy są lokalną pracą netto, nie osobnymi mocami
+idealnego generatora i całego oporu zasilającego.
+
+Dokładne granice odtworzono z pełnych parametrów, kodu i `mesh.npz`.
+XML biblioteki zapisuje część współrzędnych ze zmniejszoną precyzją;
+nie użyto go do wnioskowania o odchyłce 0,324 pm. Run korzysta z obiektu
+zbudowanego w pamięci, nie wczytuje ponownie zapisanego XML.
+
+## Następny przebieg: spójne granice źródła
+
+`parameters/quados8_1420mhz_aligned_feed.json` włącza
+`solver.port_mesh_alignment=mesh_anchors`. Moduł `solvers/feed.py` wybiera
+dokładne istniejące kotwice dla granic całego AddLumpedPort i odrzuca odchyłkę
+większą niż 1e-12 m. W tym modelu największa korekta to 3,381e-13 m.
+Audyt przed Run wykazuje 450/450 krawędzi w obszarze wymuszenia. Zapisuje go
+`feed_grid_coverage.json` oraz manifest.solver.feed; plik trafia do paczki ZIP.
+Ten audyt jest geometryczny, nie jest wynikiem operatora natywnego.
+
+Nie zmieniają się fizyczne wymiary anteny, linie siatki, dyskretny opór i jego
+metalowe zakończenia, R=200 Ω, impuls, PML ani EndCriteria. Te same lokalne
+sondy mierzą pracę. Zmienia się rozkład wymuszenia 270 → 450 krawędzi, dlatego
+potrzebny jest nowy FDTD. Stare dane nie pozwalają obliczyć skutku tej zmiany.
+Konfiguracje bez nowej opcji lub z `legacy` zachowują dawny model i zgłaszają
+ostrzeżenie o niepełnym pokryciu — służą odtworzeniu, nie naprawie.
+
+W CMD, po zakończeniu poprzedniego przebiegu:
+
+```bat
+git pull --ff-only
+.\.venv\Scripts\python.exe -m antenna_lab run --config parameters\quados8_1420mhz_aligned_feed.json
+```
+
+Przygotowanie powinno wypisać:
+
+```text
+Granice źródła (mesh_anchors): 450/450 krawędzi portu w obszarze wymuszenia.
+```
+
+Sprawdzimy, jak zmieniają się niejednorodność napięcia i lokalna praca,
+czy oba strumienie nadal odtwarzają tę pracę i czy pojedyncze U·I staje się
+wiarygodnym odniesieniem. Sama pełna obecność wymuszenia nie gwarantuje
+jednorodnego pola w porcie o skończonym rozmiarze.
+
+Nie zatwierdzamy starego Z=73,114−j84,015 Ω, SWR=3,2787 ani zysku 16,947 dBi.
+Przeliczenie tego samego starego pola względem zmierzonej pracy zwiększyłoby
+liczbę zysku o 0,558 dB, lecz nie naprawiłoby źródła ani impedancji. Nie zostało
+zastosowane. Po sprawdzeniu nowego źródła nadal potrzebna jest kontrola
+siatki, zbieżności i przypadku referencyjnego; M2 pozostaje otwarte.
 
 Nie mnożymy pola przez współczynnik wymuszający bilans 1:1. Nie zmieniamy
 odniesienia zysku na moc promieniowaną pod tą samą nazwą. Nie skalujemy anteny
@@ -152,7 +238,11 @@ wszystkich linii siatki konfiguracji kontrolnej z plikiem `mesh.npz` starego
 przebiegu. Użytkownik potwierdził działanie pierwszego zestawu dodatkowych
 monitorów na Windowsie, dostarczając powyższe wyniki. Nowe 450 par lokalnych
 sond sprawdzono testami znaków pracy, analitycznego strumienia, składania
-pomiarów i indeksów; wymagają jeszcze wykonania natywnego przebiegu.
+pomiarów i indeksów oraz kompletnym natywnym przebiegiem użytkownika.
+Regresja granic odtwarza 270/450 starego źródła, wymaga 450/450 po poprawce,
+kontroluje identyczność geometrii/siatki/sond i odrzucenie zbyt dużego
+przesunięcia. Test granicy adaptera sprawdza argumenty AddLumpedPort.
+Nowego wariantu z poprawionym źródłem nie wykonano jeszcze natywnie.
 
 Czytnik obsługuje sprawdzony zespolony format HDF5 NXYZ openEMS 0.37.0rc3.
 Inne formaty są odrzucane. Brak plików którejkolwiek ściany jest błędem także
@@ -165,4 +255,8 @@ Implementacja źródłowa używana do porównania:
 
 Dla pracy lokalnej: [całka prądu i obieg H](https://github.com/thliebig/openEMS/blob/67d378488ee40de815eed00f8aaa808f0a9e3c6d/Common/processcurrent.cpp),
 [przyciąganie sond do siatki](https://github.com/thliebig/openEMS/blob/67d378488ee40de815eed00f8aaa808f0a9e3c6d/FDTD/operator.cpp),
-[rozkład elementu skupionego na krawędzie](https://github.com/thliebig/openEMS/blob/67d378488ee40de815eed00f8aaa808f0a9e3c6d/FDTD/extensions/operator_ext_lumpedRLC.cpp).
+[rozkład oporu równoległego RC na krawędzie](https://github.com/thliebig/openEMS/blob/67d378488ee40de815eed00f8aaa808f0a9e3c6d/FDTD/operator.cpp).
+
+Dla pokrycia źródła: [wybór krawędzi wymuszenia](https://github.com/thliebig/openEMS/blob/67d378488ee40de815eed00f8aaa808f0a9e3c6d/FDTD/extensions/operator_ext_excitation.cpp),
+[IsInside dla boxa](https://github.com/thliebig/CSXCAD/blob/dcdb62bcfd1111ee3594ba22d06089b41b380990/src/CSPrimBox.cpp),
+[CoordInRange i dokładne porównania granic](https://github.com/thliebig/CSXCAD/blob/dcdb62bcfd1111ee3594ba22d06089b41b380990/src/CSPrimitives.cpp).

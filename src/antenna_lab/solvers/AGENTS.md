@@ -9,6 +9,10 @@ i poprawność fizyczna wymagają sprawdzenia na Windowsie. Wyniki są unverifie
 - Zapisuj pełne FDTD XML, linie siatki, wersje, ustawienia i komunikaty solvera.
 - Zachowuj węzły portu i obszar PML. Przekroczenie limitu komórek jest błędem,
   nie powodem do cichego pogorszenia rozdzielczości.
+- W trybie mesh_anchors port i jego wymuszenie używają dokładnie tych samych
+  granic co siatka. Dopuszczaj tylko korektę zaokrąglenia do 1e-12 m; większa
+  odchyłka jest błędem. Legacy służy odtwarzaniu wcześniejszych przebiegów.
+  Audyt boxa przed Run nie zastępuje kontroli natywnych pól i pracy źródła.
 - Sprawdzaj częstotliwości, skończoność danych i dodatnią moc przed normalizacją.
 - Surowe widma impulsowego portu nie są zwykłymi amplitudami napięcia/prądu.
   Zachowuj je osobno; normalizuj fazory pola do mocy i fazy portu.
