@@ -57,9 +57,10 @@ potwierdzono import CPython 3.14.0/openEMS 0.37.0rc3/CSXCAD 0.7.0rc3.
 Użytkownik ukończył FDTD i kontrolę 450 lokalnych par sond na Windowsie;
 poprawka UCRT działa. Lokalna praca źródła i strumień zewnętrzny różnią się
 o 0,102%, co wyjaśnia niemal cały pozorny deficyt 12,15% względem starego U·I.
-Wariant aligned_feed poprawia wykrytą różnicę granic siatki i wymuszenia;
-nie wykonano go jeszcze natywnie. Przypadek referencyjny, kontrola portu
-i sprawdzenie zbieżności pozostają otwarte.
+Wariant aligned_feed wykonano natywnie: 450 dodatnich lokalnych wkładów,
+praca 0,949145539 W i strumień zewnętrzny 0,948187885 W. Poprawka granic działa;
+pomiar pojedynczego U·I nadal różni się od pracy o 5,085% odniesienia portu.
+Przypadek referencyjny, definicja/pomiar portu i zbieżność pozostają otwarte.
 Mapy E/H i prądy wymagają dalszej implementacji; adapter odrzuca ich żądanie.
 
 CPU Ryzen 7 7800X3D, RAM 32 GB, Windows 11. Instrukcje używają CMD i `.venv`.

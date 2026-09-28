@@ -34,12 +34,24 @@ niezaokrąglonym boxem źródła; opór obejmuje 450 krawędzi, wymuszenie tylko
 Pozostałe 180 krawędzi ma zmierzony wkład ujemny zgodny z samym oporem.
 Nowy wariant parameters/quados8_1420mhz_aligned_feed.json ustawia
 solver.port_mesh_alignment=mesh_anchors i przekazuje dokładne granice siatki
-do AddLumpedPort. Nie zmienia geometrii anteny ani siatki, ale zmienia dyskretne
-wymuszenie; wymaga nowego FDTD. Tego wariantu nie wykonano jeszcze natywnie.
+do AddLumpedPort. Użytkownik ukończył ten wariant natywnie: 450 dodatnich
+wkładów pracy, zero ujemnych; ta sama geometria i siatka. Praca 0,949145539 W,
+strumień zewnętrzny 0,948187885 W, różnica 0,10090% względem pracy.
+Pomiar pojedynczego U·I nadal daje 1 W, czyli rozbieżność 5,085% względem
+tego odniesienia. Poprawka granic jest potwierdzona, pomiar mocy portu nadal
+wymaga rozwiązania. Z=67,701−j95,621 Ω i SWR200=3,6975 są robocze.
+Kierunkowość na osi wynosi 17,5100 dBi w obu przebiegach; porównanie względem
+lokalnej pracy daje około 17,5056 dBi, ale nie zastępuje kontroli zbieżności.
 Brak opcji/legacy zachowuje stare źródło do odtwarzania; nie traktuj go jako
 poprawionego modelu. Nie wymuszaj bilansu renormalizacją i nie zatwierdzaj
-starego SWR/zysku. Najpierw kontrola poprawionego portu, potem zbieżność
+starego ani nowego SWR/zysku. Nie poprawiaj Z mnożnikiem bilansu mocy.
+Powtarzanie aligned_feed bez zmiany hipotezy nie rozwiąże niejednorodnego
+pomiaru portu; dane już to wykazały. Następny eksperyment wymaga jawnej
+definicji bardziej lokalnego zasilania i jego kontroli. Potem zbieżność
 i strojenie (docs/power-audit.md). Błąd otwarcia pliku zatrzymuje pracownika.
+Analiza geometrii wskazuje dwie nadmiarowe kule przy (±G/2,0,H), całkowicie
+wewnątrz dwóch przeciwległych walców A. Pozostałe 46 ma własne próbki E.
+To wyjaśnia dwa ostrzeżenia Sphere; nie jest pełnym natywnym audytem połączeń.
 Nie przedstawiaj M2 jako zakończonego. Prądy promiennika i mapy E/H są
 jeszcze niezaimplementowane; żądanie tych danych musi kończyć się jawnym błędem.
 Pasywne sondy portu i powierzchnie diagnostyczne nie zaliczają M3.

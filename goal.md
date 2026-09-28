@@ -1,6 +1,6 @@
 # Cel projektu
 
-Wersja wymagań: 0.8. Data: 2026-09-28, Europe/Warsaw.
+Wersja wymagań: 0.9. Data: 2026-09-28, Europe/Warsaw.
 
 ## Bieżący stan
 
@@ -14,8 +14,11 @@ Komplet 450 lokalnych par U/I potwierdza pracę źródła 0,879386295 W przy
 pierwotnym odniesieniu pojedynczego U·I równym 1 W. Strumień całej anteny
 0,878490162 W różni się od tej pracy o 0,102%, zamiast wcześniejszych 12,15%.
 Wykryto niespójne granice siatki i wymuszenia: zasilane jest 270 z 450 krawędzi
-oporu portu. Osobny wariant aligned_feed usuwa tę niespójność; wymaga nowego
-przebiegu natywnego. Poprawka limitu strumieni Windows jest potwierdzona.
+oporu portu. Osobny wariant aligned_feed wykonano natywnie: wszystkie 450
+krawędzi ma dodatnią pracę. Praca netto 0,949145539 W zgadza się ze strumieniem
+0,948187885 W do 0,10090%. Pojedynczy odczyt U·I równy 1 W pozostaje zawyżonym
+odniesieniem; różnica wynosi 5,085% tego odniesienia. Poprawka granic źródła
+i limitu strumieni Windows jest potwierdzona. Pomiar portu pozostaje otwarty.
 Nie ma jeszcze zweryfikowanego wyniku obliczeń Quadosa.
 Prądy, mapy E/H, animacje oraz kontrola zbieżności pozostają do wykonania.
 
@@ -153,9 +156,14 @@ całek U/I z pomiarów lokalnych; zachowuje tę samą geometrię i siatkę.
 Po zidentyfikowaniu błędu wariant aligned_feed uzgadnia granice AddLumpedPort
 z istniejącymi kotwicami siatki (maksymalnie 1e-12 m). Audyt zapisuje granice,
 indeksy i liczbę krawędzi obejmowanych przez wymuszenie. Kolejny natywny
-przebieg ma sprawdzić rozkład pracy, zgodność obu powierzchni z pracą źródła
-oraz przydatność pojedynczego U·I. Wymiary, opór, siatka i impuls pozostają
-takie same; dyskretny rozkład wymuszenia zmienia się jawnie.
+przebieg sprawdził rozkład pracy i zgodność obu powierzchni z pracą źródła,
+ale wykazał utrzymującą się rozbieżność pojedynczego U·I. Wymiary, opór,
+siatka i impuls pozostały takie same; dyskretny rozkład wymuszenia zmienił
+się jawnie. Następny krok dotyczy lokalizacji źródła i definicji pomiaru
+portu, przed strojeniem całej anteny. Wymaga osobnej konfiguracji z opisem
+geometrii ewentualnych doprowadzeń, zachowania całej anteny i zmian siatki.
+Nie wolno zastępować tej kontroli mnożnikiem korygującym impedancję ani
+przedstawiać porównania zysku względem pracy lokalnej jako zbieżności modelu.
 Nie dopuszcza się wymuszenia bilansu przez przeskalowanie pola. Zgodność
 bilansu sama nie zastępuje zbieżności impedancji i zysku. Tryb diagnostyczny
 zapisuje dane bez raportu; opis: `docs/power-audit.md`.

@@ -184,7 +184,7 @@ XML biblioteki zapisuje część współrzędnych ze zmniejszoną precyzją;
 nie użyto go do wnioskowania o odchyłce 0,324 pm. Run korzysta z obiektu
 zbudowanego w pamięci, nie wczytuje ponownie zapisanego XML.
 
-## Następny przebieg: spójne granice źródła
+## Kontrolny przebieg: spójne granice źródła
 
 `parameters/quados8_1420mhz_aligned_feed.json` włącza
 `solver.port_mesh_alignment=mesh_anchors`. Moduł `solvers/feed.py` wybiera
@@ -214,10 +214,10 @@ Przygotowanie powinno wypisać:
 Granice źródła (mesh_anchors): 450/450 krawędzi portu w obszarze wymuszenia.
 ```
 
-Sprawdzimy, jak zmieniają się niejednorodność napięcia i lokalna praca,
-czy oba strumienie nadal odtwarzają tę pracę i czy pojedyncze U·I staje się
-wiarygodnym odniesieniem. Sama pełna obecność wymuszenia nie gwarantuje
-jednorodnego pola w porcie o skończonym rozmiarze.
+Celem przebiegu było sprawdzenie niejednorodności napięcia i lokalnej pracy,
+zgodności obu strumieni z tą pracą oraz przydatności pojedynczego U·I.
+Sama pełna obecność wymuszenia nie gwarantuje jednorodnego pola w porcie
+o skończonym rozmiarze. Wynik poniżej potwierdza to ograniczenie.
 
 Nie zatwierdzamy starego Z=73,114−j84,015 Ω, SWR=3,2787 ani zysku 16,947 dBi.
 Przeliczenie tego samego starego pola względem zmierzonej pracy zwiększyłoby
@@ -228,6 +228,87 @@ siatki, zbieżności i przypadku referencyjnego; M2 pozostaje otwarte.
 Nie mnożymy pola przez współczynnik wymuszający bilans 1:1. Nie zmieniamy
 odniesienia zysku na moc promieniowaną pod tą samą nazwą. Nie skalujemy anteny
 o 5% przed wyjaśnieniem problemu i kontrolą zbieżności.
+
+## Wynik aligned_feed na Windowsie
+
+Paczka `power_diagnostics(2).zip`, dostarczona 2026-09-28, ma SHA-256
+`af9532a035dcd9778dc44196234c4d1f3392246c4547a78529cb7435b57b1d15`.
+Zawiera 961 plików, w tym wszystkie 900 lokalnych sond i audyt 450/450.
+Kod Python w source.zip odpowiada commitowi
+`d0b925d6e0070f7bd3ea92d0212b65aad31969e0`. Siatka jest identyczna z poprzednią,
+model i ustawienia zmienia tylko jawne wyrównanie granic źródła. UCRT działa,
+nie ma błędów otwarcia plików; osiągnięto −50,04 dB po 13524 krokach.
+
+Niezależnie odtworzono widma z surowych U(t)/I(t), uwzględniając osobne
+znaczniki czasu. Różnice norm względem NPZ wynoszą poniżej 5e-16. Suma
+lokalnych napięć odtwarza długie linie do 4,52e-13, a sumy prądów przekroje
+do 1,55e-8. Odtworzono także wszystkie 161 punktów impedance_dense.csv.
+Pełne HDF5 powierzchni nie wchodzą do paczki: poniższe strumienie pochodzą
+z zapisanego power_balance.json, którego natywne porównanie jest zgodne
+z Prad. Nie powtórzono tutaj całkowania niezałączonych nowych pól HDF5.
+
+| Wielkość przy 1420 MHz | Stare źródło | Aligned feed |
+| --- | ---: | ---: |
+| Krawędzie z dodatnią / ujemną pracą | 270 / 180 | 450 / 0 |
+| Odniesienie pojedynczego U·I | 1 W | 1 W |
+| Lokalna praca netto | 0,879386295 W | 0,949145539 W |
+| Strumień zewnętrzny | 0,878490162 W | 0,948187885 W |
+| Strumień wewnętrzny | 0,878968878 W | 0,948698445 W |
+| Deficyt zewnętrzny względem lokalnej pracy | 0,10190% | 0,10090% |
+| Różnica port−praca względem 1 W portu | 12,061% | 5,085% |
+| Maksymalna amplituda U względem środkowej linii | 1,16801 | 1,09897 |
+| Maksymalna różnica fazy U względem środka | 10,8259° | 4,2812° |
+| Robocza impedancja | 73,114−j84,015 Ω | 67,701−j95,621 Ω |
+| Roboczy SWR względem 200 Ω | 3,2787 | 3,6975 |
+| Zysk +z według dotychczasowego odniesienia portu | 16,94737 dBi | 17,27896 dBi |
+| Kierunkowość +z, odniesienie Prad | 17,51000 dBi | 17,51002 dBi |
+| Zysk +z odniesiony do lokalnej pracy, tylko porównanie diagnostyczne | 17,50557 dBi | 17,50563 dBi |
+
+Poprawka usuwa wykluczone warstwy wymuszenia; potwierdza to rozkład pracy.
+Nie usuwa niejednorodności rozłożonego portu. Przy tej samej zadeklarowanej
+mocy 1 W rzeczywista obliczona praca netto wynosi 0,949145539 W. Różnica to
+5,085% nominalnego odniesienia, czyli zawyżenie portu o 5,358% względem pracy.
+Bezpośrednie odtworzenie lokalnej pracy w całym zakresie 1400–1440 MHz daje
+0,94044–0,95988 wartości pojedynczego U·I. Nie jest to pojedyncza błędna próbka.
+Nie ma pól NF2FF dla wszystkich tych częstotliwości, więc nie przypisujemy
+im zbadanej dokładności bilansu powierzchni.
+
+Zmiana zysku raportowanego według portu o +0,33159 dB jest niemal cała zmianą
+odniesienia. Po odniesieniu do niezależnie zmierzonej pracy różnica na osi
+wynosi około 0,000060 dB. Kierunkowość na osi także jest praktycznie taka sama.
+To kontrola jednego kierunku i tej samej siatki, nie porównanie pełnych
+charakterystyk ani dowód dokładności anteny fizycznej. Nie zmieniono danych
+wynikowych, normalizacji w programie ani statusu unverified.
+
+Mała powierzchnia przy źródle daje 0,907327805 W, o 4,406% mniej od pracy.
+Nadal przecina przewody i nie jest wzorcem mocy. Pełne powierzchnie zgadzają
+się z pracą źródła do około 0,1%, niezależnie od błędnego odniesienia portu.
+
+**Co jest zamknięte:** diagnoza wykluczonych warstw wymuszenia, ich poprawka
+i ilościowe wyjaśnienie pozornego deficytu mocy. **Co pozostaje otwarte:**
+wiarygodny pomiar impedancji i mocy wejściowej portu, zbieżność oraz referencja.
+Następny eksperyment ma dotyczyć bardziej lokalnego źródła i jego jawnych
+doprowadzeń/pomiaru, przy zachowaniu rozdzielenia zmian geometrii i siatki.
+Powtórzenie identycznego aligned_feed ani mnożenie impedancji przez 0,949
+nie rozwiązuje tego problemu. Zmiana skali anteny o 5% nadal nie jest uzasadniona.
+
+## Dwie nadmiarowe kule
+
+Niezależna analiza geometrii i zapisanej siatki wskazuje dokładnie dwie kule
+bez własnych próbek E: środki (±9,834507 mm, 0, 23,637324 mm), promień
+1,725352 mm. W obu miejscach odcinki A biegną w przeciwnych kierunkach po
+tej samej osi i mają ten sam promień. Ich walce obejmują całą kulę, również
+geometrycznie, niezależnie od siatki. Każda z tych kul obejmuje 72 próbki E,
+wszystkie już zajęte przez sąsiedni metal. Pozostałe 46 kul ma własne próbki
+(co najmniej trzy) poza innymi bryłami.
+
+Wyjaśnia to dwa powtarzające się ostrzeżenia Sphere. Wniosek wynika
+z geometrii i analizy próbek; log nie zawiera natywnych identyfikatorów kul.
+Nie jest to pełne sprawdzenie ciągłości całego natywnego operatora.
+Nie usuwano brył ani nie zmieniano modelu w celu wyciszenia ostrzeżeń.
+
+Liczby, identyfikacja danych i zakres kontroli:
+[zapis porównania JSON](validation/aligned-feed-20260928.json).
 
 ## Sprawdzenia kodu i ograniczenia
 
@@ -242,7 +323,7 @@ pomiarów i indeksów oraz kompletnym natywnym przebiegiem użytkownika.
 Regresja granic odtwarza 270/450 starego źródła, wymaga 450/450 po poprawce,
 kontroluje identyczność geometrii/siatki/sond i odrzucenie zbyt dużego
 przesunięcia. Test granicy adaptera sprawdza argumenty AddLumpedPort.
-Nowego wariantu z poprawionym źródłem nie wykonano jeszcze natywnie.
+Wariant z poprawionym źródłem wykonano natywnie; wyniki opisano poniżej.
 
 Czytnik obsługuje sprawdzony zespolony format HDF5 NXYZ openEMS 0.37.0rc3.
 Inne formaty są odrzucane. Brak plików którejkolwiek ściany jest błędem także

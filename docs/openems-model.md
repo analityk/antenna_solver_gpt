@@ -5,7 +5,9 @@ API sprawdzono względem źródeł wydania 0.37.0-rc3. Użytkownik potwierdził
 import, przygotowanie XML, FDTD i kontrolę pracy źródła na Windowsie.
 Pozorny deficyt 12,15% wynika głównie z błędnego odniesienia pojedynczego U·I;
 praca lokalna i strumień zewnętrzny są zgodne do 0,102%. Wariant poprawiający
-wykryty błąd granic wymuszenia wymaga natywnego sprawdzenia.
+wykryty błąd granic wymuszenia został wykonany natywnie: 450 dodatnich
+wkładów pracy, zgodność pracy i strumienia do 0,10090%. Pojedyncze U·I
+nadal zawyża odniesienie; kontrola portu pozostaje otwarta.
 
 ## Materiały i źródło
 
@@ -31,6 +33,11 @@ i odrzuca większą niezgodność. Geometria anteny i siatka pozostają bez zmia
 Brak opcji lub `legacy` odtwarza stare granice i zgłasza niepełne pokrycie.
 To zgodność wsteczna do porównań, nie zalecany poprawiony model.
 Konfiguracja kontrolna: `parameters/quados8_1420mhz_aligned_feed.json`.
+Jej wynik przy 1420 MHz: lokalna praca 0,949145539 W przy odczycie portu 1 W.
+Amplitudy 25 linii U różnią się nadal do 9,897%, fazy do 4,281°. Pełne
+pokrycie boxem nie zapewniło poprawnego pomiaru mocy przez jedną linię U
+i jeden przekrój I. Z i SWR pozostają wynikami konkretnego modelu zasilania,
+przed kontrolą bardziej lokalnego źródła i zbieżności.
 
 ## Dyskretyzacja
 

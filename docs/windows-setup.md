@@ -178,8 +178,9 @@ Kompletny wynik source_work dostarczony 2026-09-28 potwierdził powyższy
 komunikat, zapis wszystkich 900 lokalnych sond i brak błędów otwierania.
 Poprawka UCRT jest sprawdzona na komputerze użytkownika.
 
-Następny przebieg dotyczy już korekty źródła opisanej w
-[diagnostyce mocy](power-audit.md), nie limitu plików. W CMD:
+Wariant korekty źródła opisany w [diagnostyce mocy](power-audit.md) również
+został ukończony na Windowsie. Poniższe polecenie służy jego odtworzeniu;
+nie ma potrzeby powtarzać go do analizy już dostarczonych danych. W CMD:
 
 ```bat
 git pull --ff-only

@@ -364,6 +364,53 @@ użytkownika. Audyt przed Run dotyczy geometrii boxa, nie wyniku FDTD.
 Skończony rozmiar portu może nadal wymagać kontroli. Wada przejść siatki
 i zbieżność pozostają otwarte. Nie wykonano benchmarków.
 
+## 2026-09-28 — potwierdzony aligned_feed i pozostały błąd odniesienia portu
+
+**Powód:** użytkownik dostarczył ukończony power_diagnostics(2).zip po zmianie
+granic wymuszenia. Trzeba ocenić poprawkę i uniknąć strojenia na podstawie
+niezweryfikowanej impedancji lub samej zmiany liczby zysku.
+
+**Ustalenia:** 900 surowych sond jest kompletnych, indeksy zgodne z planem,
+kod odpowiada d0b925d6, siatka identyczna. Osiągnięto EndCriteria −50,04 dB.
+Wszystkie 450 krawędzi daje dodatnią pracę; 180 pasywnych krawędzi starego
+wariantu zostało usuniętych przez poprawkę. Praca 0,949145539 W i zewnętrzny
+strumień 0,948187885 W różnią się o 0,10090% względem pracy. Wewnętrzna
+powierzchnia daje 0,948698445 W (różnica 0,04710%).
+
+**Pozostały problem:** pojedynczy pomiar U·I daje nadal 1 W. Różnica wobec
+lokalnej pracy to 5,085% tego odniesienia; w przekroju portu amplitudy U
+różnią się do 9,897%, fazy do 4,281°. Robocze Z=67,701−j95,621 Ω,
+SWR200=3,6975. Zysk +z odniesiony do portu wzrósł 16,94737 → 17,27896 dBi,
+ale względem pracy lokalnej oba przebiegi dają około 17,5056 dBi, różniąc się
+o 0,000060 dB. Kierunkowość +z także pozostaje około 17,5100 dBi.
+To porównanie na jednej siatce i jednej osi, nie walidacja zbieżności.
+
+**Geometria:** dwie kule przy zaciskach zasilania całkowicie mieszczą się
+w walcach przeciwległych odcinków A. Każda obejmuje 72 próbki E, wszystkie
+już objęte sąsiednim metalem; pozostałe 46 kul ma co najmniej trzy własne
+próbki. Wyjaśnia to dwa ostrzeżenia Sphere. Natywnych ID nie ma w paczce;
+wniosek opiera się na geometrii i niezależnej analizie próbek, nie pełnym
+teście ciągłości operatora. Modelu nie zmieniono w celu wyciszenia komunikatu.
+
+**Zmiana i wpływ na fizykę:** zapisano wynik kontroli w docs/power-audit.md
+i małym docs/validation/aligned-feed-20260928.json z identyfikacją paczki.
+Zaktualizowano wymagania 0.9, stan projektu i instrukcje. Kod solvera,
+parametry, normalizacja i wcześniejsze wyniki pozostały bez zmian.
+Nie dodano zależności ani nowego formatu outcomes. Następny eksperyment
+ma badać definicję i pomiar bardziej lokalnego portu, przed skalowaniem anteny.
+Powtarzanie tego samego wariantu nie wnosi danych potrzebnych do tej diagnozy.
+
+**Sprawdzenie:** niezależna DFT surowych sond odtwarza zapisane widma do
+5e-16 względnej normy. Odtworzono całki U/I (4,52e-13 i 1,55e-8) oraz
+161 punktów gęstego widma impedancji. Sprawdzono skróty i zgodność 22 plików
+Python z kodem użytym przez użytkownika. Nie uruchamiano ponownie FDTD
+ani benchmarków; zmiana dokumentacyjna nie wymagała nowych testów solvera.
+
+**Ograniczenia:** nowe pełne pola HDF5 nie są częścią paczki; odczyty
+powierzchni pochodzą z jej power_balance.json, nie z ponownego całkowania
+HDF5 tutaj. Pomiar portu, referencja i zbieżność pozostają otwarte. Dane
+mają nadal status unverified; nie korygowano impedancji mnożnikiem mocy.
+
 ## Wzór kolejnego wpisu
 
 - Data i krótka nazwa zmiany.

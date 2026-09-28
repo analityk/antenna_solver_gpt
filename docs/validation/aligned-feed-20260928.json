@@ -1,0 +1,158 @@
+{
+  "validation_status": "unverified",
+  "kind": "measured_run_comparison_not_convergence_validation",
+  "date": "2026-09-28",
+  "frequency_hz": 1420000000.0,
+  "input_bundle": "power_diagnostics(2).zip",
+  "input_bundle_sha256": "af9532a035dcd9778dc44196234c4d1f3392246c4547a78529cb7435b57b1d15",
+  "code_commit": "d0b925d6e0070f7bd3ea92d0212b65aad31969e0",
+  "source_python_files_match_commit_copy": 22,
+  "native_grid_identical_between_runs": true,
+  "redundant_joints_check": {
+    "method": "independent_cartesian_yee_edge_membership_and_collinear_cylinder_containment",
+    "native_primitive_ids_available": false,
+    "sphere_count": 48,
+    "radius_m": 0.0017253521126760563,
+    "redundant_joints": [
+      {
+        "center_m": [
+          -0.00983450704225352,
+          -0.0,
+          0.02363732394366197
+        ],
+        "electric_edges_inside": 72,
+        "electric_edges_outside_other_metal": 0
+      },
+      {
+        "center_m": [
+          0.00983450704225352,
+          -0.0,
+          0.02363732394366197
+        ],
+        "electric_edges_inside": 72,
+        "electric_edges_outside_other_metal": 0
+      }
+    ],
+    "minimum_unique_edges_of_other_spheres": 3,
+    "scope": "The two feed-node spheres lie inside the union of opposite collinear A cylinders. All other spheres have unique sampled electric edges. Explains two warnings without changing metal geometry; not a global native connectivity test."
+  },
+  "old_source_work_control": {
+    "frequency_hz": 1420000000.0,
+    "normalization_port_reference_w": 1.0,
+    "raw_edge_probe_count": 900,
+    "raw_header_indices_verified": true,
+    "independent_dft_relative_errors": {
+      "voltage": 4.3937430040150337e-16,
+      "current": 3.9822059425671093e-16
+    },
+    "aggregation_relative_errors": {
+      "voltage": 3.9542178425415864e-13,
+      "current": 2.3393244178981154e-08
+    },
+    "positive_work_edges": 270,
+    "negative_work_edges": 180,
+    "positive_work_w": 1.43433323242584,
+    "negative_work_w": -0.5549469373987537,
+    "net_work_w": 0.8793862950270863,
+    "surface_active_flux_w": {
+      "nf2ff": 0.8784901615919795,
+      "power_inner": 0.8789688779517708,
+      "power_feed": 0.8404404387060604
+    },
+    "surface_minus_work_percent_of_work": {
+      "nf2ff": -0.10190441222185376,
+      "power_inner": -0.0474668615688012,
+      "power_feed": -4.428754068748175
+    },
+    "port_minus_work_percent_of_port": 12.061370497291367,
+    "port_overestimate_percent_of_work": 13.715668035194772,
+    "voltage_amplitude_relative_to_center_min_max": [
+      1.0,
+      1.1680093338475868
+    ],
+    "voltage_phase_relative_to_center_deg_min_max": [
+      -10.825854907230894,
+      -0.0
+    ],
+    "impedance_ohm": {
+      "real": 73.11429901440974,
+      "imag": -84.01529175077549
+    },
+    "swr_reference_ohm": 200.0,
+    "swr": 3.278725854877133,
+    "forward_gain_port_reference_dbi": 16.947367763088586,
+    "forward_gain_local_work_reference_dbi_diagnostic_only": 17.50557083322295,
+    "forward_directivity_dbi_derived": 17.50999875415353,
+    "dense_frequency_hz_min_max": [
+      1400000000.0,
+      1440000000.0
+    ],
+    "dense_port_work_fraction_min_max": [
+      0.863571355695256,
+      0.9049589793577401
+    ],
+    "dense_impedance_reproduced_from_raw_port": true,
+    "end_criteria_reached": true,
+    "unused_sphere_warnings": 2
+  },
+  "new_aligned_feed_control": {
+    "frequency_hz": 1420000000.0,
+    "normalization_port_reference_w": 1.0,
+    "raw_edge_probe_count": 900,
+    "raw_header_indices_verified": true,
+    "independent_dft_relative_errors": {
+      "voltage": 4.728254828863023e-16,
+      "current": 4.068664128908498e-16
+    },
+    "aggregation_relative_errors": {
+      "voltage": 4.516729054809638e-13,
+      "current": 1.549851907188596e-08
+    },
+    "positive_work_edges": 450,
+    "negative_work_edges": 0,
+    "positive_work_w": 0.9491455385012013,
+    "negative_work_w": 0.0,
+    "net_work_w": 0.9491455385012013,
+    "surface_active_flux_w": {
+      "nf2ff": 0.9481878854206871,
+      "power_inner": 0.948698444923251,
+      "power_feed": 0.9073278046848758
+    },
+    "surface_minus_work_percent_of_work": {
+      "nf2ff": -0.10089633693336486,
+      "power_inner": -0.04710484955303684,
+      "power_feed": -4.405829466612676
+    },
+    "port_minus_work_percent_of_port": 5.085446149879869,
+    "port_overestimate_percent_of_work": 5.357920301569674,
+    "voltage_amplitude_relative_to_center_min_max": [
+      1.0000000000000002,
+      1.0989715816473986
+    ],
+    "voltage_phase_relative_to_center_deg_min_max": [
+      -4.281196052798689,
+      -2.063603105997565e-15
+    ],
+    "impedance_ohm": {
+      "real": 67.70097085658053,
+      "imag": -95.62145025425254
+    },
+    "swr_reference_ohm": 200.0,
+    "swr": 3.697502310951586,
+    "forward_gain_port_reference_dbi": 17.27895917430044,
+    "forward_gain_local_work_reference_dbi_diagnostic_only": 17.505631067711427,
+    "forward_directivity_dbi_derived": 17.510015163077615,
+    "dense_frequency_hz_min_max": [
+      1400000000.0,
+      1440000000.0
+    ],
+    "dense_port_work_fraction_min_max": [
+      0.9404401615743969,
+      0.9598793158592375
+    ],
+    "dense_impedance_reproduced_from_raw_port": true,
+    "end_criteria_reached": true,
+    "unused_sphere_warnings": 2
+  },
+  "scope": "Raw local probes and port independently re-transformed. Surface flux values come from uploaded power_balance.json; full HDF5 surfaces are not in this archive. No result normalization or antenna dimensions changed."
+}
