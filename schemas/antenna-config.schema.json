@@ -216,6 +216,25 @@
         "name": {
           "const": "openEMS"
         },
+        "power_diagnostics": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["inner_box_fraction", "feed_margin_diameters", "port_spectrum_hz"],
+          "properties": {
+            "inner_box_fraction": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1},
+            "feed_margin_diameters": {"type": "number", "exclusiveMinimum": 0},
+            "port_spectrum_hz": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["start", "stop", "step"],
+              "properties": {
+                "start": {"type": "number", "exclusiveMinimum": 0},
+                "stop": {"type": "number", "exclusiveMinimum": 0},
+                "step": {"type": "number", "exclusiveMinimum": 0}
+              }
+            }
+          }
+        },
         "cells_per_wire_diameter": {
           "type": "integer",
           "minimum": 2,

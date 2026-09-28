@@ -30,6 +30,10 @@ ponieważ dokumentacja latest może się zmieniać:
   [nf2ff.py](https://github.com/thliebig/openEMS/blob/67d378488ee40de815eed00f8aaa808f0a9e3c6d/python/openEMS/nf2ff.py),
   [utilities.py — DFT](https://github.com/thliebig/openEMS/blob/67d378488ee40de815eed00f8aaa808f0a9e3c6d/python/openEMS/utilities.py),
   [przykład anteny](https://github.com/thliebig/openEMS/blob/67d378488ee40de815eed00f8aaa808f0a9e3c6d/python/Tutorials/Simple_Patch_Antenna.py).
+- Diagnostyka mocy tego samego wydania:
+  [kwadratura strumienia na ścianach](https://github.com/thliebig/openEMS/blob/67d378488ee40de815eed00f8aaa808f0a9e3c6d/nf2ff/nf2ff_calc.cpp),
+  [odczyt par plików E/H](https://github.com/thliebig/openEMS/blob/67d378488ee40de815eed00f8aaa808f0a9e3c6d/python/openEMS/nf2ff.py),
+  [DFT pól i znaczniki czasu](https://github.com/thliebig/openEMS/blob/67d378488ee40de815eed00f8aaa808f0a9e3c6d/Common/processfields_fd.cpp).
 - CSXCAD commit `dcdb62bcfd1111ee3594ba22d06089b41b380990`:
   [źródła](https://github.com/thliebig/CSXCAD/tree/dcdb62bcfd1111ee3594ba22d06089b41b380990).
 

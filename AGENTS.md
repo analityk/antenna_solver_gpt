@@ -14,8 +14,8 @@ Git, Python i VS Code są już zainstalowane. Interpreter: CPython 3.14.0, 64-bi
 Wybrany solver to openEMS. Lokalizacja paczki podana przez użytkownika:
 `C:\dev\openems\openEMS`. Instrukcja instalacji: `docs/windows-setup.md`.
 Nie wymagaj WSL, zmiany systemu ani uv. Użytkownik potwierdził import
-openEMS 0.37.0rc3 i CSXCAD na Windowsie 2026-09-28. Pełny przypadek obliczeniowy
-pozostaje do sprawdzenia; sam import nie kończy integracji M2.
+openEMS 0.37.0rc3 i CSXCAD na Windowsie 2026-09-28. Walidacja obliczeniowa
+pozostaje otwarta; sam import ani pierwszy solve nie kończą integracji M2.
 
 NEC2++ / PyNEC nie jest częścią implementacji. Kontrakty przeniesiono na
 openEMS: konfiguracja i manifest mają wersję 2. Wymiarów źródłowych nie zmieniono.
@@ -23,9 +23,13 @@ Potwierdzone środowisko zapisano w `docs/windows-setup.md`.
 
 M1 jest zaimplementowane: generator, walidacja, edytor i eksport geometrii.
 Adapter openEMS, impedancja i pole dalekie są kodem eksperymentalnym:
-Użytkownik potwierdził udane prepare i zapis XML na Windowsie 2026-09-28.
-Obliczenie FDTD i kontrola zbieżności pozostają do wykonania. Nie przedstawiaj M2 jako zakończonego. Prądy i mapy E/H są
+Użytkownik ukończył przebieg 20260928T004231Z_902d497594 na Windowsie.
+Bilans mocy PEC wykazuje deficyt 12,15%; niezależne całkowanie surowych NF2FF
+potwierdza odczyt, ale przyczyna fizyczna/numeryczna pozostaje otwarta.
+Najpierw diagnostyka mocy (docs/power-audit.md), potem skalowanie i zbieżność.
+Nie przedstawiaj M2 jako zakończonego. Prądy promiennika i mapy E/H są
 jeszcze niezaimplementowane; żądanie tych danych musi kończyć się jawnym błędem.
+Pasywne sondy portu i powierzchnie diagnostyczne nie zaliczają M3.
 
 ## Zasady architektury
 

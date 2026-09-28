@@ -32,11 +32,22 @@ pozostają w katalogu. Nie przedstawiamy ich jako ukończonego wyniku.
 | `impedance.csv` | run: frequency_hz, resistance_ohm, reactance_ohm, reference_ohm, s11_real, s11_imag, swr |
 | `far_field.npz` | run, gdy zażądano: zespolone pole dalekie, zysk i kierunkowość |
 | `summary.json` | run: impedancja, SWR, opcjonalnie zysk +z i bilans mocy |
-| `plots/impedance.png`, `plots/pattern_cuts.png` | run: impedancja i opcjonalne przekroje xz/yz pierwszej częstotliwości |
-| `report.html` | run: lokalny raport z zapisanych danych |
+| `plots/impedance.png`, `plots/pattern_cuts.png` | run bez diagnostyki mocy: impedancja i opcjonalne przekroje xz/yz pierwszej częstotliwości |
+| `report.html` | run bez diagnostyki mocy: lokalny raport z zapisanych danych |
+| `power_monitor_layout.json` | prepare/run z diagnostyką: położenia pasywnych powierzchni i sond, bez zmian siatki |
+| `power_balance.json` | run z diagnostyką: strumienie przez każdą ścianę trzech powierzchni, niezależna kontrola Prad i nierównomierność siatki |
+| `port_probe_spectra.npz` | run z diagnostyką: zespolone widma dodatkowych U/I i położenia pomiaru; osie [częstotliwość, sonda] |
+| `impedance_dense.csv` | run z diagnostyką: gęsty odczyt portu, częstotliwość i odniesienie w kolumnach; bez ponownego FDTD |
+| `power_diagnostics.zip` | run z diagnostyką: mała paczka danych, ustawień, kodu i logu do analizy; pełne HDF5 pozostają w openems/ |
 
 Geometria ani prepare nie tworzą pól, impedancji lub zysku. Manifest zawsze
 ma `validation_status=unverified`. Sukces testów geometrii tego nie zmienia.
+
+Diagnostyka mocy jest opcjonalnym rozszerzeniem v2. Składowe pól na powierzchniach
+pomiarowych nie oznaczają implementacji przekrojów i animacji M3. Strumień
+`power_feed` nie jest mocą promieniowania anteny ani podstawą wyznaczania zysku.
+Mała paczka nie zawiera końcowego manifestu (jego lista skrótów obejmuje tę
+paczkę); kompletny manifest i surowe powierzchnie zostają w katalogu przebiegu.
 
 ## Konwencje danych
 

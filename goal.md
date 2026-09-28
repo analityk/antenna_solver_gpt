@@ -1,6 +1,6 @@
 # Cel projektu
 
-Wersja wymagań: 0.4. Data: 2026-09-28, Europe/Warsaw.
+Wersja wymagań: 0.5. Data: 2026-09-28, Europe/Warsaw.
 
 ## Bieżący stan
 
@@ -9,7 +9,9 @@ mają wersję 2; wycofany szkic NEC2++ nie jest obsługiwany.
 Generator Quadosa, edytor wymiarów, eksport i kontrola geometrii są zaimplementowane.
 Adapter openEMS przygotowuje model XML i zawiera odczyt impedancji oraz pola
 dalekiego. Użytkownik potwierdził udane prepare oraz zapis XML na natywnym
-Windowsie 2026-09-28; wykonanie FDTD i walidacja fizyczna pozostają otwarte.
+Windowsie 2026-09-28 i ukończył pierwszy FDTD. Stwierdzony deficyt mocy PEC
+12,15% wymaga wyjaśnienia przed skalowaniem anteny. Niezależne całkowanie
+surowych NF2FF odtwarza wynik; walidacja fizyczna pozostaje otwarta.
 Nie ma jeszcze zweryfikowanego wyniku obliczeń Quadosa.
 Prądy, mapy E/H, animacje oraz kontrola zbieżności pozostają do wykonania.
 
@@ -38,7 +40,8 @@ openEMS dla Windows i zgodnych z nią modułów Pythona. Lokalizacja użytkownik
 `C:\dev\openems\openEMS`. Użytkownik potwierdził poprawny import openEMS
 0.37.0rc3 i CSXCAD w projektowym `.venv` dnia 2026-09-28.
 Przygotowanie modelu XML jest potwierdzone logiem użytkownika. Obliczeniowy
-przypadek kontrolny i walidacja fizyczna pozostają do wykonania.
+przebieg Quadosa zakończył się osiągnięciem EndCriteria; przypadek referencyjny
+i walidacja fizyczna pozostają do wykonania.
 
 ## Zakres pierwszej wersji symulatora
 
@@ -134,6 +137,13 @@ Pierwsza rekonstrukcja faz używa tych samych skal kolorów pomiędzy klatkami
 i porównywanymi modelami, przy tej samej normalizacji mocy.
 
 ## Kryteria odbioru
+
+Priorytet przed strojeniem: wyjaśnić rozbieżność mocy portu i NF2FF. Wariant
+diagnostyczny dodaje wyłącznie pasywne pomiary do pierwotnego modelu i siatki,
+zapisuje strumienie trzech zamkniętych powierzchni oraz rozkład odczytów portu.
+Nie dopuszcza się wymuszenia bilansu przez przeskalowanie pola. Zgodność
+bilansu sama nie zastępuje zbieżności impedancji i zysku. Tryb diagnostyczny
+zapisuje dane bez raportu; opis: `docs/power-audit.md`.
 
 | Etap | Warunek zakończenia | Stan |
 | --- | --- | --- |

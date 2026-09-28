@@ -29,6 +29,8 @@ def check_capabilities(config):
     if request["currents"] or request["field_planes"] or request["full_period_animation"]:
         raise ConfigurationError("Ten adapter obsługuje obecnie impedancję i pole dalekie. "
                                  "Odczyt prądów (M2), przekroje E/H i animacje (M3) pozostają do implementacji; żądanie nie zostało pominięte.")
+    if config["solver"].get("power_diagnostics") and not request["far_field"]:
+        raise ConfigurationError("Diagnostyka mocy wymaga aktywnego zapisu NF2FF (far_field=true).")
 
 
 def prepare(geometry, config, run):
@@ -68,6 +70,9 @@ def prepare(geometry, config, run):
     if config["requested_outputs"]["far_field"]:
         nf = engine.CreateNF2FFBox(start=meta["nf2ff_start_m"], stop=meta["nf2ff_stop_m"],
                                   frequency=config["simulation"]["frequency_hz"])
+    if settings.get("power_diagnostics"):
+        from .power import install_monitors
+        install_monitors(engine, csx, geometry, axes, meta, config, run)
     native_path = run.path / "openems"
     native_path.mkdir()
     xml = native_path / "model.xml"
@@ -130,6 +135,9 @@ def solve(prepared, config, run):
                "frequency_hz": frequency.tolist(), "resistance_ohm": z.real.tolist(), "reactance_ohm": z.imag.tolist(),
                "swr": swr.tolist(), "reference_impedance_ohm": reference}
     if nf is not None:
+        from .power import require_box_files
+        # Native CalcNF2FF silently skips absent E/H pairs. Require a closed box.
+        require_box_files(native_path, "nf2ff")
         step = config["solver"]["far_field_step_deg"]
         theta = np.linspace(0, 180, int(np.ceil(180 / step)) + 1)
         phi = np.unique(np.r_[np.arange(0, 360, step), 0, 90, 180, 270])
@@ -157,4 +165,7 @@ def solve(prepared, config, run):
     run.manifest["warnings"].append("Nie wykonano kontroli zbieżności. Osiągnięcie EndCriteria należy sprawdzić w solver.log.")
     run.manifest["normalization"]["applied"] = True
     write_json(run.path / "summary.json", summary)
+    if config["solver"].get("power_diagnostics"):
+        from .power import finish_diagnostics
+        finish_diagnostics(config, run)
     return summary

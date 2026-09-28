@@ -12,7 +12,8 @@ i domyślne parametry. Samodzielna dystrybucja wheel nie jest jeszcze obsługiwa
 | `core/runs.py` | RunRecord, konfiguracja, schematy, kod i skróty artefaktów | Bez wyników zastępczych |
 | `antennas/` | Rejestr modeli i deterministyczny generator Quados8 | Bez importu openEMS |
 | `solvers/mesh.py` | Niejednorodna siatka kartezjańska, PML, kontrola limitu | Bez zmian wymiarów anteny |
-| `solvers/openems.py` | Materiały, port, FDTD XML, impedancja i NF2FF | Jedyne miejsce zależne od natywnego API |
+| `solvers/openems.py` | Materiały, port, FDTD XML, impedancja i NF2FF | Główny adapter natywnego API |
+| `solvers/power.py` | Pasywne sondy, odczyt HDF5, strumień mocy, widmo portu | Diagnostyka adaptera; bez wymuszania bilansu |
 | `app/` | Formularz Tk/ttk, podgląd Matplotlib, zapis parametrów i eksport | Sterowanie geometrią |
 | `visualization/` | Rysunki, wykresy CSV/NPZ i HTML | Bez wywołań solvera |
 | `cli.py` | Polecenia i proces potomny solvera | Log, przerwanie i stan przebiegu |
@@ -28,6 +29,8 @@ i wpisu w rejestrze, bez specjalnych warunków w rdzeniu.
 do utworzenia XML, ale nie wywołuje Run. `run` wykonuje FDTD, postprocessing
 i raport. Biblioteki natywne są importowane dopiero w procesie potomnym
 uruchomionym tym samym interpreterem, co polecenie główne.
+Opcjonalne `solver.power_diagnostics` dodaje pasywne monitory i po solve
+zapisuje diagnostykę oraz paczkę ZIP, pomijając raport i wykresy wynikowe.
 
 Każdy przebieg otrzymuje unikalny katalog. Zawiera rozwiązaną konfigurację,
 schematy, archiwum kodu źródłowego, wersję Git (jeśli jest dostępna), geometrię
@@ -44,8 +47,9 @@ wykonania i status fizycznej walidacji. `completed` nie oznacza `passed`.
 M1 i podstawowy edytor są zaimplementowane. Adapter M2 jest eksperymentalny;
 nie wykonano tutaj obliczenia natywnym openEMS. Na Windowsie użytkownika
 potwierdzono import CPython 3.14.0/openEMS 0.37.0rc3/CSXCAD 0.7.0rc3.
-Użytkownik potwierdził prepare i zapis XML na Windowsie. Przypadek kontrolny,
-wykonanie FDTD i sprawdzenie zbieżności pozostają otwarte.
+Użytkownik ukończył pierwszy FDTD na Windowsie; deficyt mocy PEC 12,15% jest
+potwierdzony surowymi danymi. Przypadek referencyjny, wyjaśnienie deficytu
+i sprawdzenie zbieżności pozostają otwarte.
 Mapy E/H i prądy wymagają dalszej implementacji; adapter odrzuca ich żądanie.
 
 CPU Ryzen 7 7800X3D, RAM 32 GB, Windows 11. Instrukcje używają CMD i `.venv`.

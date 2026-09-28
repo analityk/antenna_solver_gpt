@@ -82,7 +82,11 @@ def _native_job(config, output, mode):
         if exit_code != 0:
             raise RuntimeError(record.manifest["error"] or f"Proces openEMS zakończył się kodem {exit_code}; zobacz solver.log.")
         if mode == "run":
-            render_results(record.path)
+            if config["solver"].get("power_diagnostics"):
+                from antenna_lab.solvers.power import pack_diagnostics
+                print(f"Paczka diagnostyczna: {pack_diagnostics(record.path)}", flush=True)
+            else:
+                render_results(record.path)
         record.finish("prepared" if mode == "prepare" else "completed")
         print("Wejście openEMS przygotowane." if mode == "prepare" else "Obliczenie zakończone. Wynik roboczy: wymagane sprawdzenie zbieżności.")
         print(f"Katalog: {record.path}")

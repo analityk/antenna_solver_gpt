@@ -2,8 +2,8 @@
 
 **Stan: implementacja eksperymentalna, bez zakończonej walidacji natywnej.**
 API sprawdzono względem źródeł wydania 0.37.0-rc3. Użytkownik potwierdził
-import oraz udane przygotowanie XML na Windowsie. Wykonanie FDTD
-i fizyczna kontrola wyniku pozostają do sprawdzenia.
+import, przygotowanie XML i pierwszy FDTD na Windowsie. Surowe dane
+potwierdzają deficyt mocy PEC 12,15%; fizyczna kontrola pozostaje otwarta.
 
 ## Materiały i źródło
 
@@ -63,6 +63,12 @@ Program nie potwierdza automatycznie osiągnięcia EndCriteria przed limitem
 kroków; trzeba sprawdzić log. Bilans mocy PEC odbiegający o ponad 10%
 generuje ostrzeżenie, ale nie zastępuje zbieżności.
 Wyniki pozostają `unverified` i nie są potwierdzonym projektem wykonawczym.
+
+Przed skalowaniem aktywny jest plan [diagnostyki mocy](power-audit.md).
+Opcjonalne monitory nie zmieniają geometrii ani siatki; zapisują trzy strumienie
+i profile U/I portu. Znany skok rozmiaru komórek do 1,8667 pozostaje w tym
+wariancie kontrolnym; `growth_ratio` obecnie nie gwarantuje globalnego limitu.
+Brak którejkolwiek z sześciu par plików NF2FF jest teraz jawnym błędem.
 
 Prądy, przekroje E/H i animacje nie są jeszcze zaimplementowane.
 Żądanie takich danych jest odrzucane jawnie. Nie tworzymy zastępczych map.

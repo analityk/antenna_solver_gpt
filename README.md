@@ -5,9 +5,9 @@ Lokalny program do parametrycznego modelowania anten. Pierwszy model to
 i skończonym reflektorem. Silnik obliczeniowy: **openEMS** na Windows 11.
 
 **Działa generator, edytor wymiarów i eksport geometrii (M1).**
-Adapter openEMS oraz odczyt impedancji i pola dalekiego są zaimplementowane,
-ale obliczenia i walidacja fizyczna na Windowsie pozostają otwarte (M2).
-Użytkownik potwierdził przygotowanie modelu XML poleceniem prepare.
+Adapter openEMS oraz odczyt impedancji i pola dalekiego są zaimplementowane;
+użytkownik ukończył pierwszy przebieg na Windowsie. Jego bilans mocy PEC
+wykazuje deficyt 12,15%; przyczyna i walidacja fizyczna pozostają otwarte (M2).
 Nie ma jeszcze zweryfikowanych wyników anteny, map E/H, prądów ani animacji.
 
 ## Pierwsze uruchomienie — CMD
@@ -74,6 +74,20 @@ Wyniki pozostają **unverified** do kontroli źródła, przypadku referencyjnego
 i zbieżności siatki. Nie wykonujemy benchmarków.
 
 ## Model i dokumentacja
+
+Przed zmianą skali anteny wykonujemy kontrolę bilansu mocy.
+Konfiguracja diagnostyczna zachowuje wymiary, port, siatkę i impuls pierwszego
+przebiegu; dodaje pasywne pomiary, nie zmienia rozwiązania przez normalizację.
+
+```bat
+.\.venv\Scripts\python.exe -m antenna_lab run --config parameters\quados8_1420mhz_power_audit.json
+```
+
+To nowy przebieg FDTD. Zamiast raportu HTML zapisuje `power_balance.json`,
+widmo impedancji 1400–1440 MHz co 0,25 MHz i małą paczkę `power_diagnostics.zip`
+w nowym katalogu wyników. Ten krok częstotliwości dotyczy odczytu przebiegów
+portu, nie dodatkowych symulacji ani deklaracji dokładności. Szczegóły i
+interpretacja: [diagnostyka mocy](docs/power-audit.md).
 
 Promiennik jest sumą cylindrów PEC ze złączami kulistymi. Reflektor jest
 pełną płytą PEC o zadanej grubości. Port różnicowy ma odniesienie 200 Ω;

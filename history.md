@@ -195,6 +195,48 @@ artefakty obu zapisów. W środowisku wykonawczym nie można uruchomić ekranu T
 testy te są jawnie pomijane, a działanie nowego okna wymaga potwierdzenia
 na Windowsie użytkownika. Nie wykonywano benchmarków ani pomiarów czasu.
 
+## 2026-09-28 — audyt deficytu mocy i pasywna diagnostyka
+
+**Powód:** użytkownik wymaga wyjaśnienia deficytu mocy przed generowaniem
+kolejnych raportów i skalowaniem anteny. Dostarczył dane zakończonego przebiegu
+20260928T004231Z_902d497594, port U/I oraz wszystkie 13 plików NF2FF HDF5.
+
+**Ustalenia:** natywny wynik 0,878490159 W na 1 W przyjęty przez port został
+odtworzony niezależnie jako 0,878490162 W. Sprawdzono skróty plików, komplet
+ścian, zgodność E/H, orientacje i symetrię strumieni. Nie stwierdzono błędu
+samego całkowania/normalizacji; przyczyna deficytu pozostaje niepotwierdzona.
+Port zajmuje 18 × 4 × 4 komórki. W siatce wykryto skok wielkości komórek do
+1,8667 mimo growth_ratio=1,4; generator nie ogranicza wszystkich przejść.
+Osiągnięcie EndCriteria potwierdza solver.log, nie stanowi kontroli zbieżności.
+
+**Zmiana:** dodano opcjonalne pasywne monitory dwóch dodatkowych powierzchni
+mocy, 25 linii U i 18 przekrojów I portu oraz ich odczyt. Oddzielny wariant
+konfiguracji zachowuje pierwotną geometrię, siatkę, impuls, port i zakończenie.
+Diagnostyczny postprocessing zapisuje JSON, widma NPZ, impedancję 1400–1440 MHz
+co 0,25 MHz i małą paczkę ZIP; pomija raport HTML i wykresy wynikowe.
+Standardowe CalcNF2FF poprzedza teraz kontrola obecności sześciu par plików,
+aby nie przyjąć niekompletnej powierzchni. Dodano jawną zależność h5py.
+
+**Wpływ na fizykę:** brak zmiany wymiarów, źródła lub siatki. Nie wymuszono
+bilansu mnożnikiem i nie przypisano deficytu rzeczywistym stratom PEC.
+Celowo zachowano także znaną nierównomierność siatki w eksperymencie porównawczym.
+Naprawa siatki i walidacja modelu pozostają osobnymi kolejnymi krokami.
+Monitor wokół źródła służy strumieniowi lokalnemu; nie jest transformowany
+na charakterystykę pola dalekiego. Mapy i prądy promiennika M3 pozostają otwarte.
+
+**Formaty i odtwarzalność:** opcjonalne pole solver.power_diagnostics rozszerza
+v2 bez zmiany starych konfiguracji. Dodano jawne artefakty w outcomes/README.md.
+Pierwotnych danych nie nadpisano. Wariant i położenia monitorów są zapisywane.
+
+**Sprawdzenie:** 18 testów bez natywnego solvera przeszło; klasa testów GUI
+została pominięta z powodu niedostępnego Tk. Nowe kontrole sprawdzają twierdzenie
+o dywergencji dla znanego pola, niejednorodne komórki, znaki normalnych,
+niekompletne/niezgodne E/H, osobne znaczniki U/I i izolację eksperymentu.
+Czytnik sprawdzono również na rzeczywistych plikach użytkownika. Potwierdzono
+identyczność wszystkich linii siatki nowej konfiguracji z jego mesh.npz.
+Nie wykonano nowego FDTD ani benchmarków. Natywne dodatkowe monitory wymagają
+uruchomienia na Windowsie użytkownika; wyniki pozostają unverified.
+
 ## Wzór kolejnego wpisu
 
 - Data i krótka nazwa zmiany.
