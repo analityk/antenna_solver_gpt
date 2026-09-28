@@ -8,7 +8,8 @@ Projekt `antenna_solver_gpt` używa openEMS. Kontrakty konfiguracji i manifestu
 mają wersję 2; wycofany szkic NEC2++ nie jest obsługiwany.
 Generator Quadosa, edytor wymiarów, eksport i kontrola geometrii są zaimplementowane.
 Adapter openEMS przygotowuje model XML i zawiera odczyt impedancji oraz pola
-dalekiego, ale wymaga uruchomienia i walidacji na natywnym Windowsie.
+dalekiego. Użytkownik potwierdził udane prepare oraz zapis XML na natywnym
+Windowsie 2026-09-28; wykonanie FDTD i walidacja fizyczna pozostają otwarte.
 Nie ma jeszcze zweryfikowanego wyniku obliczeń Quadosa.
 Prądy, mapy E/H, animacje oraz kontrola zbieżności pozostają do wykonania.
 
@@ -36,7 +37,8 @@ na Linuxie nie zalicza tego wymagania. Ścieżka instalacji używa gotowej paczk
 openEMS dla Windows i zgodnych z nią modułów Pythona. Lokalizacja użytkownika:
 `C:\dev\openems\openEMS`. Użytkownik potwierdził poprawny import openEMS
 0.37.0rc3 i CSXCAD w projektowym `.venv` dnia 2026-09-28.
-Obliczeniowy przypadek kontrolny i integracja modelu pozostają do wykonania.
+Przygotowanie modelu XML jest potwierdzone logiem użytkownika. Obliczeniowy
+przypadek kontrolny i walidacja fizyczna pozostają do wykonania.
 
 ## Zakres pierwszej wersji symulatora
 

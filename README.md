@@ -6,7 +6,8 @@ i skończonym reflektorem. Silnik obliczeniowy: **openEMS** na Windows 11.
 
 **Działa generator, edytor wymiarów i eksport geometrii (M1).**
 Adapter openEMS oraz odczyt impedancji i pola dalekiego są zaimplementowane,
-ale wymagają uruchomienia i walidacji na Windowsie (M2).
+ale obliczenia i walidacja fizyczna na Windowsie pozostają otwarte (M2).
+Użytkownik potwierdził przygotowanie modelu XML poleceniem prepare.
 Nie ma jeszcze zweryfikowanych wyników anteny, map E/H, prądów ani animacji.
 
 ## Pierwsze uruchomienie — CMD
@@ -26,10 +27,20 @@ przeznaczona do instalacji jako samodzielny wheel.
 Pełna instrukcja środowiska: [Windows 11](docs/windows-setup.md).
 
 Edytor pokazuje antenę z przodu i z boku. Wymiary podajesz w mm, częstotliwość
-w MHz. **Enter** lub **Zastosuj** przebudowuje model. Możesz wyłączyć reflektor,
-zapisać wariant JSON i wyeksportować geometrię wraz z rysunkiem.
-Zmiana częstotliwości zachowuje wymiary; **Skaluj…** jest osobną operacją.
+w MHz. Pisanie, wklejanie i przechodzenie Tabem nie przelicza modelu i nie
+odrysowuje wykresu. **Enter** lub **Zastosuj** zatwierdza wszystkie pola
+oraz włączenie/wyłączenie reflektora. Komunikat przypomina o niezastosowanych
+zmianach. Zmiana częstotliwości zachowuje wymiary; **Skaluj…** jest osobną operacją.
 Kolory oznaczają odcinki A–F, nie rozkład prądu. Edytor nie uruchamia FDTD.
+
+| Przycisk | Co zapisuje | Do czego służy |
+| --- | --- | --- |
+| **Zapisz parametry (.json)…** | Jeden plik ustawień w wybranym miejscu | Ponowna edycja lub obliczenia tego wariantu przez opcję --config |
+| **Eksportuj geometrię** | Nowy folder z modelem, rysunkiem PNG, parametrami i dokumentacją przebiegu | Obejrzenie i zachowanie konkretnej konstrukcji; bez obliczeń openEMS |
+
+Oba przyciski najpierw zatwierdzają bieżące pola. Błędny lub niekompletny
+wpis blokuje zapis; program nie zapisuje wówczas poprzedniego modelu jako nowego.
+Po sukcesie ścieżkę można skopiować z pola pod komunikatem.
 
 ## Polecenia
 

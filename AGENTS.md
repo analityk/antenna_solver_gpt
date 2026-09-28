@@ -23,8 +23,8 @@ Potwierdzone środowisko zapisano w `docs/windows-setup.md`.
 
 M1 jest zaimplementowane: generator, walidacja, edytor i eksport geometrii.
 Adapter openEMS, impedancja i pole dalekie są kodem eksperymentalnym:
-natywne przygotowanie, obliczenie i kontrola zbieżności wymagają sprawdzenia
-na Windowsie. Nie przedstawiaj M2 jako zakończonego. Prądy i mapy E/H są
+Użytkownik potwierdził udane prepare i zapis XML na Windowsie 2026-09-28.
+Obliczenie FDTD i kontrola zbieżności pozostają do wykonania. Nie przedstawiaj M2 jako zakończonego. Prądy i mapy E/H są
 jeszcze niezaimplementowane; żądanie tych danych musi kończyć się jawnym błędem.
 
 ## Zasady architektury

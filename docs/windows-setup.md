@@ -125,7 +125,9 @@ git pull --ff-only
 
 Nie trzeba ponownie instalować openEMS ani tworzyć .venv. Edytor powinien
 pokazać wymiary i dwa rzuty anteny. Zmiana C/D przesuwa sekcje, zachowując E.
-Można zapisać wariant JSON i eksport geometrii.
+Pisanie i Tab nie przeliczają podglądu; zatwierdza go Enter lub Zastosuj.
+Zapisz parametry (.json) tworzy jeden plik ustawień do dalszej pracy.
+Eksportuj geometrię tworzy folder z modelem, rysunkiem i dokumentacją.
 
 Po zamknięciu okna przygotuj wejście solvera:
 
@@ -147,6 +149,20 @@ Polecenie uruchamiające właściwe obliczenie jest dostępne eksperymentalnie:
 Ctrl+C przerywa przebieg. Nie uruchamiaj kilku obliczeń naraz na tym etapie.
 Zapisany raport i wyniki będą oznaczone jako unverified; nie wykonano jeszcze
 kontroli dipola ani zbieżności Quadosa. Opis modelu: [openEMS](openems-model.md).
+
+## Potwierdzone przygotowanie modelu
+
+Użytkownik przesłał 2026-09-28 log udanego prepare z Windows 11:
+
+```text
+Zapisano openems/model.xml.
+Wejście openEMS przygotowane.
+```
+
+Run ID: `20260928T002146Z_f265477ca6`. Potwierdzenie pochodzi z logu
+użytkownika. Oznacza działające budowanie wejścia przez natywne API;
+nie oznacza wykonania FDTD, kontroli pliku XML przez autora zmiany ani
+zakończonej walidacji fizycznej. Pełne M2 nadal pozostaje otwarte.
 
 ## Potwierdzone środowisko
 

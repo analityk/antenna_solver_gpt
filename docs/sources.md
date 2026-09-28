@@ -43,3 +43,12 @@ Wcześniejsza symulacja double biquada przy 800 MHz w tej rozmowie korzystała
 z PyNEC 2.3.4. Stanowi wskazówkę integracyjną, nie wynik dla Quadosa 8.
 Nie przenosimy jej czasów wykonania ani zysku do wymagań tej anteny.
 
+
+## Interfejs
+
+- [Matplotlib — osadzenie wykresu w Tk](https://matplotlib.org/stable/gallery/user_interfaces/embedding_in_tk_sgskip.html).
+- [Python 3.14 — kontrolki ttk](https://docs.python.org/3.14/library/tkinter.ttk.html).
+
+Rysowanie i pola tekstowe są rozdzielone. Wcześniejszy TextBox Matplotlib
+wykonywał pełne canvas.draw w _rendercursor przy edycji, a on_submit również
+przy opuszczeniu pola; nowy formularz nie używa tych kontrolek.

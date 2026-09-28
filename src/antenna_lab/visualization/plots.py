@@ -3,6 +3,8 @@ import json
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+from matplotlib.backends.backend_agg import FigureCanvasAgg
+from matplotlib.figure import Figure
 from matplotlib.patches import Rectangle
 import numpy as np
 
@@ -16,7 +18,7 @@ def draw_geometry(front, side, geometry):
         ax.grid(alpha=0.2)
         ax.set_aspect("equal", adjustable="box")
         ax.set_xlabel("y [mm]")
-    front.set_title("Rzut xy — długa oś y poziomo", loc="left", fontsize=11)
+    front.set_title("Rzut xy — długa oś y poziomo", loc="left", fontsize=11, pad=32)
     front.set_ylabel("x [mm]")
     side.set_title("Rzut yz — wysokość nad reflektorem", loc="left", fontsize=11)
     side.set_ylabel("z [mm]")
@@ -39,17 +41,19 @@ def draw_geometry(front, side, geometry):
         ax.set_xlim(low[1] * 1000 - 25, high[1] * 1000 + 25)
     front.set_ylim(geometry.bounds[0][0] * 1000 - 15, geometry.bounds[1][0] * 1000 + 15)
     side.set_ylim(geometry.bounds[0][2] * 1000 - 6, geometry.bounds[1][2] * 1000 + 10)
-    front.legend(ncol=7, loc="upper center", bbox_to_anchor=(0.5, 1.3), fontsize=8, frameon=False)
+    front.legend(ncol=7, loc="lower center", bbox_to_anchor=(0.5, 1.0), fontsize=8, frameon=False)
 
 
 def geometry_plot(geometry, filename):
-    fig, (front, side) = plt.subplots(2, 1, figsize=(13, 5), gridspec_kw={"height_ratios": [3, 1.5]})
+    # File export must not create a second GUI window in an embedded Tk editor.
+    fig = Figure(figsize=(13, 5))
+    FigureCanvasAgg(fig)
+    front, side = fig.subplots(2, 1, gridspec_kw={"height_ratios": [3, 1.5]})
     draw_geometry(front, side, geometry)
     fig.suptitle("Quados 8 — geometria konstrukcyjna, bez wyników elektromagnetycznych", fontsize=12)
     fig.subplots_adjust(top=0.76, bottom=0.12, hspace=0.8, left=0.06, right=0.98)
     Path(filename).parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(filename, dpi=160)
-    plt.close(fig)
 
 
 def render_results(run_path):

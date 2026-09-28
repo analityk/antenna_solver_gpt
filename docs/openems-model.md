@@ -1,8 +1,9 @@
 # Model openEMS — pierwszy adapter
 
 **Stan: implementacja eksperymentalna, bez zakończonej walidacji natywnej.**
-API sprawdzono względem źródeł wydania 0.37.0-rc3. Import u użytkownika działa;
-przygotowanie modelu i obliczenia muszą zostać sprawdzone na Windowsie.
+API sprawdzono względem źródeł wydania 0.37.0-rc3. Użytkownik potwierdził
+import oraz udane przygotowanie XML na Windowsie. Wykonanie FDTD
+i fizyczna kontrola wyniku pozostają do sprawdzenia.
 
 ## Materiały i źródło
 

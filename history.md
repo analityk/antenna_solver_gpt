@@ -157,6 +157,44 @@ Quadosa. Wyniki adaptera są zawsze unverified; program nie potwierdza jeszcze
 automatycznie osiągnięcia EndCriteria. Prądy, mapy E/H i animacje są odrzucane
 jako nieobsługiwane, zamiast zapisywania pustych danych. Nie było benchmarków.
 
+## 2026-09-28 — płynna edycja parametrów i rozdzielenie zapisów
+
+**Powód:** użytkownik zgłosił opóźnienia przy wpisywaniu oraz niejasną różnicę
+między zapisem wariantu i eksportem. Jednocześnie potwierdził udane prepare
+na Windowsie, run_id 20260928T002146Z_f265477ca6, komunikat zapisu model.xml.
+
+**Przyczyna:** TextBox Matplotlib odrysowywał całą figurę podczas edycji
+kursora. Dodatkowe on_submit przy utracie fokusu uruchamiało walidację,
+przebudowę i odświeżanie wszystkich pól. Był to problem obsługi GUI,
+nie obliczeń openEMS.
+
+**Zmiana:** formularz używa natywnych kontrolek Tk/ttk. Wpisywanie i Tab
+oznaczają tylko niezastosowane zmiany; Enter/Zastosuj zatwierdza cały
+formularz. EditorState zachowuje pełną precyzję nietkniętych wartości
+i odrzuca błędy bez częściowego zmieniania modelu. Sama zmiana częstotliwości
+nie przebudowuje geometrii. Podgląd jest rysowany po zmianie geometrii.
+Komunikaty mają stałe miejsce, aby ich zmiana nie zmieniała rozmiaru wykresu.
+
+Przyciski mają nazwy Zapisz parametry (.json) i Eksportuj geometrię oraz
+widoczne opisy zawartości. Obie akcje najpierw zatwierdzają wpisane dane.
+Ścieżkę zapisu można skopiować. Eksport PNG używa FigureCanvasAgg,
+bez otwierania dodatkowej figury GUI. Uporządkowano pozycję legendy.
+
+**Wpływ na fizykę i odtwarzalność:** brak zmiany generatora, solvera, jednostek
+i formatów danych v2. JSON parametrów pozostaje wejściem przez --config,
+a eksport tworzy odrębny przebieg geometryczny z pełną dokumentacją.
+Tkinter jest już częścią standardowej instalacji Pythona Windows;
+nie dodano zależności pip. Potwierdzenie prepare pochodzi z logu użytkownika,
+nie z lokalnego odczytu jego XML. FDTD i walidacja fizyczna nadal są otwarte.
+
+**Sprawdzenie:** przeszło 14 testów bez GUI, w tym nowe przypadki niepełnego
+wpisu, odrzucenia kolizji, zachowania precyzji oraz braku przebudowy przy
+zmianie samej częstotliwości. Dodano dwa testy integracyjne Tk: brak rysowania
+i generowania podczas wpisywania/Tab, jedno zatwierdzenie Enter oraz oddzielne
+artefakty obu zapisów. W środowisku wykonawczym nie można uruchomić ekranu Tk;
+testy te są jawnie pomijane, a działanie nowego okna wymaga potwierdzenia
+na Windowsie użytkownika. Nie wykonywano benchmarków ani pomiarów czasu.
+
 ## Wzór kolejnego wpisu
 
 - Data i krótka nazwa zmiany.

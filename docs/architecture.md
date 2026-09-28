@@ -13,7 +13,7 @@ i domyślne parametry. Samodzielna dystrybucja wheel nie jest jeszcze obsługiwa
 | `antennas/` | Rejestr modeli i deterministyczny generator Quados8 | Bez importu openEMS |
 | `solvers/mesh.py` | Niejednorodna siatka kartezjańska, PML, kontrola limitu | Bez zmian wymiarów anteny |
 | `solvers/openems.py` | Materiały, port, FDTD XML, impedancja i NF2FF | Jedyne miejsce zależne od natywnego API |
-| `app/` | Edytor Matplotlib, zapis wariantów i eksport | Sterowanie geometrią |
+| `app/` | Formularz Tk/ttk, podgląd Matplotlib, zapis parametrów i eksport | Sterowanie geometrią |
 | `visualization/` | Rysunki, wykresy CSV/NPZ i HTML | Bez wywołań solvera |
 | `cli.py` | Polecenia i proces potomny solvera | Log, przerwanie i stan przebiegu |
 
@@ -44,10 +44,20 @@ wykonania i status fizycznej walidacji. `completed` nie oznacza `passed`.
 M1 i podstawowy edytor są zaimplementowane. Adapter M2 jest eksperymentalny;
 nie wykonano tutaj obliczenia natywnym openEMS. Na Windowsie użytkownika
 potwierdzono import CPython 3.14.0/openEMS 0.37.0rc3/CSXCAD 0.7.0rc3.
-Następny krok to `prepare`, potem przypadek kontrolny i zbieżność.
+Użytkownik potwierdził prepare i zapis XML na Windowsie. Przypadek kontrolny,
+wykonanie FDTD i sprawdzenie zbieżności pozostają otwarte.
 Mapy E/H i prądy wymagają dalszej implementacji; adapter odrzuca ich żądanie.
 
 CPU Ryzen 7 7800X3D, RAM 32 GB, Windows 11. Instrukcje używają CMD i `.venv`.
 Nie wymagamy WSL, uv ani GPU. Pole `threads=0` pozostawia wybór openEMS;
 `max_cells` ogranicza rozmiar siatki, ale nie jest gwarancją zużycia RAM.
 Nie wykonujemy benchmarków ani prognoz czasów obliczeń.
+
+## Interakcja edytora
+
+Pola są kontrolkami Tk/ttk poza obszarem Matplotlib. Zmiana tekstu wyłącznie
+oznacza formularz jako niezastosowany. Enter/Zastosuj waliduje komplet pól
+i atomowo zastępuje poprawny model. Tab lub utrata fokusu nie uruchamia apply.
+EditorState zachowuje pełną precyzję nietkniętych wartości. Zmiana samej
+częstotliwości nie przebudowuje geometrii; zatwierdzenie bez zmian nie rysuje
+ponownie wykresu. Eksport PNG używa FigureCanvasAgg bez dodatkowego okna.
