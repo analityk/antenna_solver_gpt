@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Antenna Lab experiment configuration v1",
+  "title": "Antenna Solver GPT experiment configuration v2",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -10,14 +10,15 @@
     "antenna",
     "simulation",
     "requested_outputs",
-    "provenance"
+    "provenance",
+    "solver"
   ],
   "properties": {
     "$schema": {
       "type": "string"
     },
     "schema_version": {
-      "const": 1
+      "const": 2
     },
     "id": {
       "type": "string",
@@ -82,12 +83,12 @@
         },
         "reflector_model": {
           "enum": [
-            "connected_wire_grid",
+            "pec_plate",
             "none"
           ]
         },
         "feed_model": {
-          "const": "ideal_balanced_port"
+          "const": "differential_lumped_port"
         },
         "reference_impedance_ohm": {
           "type": "number",
@@ -191,6 +192,81 @@
         },
         "note": {
           "type": "string"
+        }
+      }
+    },
+    "solver": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "cells_per_wire_diameter",
+        "cells_per_wavelength",
+        "growth_ratio",
+        "padding_wavelengths",
+        "pml_cells",
+        "max_cells",
+        "max_timesteps",
+        "end_criteria",
+        "threads",
+        "excitation_fractional_bandwidth",
+        "far_field_step_deg"
+      ],
+      "properties": {
+        "name": {
+          "const": "openEMS"
+        },
+        "cells_per_wire_diameter": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 12
+        },
+        "cells_per_wavelength": {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 100
+        },
+        "growth_ratio": {
+          "type": "number",
+          "minimum": 1.05,
+          "maximum": 1.5
+        },
+        "padding_wavelengths": {
+          "type": "number",
+          "minimum": 0.25,
+          "maximum": 2
+        },
+        "pml_cells": {
+          "type": "integer",
+          "minimum": 8,
+          "maximum": 20
+        },
+        "max_cells": {
+          "type": "integer",
+          "minimum": 1000
+        },
+        "max_timesteps": {
+          "type": "integer",
+          "minimum": 1000
+        },
+        "end_criteria": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 0.0001
+        },
+        "threads": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "excitation_fractional_bandwidth": {
+          "type": "number",
+          "minimum": 0.05,
+          "maximum": 0.8
+        },
+        "far_field_step_deg": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 15
         }
       }
     }

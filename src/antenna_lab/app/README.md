@@ -1,9 +1,7 @@
-# Aplikacja
+# Aplikacja lokalna
 
-Implementacja planowana na M4. Lokalny interfejs ma edytować konfigurację,
-pokazywać geometrię, uruchamiać/anulować obliczenia oraz porównywać wyniki.
-Ciężkie obliczenia nie powinny blokować interakcji z interfejsem.
-
-Framework nie został wybrany. Funkcje obliczeniowe muszą pozostać dostępne
-bez GUI. Otwarcie istniejącego wyniku i przesuwanie fazy nie uruchamia solvera.
-
+`python -m antenna_lab preview` otwiera edytor Matplotlib.
+Obsługuje wymiary, częstotliwość, osobne skalowanie, reflektor, zapis wariantu
+JSON i eksport geometrii. Dialogi zapisu i skalowania używają tkinter.
+Podgląd nie uruchamia FDTD; obliczeniami steruje CLI w osobnym procesie.
+Porównania wariantów, serie i przegląd pól pozostają do implementacji.

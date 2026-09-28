@@ -1,6 +1,7 @@
 # Geometria Quadosa 8 — specyfikacja generatora
 
-To jawna rekonstrukcja rysunku użytkownika, jeszcze bez walidacji solverem.
+Generator odtwarza poniższą rekonstrukcję rysunku użytkownika. Geometrię
+sprawdzono testami; walidacja elektromagnetyczna pozostaje otwarta.
 Rysunek wymiarowy jest źródłem długości; brak oryginalnego pliku NEC.
 
 ## Założenia geometryczne
@@ -38,8 +39,9 @@ Pozostałe gałęzie są odbiciami względem x = 0 i y = 0. Łączna długość
 jednej gałęzi musi być równa A + B + C + D + 7E + F.
 
 Centralny port łączy terminale (−G/2, 0, H) i (+G/2, 0, H). Jego fizyczna
-definicja to idealne wymuszenie różnicowe; reprezentacja segmentem źródła
-w NEC jest zadaniem adaptera i musi zostać opisana w `model.nec` i raporcie.
+definicja to idealne wymuszenie różnicowe. Adapter openEMS używa portu
+skupionego o skończonej objętości i zakończeniach PEC; szczegóły zapisuje
+w `openems/model.xml` i manifeście. Opis: `docs/openems-model.md`.
 Portu nie dolicza się do czterech długości drutu z rysunku.
 
 ## Warunki poprawności
@@ -60,7 +62,8 @@ Portu nie dolicza się do czterech długości drutu z rysunku.
 
 Przednia powierzchnia fizycznej płytki to z = 0, zakres x = ±szerokość/2,
 y = ±długość/2; grubość rozciąga się w stronę ujemnego z.
-Pierwszy adapter zastępuje ją połączoną siatką w z = 0. Każde skrzyżowanie
-siatki musi być węzłem elektrycznym. Podział siatki i promień jej drutów
-są parametrami numerycznymi, odrębnymi od wymiarów konstrukcyjnych anteny.
-
+Adapter tworzy bryłę PEC przez AddBox. Grubość jest wymiarem aktywnym;
+nie zastępujemy płyty siatką drutów. Cylindry drutu mają w węzłach kule tego
+samego promienia, zapewniające ciągłość połączeń. Dla konfiguracji startowej
+powstaje 48 odcinków osi i 48 różnych węzłów. Długość każdej gałęzi wynosi
+775,718309859 mm; objętości kul nie dolicza się do długości osi z rysunku.

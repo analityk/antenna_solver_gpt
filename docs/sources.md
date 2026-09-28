@@ -12,18 +12,30 @@
 - 2450 MHz w konfiguracji jest założeniem skalowania, nie zweryfikowaną
   częstotliwością optimum konkretnego rysunku Quadosa 8.
 
-## Solver
+## Solver i API
 
-- [NEC2++](https://github.com/tmolteno/necpp) — projekt autora, implementacja
-  metody momentów zgodna z NEC-2.
-- [NE/NH — pola bliskie](https://www.nec2.org/part_3/cards/ne.html).
-- [Dokumentacja NEC2++](https://tmolteno.github.io/necpp/).
-- [openEMS](https://docs.openems.de/en/latest/) — możliwy przyszły adapter FDTD.
+- [openEMS — dokumentacja](https://docs.openems.de/en/latest/).
+- [Wydanie Windows 0.37.0-rc3](https://github.com/thliebig/openEMS-Project/releases/tag/v0.37.0-rc3).
+- [API openEMS](https://docs.openems.de/en/latest/python/openEMS/openEMS.html).
+- [Porty](https://docs.openems.de/en/latest/python/openEMS/ports.html).
+- [NF2FF](https://docs.openems.de/en/latest/python/openEMS/nf2ff.html).
+- [Geometria CSXCAD](https://docs.openems.de/en/latest/python/CSXCAD/CSProperties.html).
 
-Przy integracji należy zapisać dokładną wersję solvera i jego zależności,
-zachować wymagane informacje licencyjne i nie dołączać cudzych plików
-binarnych bez określenia sposobu dystrybucji. M0 nie zawiera kodu solvera
-ani kopii artykułu lub rysunków autora.
+Adapter sprawdzano względem źródeł podmodułów przypiętych przez wydanie,
+ponieważ dokumentacja latest może się zmieniać:
+
+- openEMS commit `67d378488ee40de815eed00f8aaa808f0a9e3c6d`:
+  [openEMS.pyx](https://github.com/thliebig/openEMS/blob/67d378488ee40de815eed00f8aaa808f0a9e3c6d/python/openEMS/openEMS.pyx),
+  [ports.py](https://github.com/thliebig/openEMS/blob/67d378488ee40de815eed00f8aaa808f0a9e3c6d/python/openEMS/ports.py),
+  [nf2ff.py](https://github.com/thliebig/openEMS/blob/67d378488ee40de815eed00f8aaa808f0a9e3c6d/python/openEMS/nf2ff.py),
+  [utilities.py — DFT](https://github.com/thliebig/openEMS/blob/67d378488ee40de815eed00f8aaa808f0a9e3c6d/python/openEMS/utilities.py),
+  [przykład anteny](https://github.com/thliebig/openEMS/blob/67d378488ee40de815eed00f8aaa808f0a9e3c6d/python/Tutorials/Simple_Patch_Antenna.py).
+- CSXCAD commit `dcdb62bcfd1111ee3594ba22d06089b41b380990`:
+  [źródła](https://github.com/thliebig/CSXCAD/tree/dcdb62bcfd1111ee3594ba22d06089b41b380990).
+
+Przegląd źródeł nie zastępuje wykonania na Windowsie. Repozytorium projektu
+nie dołącza cudzych bibliotek binarnych, artykułu ani rysunków autora anteny.
+Wersje faktycznie importowane przez adapter zapisuje manifest przebiegu.
 
 ## Poprzedni eksperyment
 

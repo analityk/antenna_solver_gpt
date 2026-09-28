@@ -1,71 +1,53 @@
 # Architektura
 
-## Granice modułów
+Jeden pakiet Pythona `antenna_lab`, lokalny interfejs i natywny openEMS.
+Geometria oraz konfiguracja są niezależne od solvera. Instalacja jest obecnie
+edycyjna (`pip install -e .`) w kopii repozytorium: stąd pobierane są schematy
+i domyślne parametry. Samodzielna dystrybucja wheel nie jest jeszcze obsługiwana.
 
-Na początek jeden pakiet Pythona `antenna_lab`. Solver numeryczny jest osobną
-zależnością natywną, a nie implementacją równań Maxwella pisaną od zera.
+| Moduł | Implementacja | Granica odpowiedzialności |
+| --- | --- | --- |
+| `core/config.py` | JSON Schema v2, wartości skończone, warianty, skalowanie | Bez nazw wymiarów konkretnej anteny |
+| `core/geometry.py` | Wire, Plate, Port, Geometry, topologia i kolizje | Geometria SI, bez siatki FDTD |
+| `core/runs.py` | RunRecord, konfiguracja, schematy, kod i skróty artefaktów | Bez wyników zastępczych |
+| `antennas/` | Rejestr modeli i deterministyczny generator Quados8 | Bez importu openEMS |
+| `solvers/mesh.py` | Niejednorodna siatka kartezjańska, PML, kontrola limitu | Bez zmian wymiarów anteny |
+| `solvers/openems.py` | Materiały, port, FDTD XML, impedancja i NF2FF | Jedyne miejsce zależne od natywnego API |
+| `app/` | Edytor Matplotlib, zapis wariantów i eksport | Sterowanie geometrią |
+| `visualization/` | Rysunki, wykresy CSV/NPZ i HTML | Bez wywołań solvera |
+| `cli.py` | Polecenia i proces potomny solvera | Log, przerwanie i stan przebiegu |
 
-| Moduł | Przyjmuje | Zwraca | Nie odpowiada za |
-| --- | --- | --- | --- |
-| `core` | Geometrię, parametry, porty, żądanie obliczeń | Wspólne obiekty danych i walidację | Nazwy anten i API solverów |
-| `antennas` | Parametry konkretnej anteny | Geometrię w SI, porty, opis założeń | Wyniki elektromagnetyczne |
-| `solvers` | Geometrię, częstotliwości, siatki próbek | Prądy, impedancje, pola, komunikaty | Parametryzację Quadosa i GUI |
-| `visualization` | Zapisane wyniki, fazę, zakres widoku | Wykresy, mapy, animacje | Ponowne rozwiązywanie anteny |
-| `app` | Wybory użytkownika | Zadania obliczeń i podgląd wyników | Alternatywne implementacje fizyki |
+Konfiguracja przechodzi przez generator anteny do geometrii, następnie przez
+adapter do zapisanych danych. Wizualizacja odczytuje pliki. Obecny generator
+zwraca zwykły obiekt Geometry; dodanie modelu wymaga generatora, schematu
+i wpisu w rejestrze, bez specjalnych warunków w rdzeniu.
 
-Przepływ: konfiguracja → generator anteny → geometria → adapter solvera
-→ zapis outcomes → wizualizacja. Interfejs steruje przepływem, ale rdzeń
-pozostaje użyteczny bez przeglądarki.
+## Przebiegi
 
-## Podstawowe kontrakty
+`geometry` zapisuje wyłącznie geometrię. `prepare` używa natywnych bibliotek
+do utworzenia XML, ale nie wywołuje Run. `run` wykonuje FDTD, postprocessing
+i raport. Biblioteki natywne są importowane dopiero w procesie potomnym
+uruchomionym tym samym interpreterem, co polecenie główne.
 
-- `AntennaModel`: identyfikator, wersja generatora, schemat parametrów oraz
-  operacja budowania geometrii. Bez wymaganego dziedziczenia z klas solvera.
-- `Geometry`: węzły, przewody, połączenia, porty, materiały, oznaczenia części
-  anteny i przybliżenia. Geometria idealna oddzielona od dyskretyzacji solvera.
-- `SolverAdapter`: deklaruje obsługiwane możliwości; brak funkcji jest jawnym
-  błędem, a nie pustym wynikiem udającym powodzenie.
-- `RunRequest`: kopia parametrów, częstotliwości, normalizacja, zakres danych
-  i ustawienia dyskretyzacji. Po rozpoczęciu przebiegu nie jest modyfikowany.
-- `RunResult`: odsyłacze do danych, metryki, stan kontroli i pochodzenie.
+Każdy przebieg otrzymuje unikalny katalog. Zawiera rozwiązaną konfigurację,
+schematy, archiwum kodu źródłowego, wersję Git (jeśli jest dostępna), geometrię
+i manifest. Kopia konfiguracji nie zależy od późniejszych zmian w edytorze.
+Nie zapisujemy środowiska procesu, danych kont ani całego katalogu roboczego.
 
-Typy i nazwy metod zostaną ustalone podczas M1. M0 nie wprowadza pozornego
-API z funkcjami zwracającymi atrapy danych.
+Proces główny przechwytuje log, kod wyjścia i Ctrl+C. Po zakończeniu zapisuje
+stan oraz skróty plików. Zakończone przebiegi nie są używane ponownie do solve.
+Wersja 2 rozdziela etap (`geometry`, `openems_input`, `simulation`), stan
+wykonania i status fizycznej walidacji. `completed` nie oznacza `passed`.
 
-## Pierwszy adapter
+## Stan i platforma
 
-Pierwszym i obecnie jedynym wybranym solverem jest openEMS. NEC2++ / PyNEC
-nie będzie implementowany. Biblioteki openEMS i CSXCAD pozostają w adapterze;
-rdzeń oraz generatory anten nie zależą bezpośrednio od ich API.
+M1 i podstawowy edytor są zaimplementowane. Adapter M2 jest eksperymentalny;
+nie wykonano tutaj obliczenia natywnym openEMS. Na Windowsie użytkownika
+potwierdzono import CPython 3.14.0/openEMS 0.37.0rc3/CSXCAD 0.7.0rc3.
+Następny krok to `prepare`, potem przypadek kontrolny i zbieżność.
+Mapy E/H i prądy wymagają dalszej implementacji; adapter odrzuca ich żądanie.
 
-Przed implementacją trzeba przenieść wcześniejsze kontrakty M0 na model
-openEMS: geometrię materiałów, siatkę FDTD, port, granice obszaru, odczyt
-prądów i pól oraz odtwarzalne pliki wejściowe. Lista nieaktywnych kontraktów
-NEC jest w `goal.md`. Samo zastąpienie nazwy biblioteki nie kończy tej migracji.
-
-## Lokalna praca i zasoby
-
-Docelowe obliczenia mają działać na komputerze użytkownika. Zgłoszona
-konfiguracja: Ryzen 7 7800X3D, 32 GB RAM, GeForce GTX 1660 Ti 6 GB.
-System docelowy: natywny Windows 11. Użytkownik posiada Git, Python i VS Code.
-Stosujemy CMD lub PowerShell oraz projektowe `.venv` z pip. Użytkownik potwierdził
-CPython 3.14.0, 64-bit AMD64. Nie przenosimy do projektu całej listy pakietów
-z globalnego środowiska użytkownika. WSL i uv nie są wymagane.
-
-Instrukcja instalacji korzysta z oficjalnej paczki openEMS 0.37.0-rc3 MSVC
-z modułami cp314 dla Windows x64. To wydanie RC. Podana lokalizacja paczki:
-`C:\dev\openems\openEMS`. Użytkownik potwierdził import openEMS 0.37.0rc3
-i CSXCAD w CMD dnia 2026-09-28. Adapter i obliczeniowy przypadek kontrolny
-pozostają do implementacji oraz sprawdzenia. Instrukcja: [Windows 11](windows-setup.md).
-
-Pierwszy adapter używa CPU. Obsługa GPU i dobór optymalnej liczby procesów
-są poza bieżącym zakresem. Przyszłe serie obliczeń powinny mieć ograniczenie
-współbieżności i możliwość anulowania, bez założenia, że 16 wątków sprzętowych
-oznacza 16 niezależnych zadań naraz. Benchmarki nie są częścią projektu na M0.
-
-## Zapis i wersjonowanie
-
-Git przechowuje kod, wymagania, konfiguracje i schematy. Duże outcomes są
-lokalnymi artefaktami przebiegów. Każdy przebieg ma manifest ze skrótami plików,
-wersją solvera i rewizją kodu. Zmiana schematu nie może po cichu zmieniać
-interpretacji już zapisanych pól, osi lub fazy.
+CPU Ryzen 7 7800X3D, RAM 32 GB, Windows 11. Instrukcje używają CMD i `.venv`.
+Nie wymagamy WSL, uv ani GPU. Pole `threads=0` pozostawia wybór openEMS;
+`max_cells` ogranicza rozmiar siatki, ale nie jest gwarancją zużycia RAM.
+Nie wykonujemy benchmarków ani prognoz czasów obliczeń.

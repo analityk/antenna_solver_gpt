@@ -1,11 +1,9 @@
 # Wizualizacja
 
-Implementacja planowana na M3. Moduł odczytuje outcomes i pozwala odtwarzać
-mapy bez uruchamiania solvera. Używa zespolonych pól oraz zapisanej konwencji
-fazowej. Osobno prezentuje amplitudę, fazę i chwilowe składowe ze znakiem.
+Dostępne: dwa rzuty geometrii, wykres impedancji, przekroje pola dalekiego
+oraz raport HTML. Wykresy elektromagnetyczne powstają wyłącznie z zapisanych
+danych CSV/NPZ po obliczeniu, z oznaczeniem unverified.
 
-Skale, jednostki, maski, płaszczyzny przekroju i normalizacja są widoczne.
-Interpolacja do wyświetlania nie może być przedstawiana jako gęstsza siatka
-obliczeniowa. Nie normalizuj każdej klatki osobno i nie obracaj geometrii
-w celu pozorowania zmiany fazy.
-
+Pola bliskie i animacje są planowane w M3. Będą korzystać z zespolonych danych,
+jawnych masek i wspólnych skal; zmiana fazy nie może uruchamiać solvera.
+Interpolacja obrazu nie oznacza gęstszej siatki obliczeniowej.

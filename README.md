@@ -1,50 +1,93 @@
 # antenna_solver_gpt
 
-Projekt do parametrycznego modelowania i symulacji anten. Pierwszy model:
-**Quados 8 przy 1420 MHz**. Docelowo wspólny rdzeń, różne generatory anten,
-wymienne adaptery solverów i odtwarzalne wyniki.
+Lokalny program do parametrycznego modelowania anten. Pierwszy model to
+**Quados 8 przy dokładnie 1420 MHz**, z czterema połączonymi gałęziami
+i skończonym reflektorem. Silnik obliczeniowy: **openEMS** na Windows 11.
 
-**Stan: M0 — fundament projektu.** Są wymagania, parametry i kontrakt wyników.
-Wybrany silnik obliczeniowy: **openEMS**, natywnie na Windows 11.
-Generator geometrii, adapter openEMS i aplikacja nie są jeszcze zaimplementowane.
-W tym repozytorium nie ma jeszcze wyników symulacji Quadosa.
+**Działa generator, edytor wymiarów i eksport geometrii (M1).**
+Adapter openEMS oraz odczyt impedancji i pola dalekiego są zaimplementowane,
+ale wymagają uruchomienia i walidacji na Windowsie (M2).
+Nie ma jeszcze zweryfikowanych wyników anteny, map E/H, prądów ani animacji.
 
-Decyzja o openEMS zastępuje wcześniejszy plan użycia NEC2++.
-Szczegółowe kontrakty M0 związane z NEC wymagają migracji przed implementacją;
-ich status opisuje [goal.md](goal.md). Nie są gotowym wejściem openEMS.
+## Pierwsze uruchomienie — CMD
 
-## Mapa projektu
+W istniejącej kopii użytkownika, z już zainstalowanym openEMS:
+
+```bat
+cd /d C:\dev\antenna_solver_gpt\antenna_solver_gpt
+git pull --ff-only
+.\.venv\Scripts\python.exe -m pip install -e .
+.\.venv\Scripts\python.exe -m antenna_lab preview
+```
+
+Instalacja `-e .` łączy pakiet z kodem w tej kopii repozytorium. Obecna wersja
+wymaga również katalogów `schemas/` i `parameters/` z repozytorium; nie jest
+przeznaczona do instalacji jako samodzielny wheel.
+Pełna instrukcja środowiska: [Windows 11](docs/windows-setup.md).
+
+Edytor pokazuje antenę z przodu i z boku. Wymiary podajesz w mm, częstotliwość
+w MHz. **Enter** lub **Zastosuj** przebudowuje model. Możesz wyłączyć reflektor,
+zapisać wariant JSON i wyeksportować geometrię wraz z rysunkiem.
+Zmiana częstotliwości zachowuje wymiary; **Skaluj…** jest osobną operacją.
+Kolory oznaczają odcinki A–F, nie rozkład prądu. Edytor nie uruchamia FDTD.
+
+## Polecenia
+
+W poniższych poleceniach używaj `.\.venv\Scripts\python.exe`:
+
+| Polecenie | Działanie |
+| --- | --- |
+| `-m antenna_lab preview` | Edytor wymiarów i widoki xy/yz |
+| `-m antenna_lab check` | Kontrola geometrii i plan siatki, bez openEMS |
+| `-m antenna_lab geometry` | Nowy katalog z geometrią, konfiguracją i PNG |
+| `-m antenna_lab prepare` | Import openEMS i zapis pełnego XML, bez obliczeń FDTD |
+| `-m antenna_lab run` | Eksperymentalne FDTD oraz zapis impedancji i pola dalekiego |
+
+Przykłady wariantów:
+
+```bat
+.\.venv\Scripts\python.exe -m antenna_lab preview --set-mm C=75 --set-mm D=80
+.\.venv\Scripts\python.exe -m antenna_lab geometry --no-reflector
+.\.venv\Scripts\python.exe -m antenna_lab prepare --config parameters\quados8_variant.json
+```
+
+Opcje `--frequency-mhz 1500` i `--scale-to-mhz 1500` oznaczają odpowiednio
+zmianę częstotliwości bez zmiany anteny oraz jawne skalowanie wszystkich
+wymiarów. Nie można użyć ich jednocześnie.
+
+Pierwszy krok integracji na komputerze użytkownika to `prepare`. Sukces
+potwierdza utworzenie wejścia, nie poprawność elektromagnetyczną modelu.
+Polecenie `run` działa w osobnym procesie; **Ctrl+C** przerywa obliczenie.
+Każde uruchomienie zapisuje osobny katalog `outcomes/runs/<run_id>/`.
+Wyniki pozostają **unverified** do kontroli źródła, przypadku referencyjnego
+i zbieżności siatki. Nie wykonujemy benchmarków.
+
+## Model i dokumentacja
+
+Promiennik jest sumą cylindrów PEC ze złączami kulistymi. Reflektor jest
+pełną płytą PEC o zadanej grubości. Port różnicowy ma odniesienie 200 Ω;
+to nie założona impedancja anteny. Balun, kabel, straty i wsporniki są poza modelem.
+Wymiary startowe przeskalowano z roboczo przyjętych 2450 MHz. Nie są projektem
+anteny dostrojonej i potwierdzonej pomiarem przy 1420 MHz.
 
 | Ścieżka | Odpowiedzialność |
 | --- | --- |
-| `AGENTS.md` | Instrukcje dla kolejnych prac nad projektem |
-| `goal.md` | Zakres, model fizyczny, wymiary, wyniki i kryteria zakończenia |
-| `history.md` | Większe zmiany i ocena ich wpływu |
-| `src/antenna_lab/core/` | Wspólne pojęcia geometrii, portu i wyniku |
-| `src/antenna_lab/antennas/` | Modele anten, początkowo Quados 8 |
-| `src/antenna_lab/solvers/` | Integracja z openEMS |
-| `src/antenna_lab/visualization/` | Mapy, charakterystyki i animacje z danych |
-| `src/antenna_lab/app/` | Docelowy lokalny interfejs i sterowanie zadaniami |
-| `parameters/` | Jawne konfiguracje eksperymentów i dane źródłowe |
-| `outcomes/` | Kontrakt katalogu wyników; właściwe przebiegi pomijane przez Git |
-| `schemas/` | Schematy JSON konfiguracji i manifestu wyników |
-| `docs/` | Architektura, geometria, założenia i plan implementacji |
+| [goal.md](goal.md), [history.md](history.md), `AGENTS.md` | Wymagania, decyzje i instrukcje pracy |
+| `src/antenna_lab/core/` | Geometria, walidacja, konfiguracje i zapis przebiegów |
+| `src/antenna_lab/antennas/` | Generatory konkretnych anten |
+| `src/antenna_lab/solvers/` | Siatka i adapter openEMS |
+| `src/antenna_lab/app/`, `src/antenna_lab/visualization/` | Edytor, wykresy i raport |
+| `parameters/`, `schemas/` | Wymiary źródłowe, warianty i kontrakty JSON |
+| [outcomes/README.md](outcomes/README.md) | Kontrakt zapisanych danych |
+| [docs/architecture.md](docs/architecture.md) | Granice modułów |
+| [docs/openems-model.md](docs/openems-model.md) | Dyskretyzacja, port i normalizacja |
+| [docs/quados8-geometry.md](docs/quados8-geometry.md) | Dokładna konstrukcja gałęzi |
+| [docs/roadmap.md](docs/roadmap.md), [docs/sources.md](docs/sources.md) | Dalsze etapy i źródła |
 
-## Dokumenty startowe
+Sprawdzenia kodu bez natywnego solvera:
 
-- [Cel i wymagania](goal.md)
-- [Historia decyzji](history.md)
-- [Architektura](docs/architecture.md)
-- [Konstrukcja geometrii Quadosa](docs/quados8-geometry.md)
-- [Kontrakt plików wynikowych](outcomes/README.md)
-- [Kolejność implementacji](docs/roadmap.md)
-- [Przygotowanie środowiska Windows 11](docs/windows-setup.md)
-- [Źródła i pochodzenie danych](docs/sources.md)
+```bat
+.\.venv\Scripts\python.exe -m unittest discover -s tests -v
+```
 
-Konfiguracja `parameters/quados8_1420mhz.json` zawiera jawne, przeskalowane
-wymiary początkowe. Skalowanie z 2450 MHz jest założeniem roboczym i nie
-oznacza, że antena została dostrojona lub zweryfikowana przy 1420 MHz.
-
-Repozytorium: [analityk/antenna_solver_gpt](https://github.com/analityk/antenna_solver_gpt).
-Nazwa pakietu `antenna_lab` pozostaje ogólna, żeby kolejne anteny korzystały
-z tego samego rdzenia. Kod i dokumentacja mają być rozwijane w tym repozytorium.
+Testy geometrii i zapisu nie zastępują kontroli fizycznej anteny.

@@ -119,6 +119,44 @@ obliczeniowego, symulacji Quadosa ani benchmarków. Etap M2 pozostaje otwarty.
 formaty wyników i konfiguracje anten nie zmieniły się. Pełny plik zależności
 aplikacji powstanie przy jej implementacji.
 
+## 2026-09-28 — M1 i pierwszy adapter openEMS
+
+**Powód:** środowisko użytkownika importuje openEMS; kolejnym krokiem jest
+wykonywalny model anteny i podgląd, z zachowaniem rozdziału geometrii i fizyki.
+
+**Zmiana:** dodano instalowalny edycyjnie pakiet, parametryczny generator
+Quados8, kontrolę połączeń i kolizji, edytor Matplotlib oraz polecenia check,
+geometry, prepare i run. Edytor rozdziela zmianę częstotliwości i skalowanie.
+Adapter przygotowuje siatkę i pełny FDTD XML; zawiera odczyt portu, impedancji,
+S11/SWR oraz NF2FF i raport. Proces solvera jest oddzielony od procesu CLI.
+
+**Wpływ na fizykę:** porzucony szkic NEC zastąpiono cylindrami PEC ze złączami
+kulistymi oraz pełną płytą PEC o aktywnej grubości. Port jest skończonym
+obszarem AddLumpedPort ze standardowymi zakończeniami. Wymiary źródłowe i
+założenie skalowania 2450/1420 nie zmieniły się. Nie obliczono jeszcze
+charakterystyki anteny, prądów ani pól. Występujące w testach liczby portu
+są analitycznymi danymi jednostkowymi, nie wynikami symulacji Quadosa.
+
+**Wpływ na formaty:** konfiguracja i manifest mają wersję 2; v1 jest jawnie
+odrzucane. Przebiegi przechowują konfigurację, schematy, geometrię, archiwum
+wybranych źródeł i skróty plików. Etap i stan wykonania są niezależne od
+walidacji fizycznej. Wycofane kontrakty NEC usunięto z aktywnej dokumentacji.
+Zachowano docelowe wymagania M2/M3 dotyczące prądów, E/H i animacji.
+
+**Sprawdzenie:** przeszło 12 testów geometrii, normalizacji analitycznej,
+siatki i zapisu. Sprawdzono instalację edycyjną pakietu i uruchomienie spoza katalogu repozytorium,
+eksport CLI, wizualnie oba rzuty i edytor oraz
+zmiany C, częstotliwości i odrzucenie kolidującego portu. Brak biblioteki
+openEMS w środowisku wykonawczym poprawnie zakończył prepare stanem failed
+i zapisanym logiem. API porównano z przypiętymi źródłami wydania 0.37.0-rc3.
+To kontrola kodu na Linuxie; nie zalicza wymaganego odbioru M2 na Windowsie.
+
+**Ograniczenia:** przygotowanie XML i obliczenia natywnym solverem pozostają
+do sprawdzenia na Windowsie. Nie wykonano dipola kontrolnego ani trzech siatek
+Quadosa. Wyniki adaptera są zawsze unverified; program nie potwierdza jeszcze
+automatycznie osiągnięcia EndCriteria. Prądy, mapy E/H i animacje są odrzucane
+jako nieobsługiwane, zamiast zapisywania pustych danych. Nie było benchmarków.
+
 ## Wzór kolejnego wpisu
 
 - Data i krótka nazwa zmiany.

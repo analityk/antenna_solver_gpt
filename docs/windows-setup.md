@@ -1,6 +1,6 @@
 # Środowisko lokalne — Windows 11 i openEMS
 
-Projekt: `antenna_solver_gpt`. Stan: M0, przed implementacją modelu i adaptera.
+Projekt: `antenna_solver_gpt`. Stan: M1 gotowe, adapter M2 do natywnej walidacji.
 Użytkownik ma Git, VS Code oraz CPython 3.14.0, 64-bit AMD64.
 Instalację i import potwierdzono w CMD dnia 2026-09-28 na podstawie logu
 przesłanego przez użytkownika. Polecenia Pythona i Git działają także
@@ -70,8 +70,8 @@ wcześniej, ponieważ `--no-index` ogranicza ostatni krok do plików lokalnych.
 Polecenia z pełną ścieżką do `python.exe` działają bez aktywowania środowiska.
 W VS Code wybierz `Python: Select Interpreter` → `.venv\Scripts\python.exe`.
 
-To zestaw do uruchomienia silnika. Pełny plik zależności aplikacji i przypięte
-wersje powstaną przy implementacji. Nie kopiujemy globalnego `pip list`.
+To zestaw do uruchomienia silnika. Zależności aplikacji określa pyproject.toml;
+instaluje je polecenie z sekcji 7. Nie kopiujemy globalnego pip list.
 
 ## 5. Lokalizacja bibliotek DLL
 
@@ -111,6 +111,42 @@ Potwierdza to import modułów wraz z wymaganymi przy imporcie bibliotekami
 natywnymi w projektowym `.venv`. Nie wykonano jeszcze obliczeniowego przypadku
 kontrolnego ani symulacji Quadosa. Kontrola fizyczna należy do M2.
 Nie wykonujemy benchmarków.
+
+## 7. Instalacja i uruchomienie programu
+
+W CMD, w już utworzonym środowisku:
+
+```bat
+cd /d C:\dev\antenna_solver_gpt\antenna_solver_gpt
+git pull --ff-only
+.\.venv\Scripts\python.exe -m pip install -e .
+.\.venv\Scripts\python.exe -m antenna_lab preview
+```
+
+Nie trzeba ponownie instalować openEMS ani tworzyć .venv. Edytor powinien
+pokazać wymiary i dwa rzuty anteny. Zmiana C/D przesuwa sekcje, zachowując E.
+Można zapisać wariant JSON i eksport geometrii.
+
+Po zamknięciu okna przygotuj wejście solvera:
+
+```bat
+.\.venv\Scripts\python.exe -m antenna_lab prepare
+```
+
+Oczekiwany komunikat: `Wejście openEMS przygotowane.`, następnie ścieżka
+katalogu z `openems\model.xml`, geometrią i logiem. To pierwszy krok kontroli
+integracji na Windowsie; nie uruchamia FDTD. W razie błędu zachowaj komunikat
+i `solver.log`. Udane przygotowanie nie zalicza fizycznej walidacji M2.
+
+Polecenie uruchamiające właściwe obliczenie jest dostępne eksperymentalnie:
+
+```bat
+.\.venv\Scripts\python.exe -m antenna_lab run
+```
+
+Ctrl+C przerywa przebieg. Nie uruchamiaj kilku obliczeń naraz na tym etapie.
+Zapisany raport i wyniki będą oznaczone jako unverified; nie wykonano jeszcze
+kontroli dipola ani zbieżności Quadosa. Opis modelu: [openEMS](openems-model.md).
 
 ## Potwierdzone środowisko
 

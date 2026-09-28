@@ -1,25 +1,16 @@
 # Cel projektu
 
-Wersja wymagań: 0.3. Data: 2026-09-28, Europe/Warsaw.
+Wersja wymagań: 0.4. Data: 2026-09-28, Europe/Warsaw.
 
-## Bieżąca decyzja o solverze i status kontraktów
+## Bieżący stan
 
-Nazwa projektu: `antenna_solver_gpt`. Wybrany solver: **openEMS**.
-NEC2++ / PyNEC został wycofany z planu implementacji. Ta decyzja zastępuje
-odnoszące się do NEC zapisy wcześniejszego M0, również w instrukcjach lokalnych.
-
-Nadal obowiązują wymiary Quadosa, częstotliwość 1420 MHz, modułowość,
-normalizacja i wymagania dotyczące kontroli fizycznej oraz wizualizacji.
-Przed implementacją trzeba zastąpić szkic modelu cienkoprzewodowego,
-siatki reflektora, źródła NEC i pliku `model.nec` kontraktem openEMS.
-Dotyczy to dalszych sekcji tego dokumentu, `docs/quados8-geometry.md`,
-`outcomes/README.md`, `parameters/quados8_1420mhz.json`, powiązanych schematów
-i `src/antenna_lab/solvers/AGENTS.md`. Ich szczegóły zależne od NEC są obecnie
-**nieaktywne**, a konfiguracja nie jest gotowym wejściem openEMS.
-Migracja ma jawnie opisać geometrię materiałów, siatkę FDTD, port,
-granice obszaru, odczyt prądów i pól oraz odtwarzalne wejście solvera.
-Ta zmiana zapisuje decyzję i instrukcję instalacji, nie deklaruje zakończenia
-migracji kontraktów ani implementacji adaptera.
+Projekt `antenna_solver_gpt` używa openEMS. Kontrakty konfiguracji i manifestu
+mają wersję 2; wycofany szkic NEC2++ nie jest obsługiwany.
+Generator Quadosa, edytor wymiarów, eksport i kontrola geometrii są zaimplementowane.
+Adapter openEMS przygotowuje model XML i zawiera odczyt impedancji oraz pola
+dalekiego, ale wymaga uruchomienia i walidacji na natywnym Windowsie.
+Nie ma jeszcze zweryfikowanego wyniku obliczeń Quadosa.
+Prądy, mapy E/H, animacje oraz kontrola zbieżności pozostają do wykonania.
 
 ## Cel użytkownika
 
@@ -98,12 +89,16 @@ Zaokrąglenie tabeli nie może być źródłem danych dla solvera.
   promiennik leży na z = H. Kierunek główny: +z. Polaryzacja oczekiwana: E w x.
 - Szczegółowa konstrukcja gałęzi i zamknięć końcowych: `docs/quados8-geometry.md`.
   Środkowych sekcji nie wolno zastępować niezależnymi zamkniętymi pętlami.
-- Model M2: wolna przestrzeń, PEC, standardowy model cienkoprzewodowy NEC2++.
-  Skończony reflektor jest połączoną siatką przewodów, nie ciągłą blachą.
-  Wymiary blachy są parametrami konstrukcyjnymi; jej grubość nie jest
-  odwzorowana przez tę siatkę i musi być oznaczona jako nieaktywna w solverze.
-- Model siatki ma osobne parametry: podział x/y i promień przewodów siatki.
-  Nie wolno utożsamiać tego promienia z grubością blachy ani średnicą promiennika.
+- Model M2: wolna przestrzeń i PEC. Odcinki drutu są cylindrami o skończonym
+  promieniu, połączonymi kulami w węzłach. Reflektor jest pełną, skończoną płytą
+  PEC; jego grubość jest aktywnym wymiarem geometrii. Brak rzeczywistych gięć.
+- Siatka kartezjańska FDTD jest niezależna od wymiarów konstrukcyjnych.
+  Zachowuje węzły portu, rozdzielczość w otoczeniu przewodów i komórki PML.
+  Rozdzielczość początkowa nie stanowi potwierdzenia zbieżności.
+- Reprezentacja portu: AddLumpedPort wzdłuż +x, ze skończonym przekrojem
+  kwadratowym równym średnicy drutu i metalowymi zakończeniami.
+  Ta idealizacja źródła wymaga kontroli numerycznej.
+  Szczegóły siatki, portu i normalizacji: `docs/openems-model.md`.
 - Idealny port różnicowy w środku anteny. Początkowe Z odniesienia: 200 Ω.
   Nie jest to założenie, że obliczona impedancja wejściowa wynosi 200 Ω.
 - Rzeczywisty koncentryk, balun 4:1, wsporniki, straty przewodnika, grunt i LNA
@@ -119,9 +114,11 @@ Zaokrąglenie tabeli nie może być źródłem danych dla solvera.
 ## Wymagane outcomes
 
 Każdy przebieg otrzymuje osobny, niezmienny katalog `outcomes/runs/<run_id>/`.
-Dokładny kontrakt opisuje `outcomes/README.md`. Pierwszy pełny przebieg ma zawierać:
+Dokładny kontrakt opisuje `outcomes/README.md`. Poniższa lista opisuje docelowy pełny przebieg M3, nie aktualnie dostępne dane.
+Aktualny podzbiór plików i etapy geometry/prepare/run opisuje ten kontrakt.
+Docelowy pełny przebieg ma zawierać:
 
-- `manifest.json`, `parameters.resolved.json`, `geometry.json`, `model.nec`;
+- `manifest.json`, `parameters.resolved.json`, `geometry.json`, `openems/model.xml`;
 - `currents.npz`, `impedance.csv`, `far_field.npz`;
 - `fields/xz.npz`, `fields/yz.npz`, `fields/xy_front.npz`;
 - `summary.json`, `validation.json`, `solver.log`, `report.html`;
@@ -138,11 +135,11 @@ i porównywanymi modelami, przy tej samej normalizacji mocy.
 
 | Etap | Warunek zakończenia | Stan |
 | --- | --- | --- |
-| M0 | Instrukcje, wymagania, historia, moduły, parametry i kontrakt outcomes | Zakończone w tym commicie |
-| M1 | Generator geometrii odtwarza topologię, długości, symetrię i port; pokazuje model do kontroli | Planowane |
-| M2 | openEMS liczy prądy, impedancję i pole dalekie; referencja kontrolna i sprawdzenie zbieżności | Planowane po migracji kontraktów |
+| M0 | Instrukcje, wymagania, historia, moduły, parametry i kontrakt outcomes | Zakończone; kontrakty przeniesione na openEMS |
+| M1 | Generator geometrii odtwarza topologię, długości, symetrię i port; pokazuje model do kontroli | Zaimplementowane i sprawdzone testami geometrii |
+| M2 | openEMS liczy prądy, impedancję i pole dalekie; referencja kontrolna i sprawdzenie zbieżności | Adapter impedancji/pola dalekiego napisany; prądy i walidacja otwarte |
 | M3 | Zespolone E/H, maski, przekroje i animacje fazy oraz komplet outcomes | Planowane |
-| M4 | Lokalny interfejs, porównywanie wariantów i przegląd zapisanych wyników | Planowane |
+| M4 | Lokalny interfejs, porównywanie wariantów i przegląd zapisanych wyników | Edytor gotowy; porównania i sterowanie obliczeniami otwarte |
 
 Kontrola M2 obejmuje dipol jako niezależny przypadek fizyczny oraz przynajmniej
 trzy poziomy dyskretyzacji Quadosa. Wstępne progi stabilności pomiędzy dwoma

@@ -17,14 +17,15 @@ Nie wymagaj WSL, zmiany systemu ani uv. Użytkownik potwierdził import
 openEMS 0.37.0rc3 i CSXCAD na Windowsie 2026-09-28. Pełny przypadek obliczeniowy
 pozostaje do sprawdzenia; sam import nie kończy integracji M2.
 
-NEC2++ / PyNEC nie jest częścią planowanej implementacji. Wcześniejsze kontrakty
-M0 związane z NEC są wycofanym szkicem, wymagającym migracji opisanej w `goal.md`.
-Nie implementuj ich jako aktualnych wymagań. Potwierdzone środowisko i zakres
-sprawdzenia zapisano w `docs/windows-setup.md` oraz `history.md`.
+NEC2++ / PyNEC nie jest częścią implementacji. Kontrakty przeniesiono na
+openEMS: konfiguracja i manifest mają wersję 2. Wymiarów źródłowych nie zmieniono.
+Potwierdzone środowisko zapisano w `docs/windows-setup.md`.
 
-Repozytorium na etapie M0 zawiera wymagania, strukturę i kontrakty danych.
-Nie przedstawiaj szkieletu jako działającego symulatora ani pustych katalogów
-jako zaimplementowanych modułów. Stan każdego etapu jest w `goal.md`.
+M1 jest zaimplementowane: generator, walidacja, edytor i eksport geometrii.
+Adapter openEMS, impedancja i pole dalekie są kodem eksperymentalnym:
+natywne przygotowanie, obliczenie i kontrola zbieżności wymagają sprawdzenia
+na Windowsie. Nie przedstawiaj M2 jako zakończonego. Prądy i mapy E/H są
+jeszcze niezaimplementowane; żądanie tych danych musi kończyć się jawnym błędem.
 
 ## Zasady architektury
 
@@ -34,7 +35,8 @@ jako zaimplementowanych modułów. Stan każdego etapu jest w `goal.md`.
 - Parametry nie są zaszyte w kodzie. Każdy wynik zawiera ich rozwiązaną kopię.
 - Wizualizacja czyta zapisane wyniki. Zmiana fazy animacji nie uruchamia solvera.
 - Dodanie nowej anteny nie powinno wymagać specjalnych warunków w rdzeniu.
-- Na początek jeden pakiet Pythona i jeden lokalny proces aplikacji. Nie dodawaj
+- Na początek jeden pakiet Pythona; solver działa w lokalnym procesie potomnym.
+  Nie dodawaj
   mikroserwisów, klastra, zewnętrznej bazy ani chmury bez konkretnej potrzeby.
 
 ## Rzetelność obliczeń
