@@ -135,6 +135,23 @@ class NativeEditorTests(unittest.TestCase):
             self.assertFalse(self.ui.dirty)
             self.assertIn(model[:3].lower(), self.root.title().lower())
 
+    def test_biquad_invalid_feed_explains_unchanged_preview_then_recovers(self):
+        from tkinter import filedialog
+        from antenna_lab.app.editor import APPLY_HINT
+        with patch.object(filedialog, "askopenfilename", return_value=str(ROOT / "parameters/biquad_1420mhz.json")):
+            self.ui.load_button.invoke()
+        original = self.ui.state.geometry
+        for key, value in {"S": "60", "G": "2", "wire_diameter": "2"}.items():
+            self.ui.fields[key].set(value)
+        self.ui.apply_button.invoke()
+        self.assertIs(self.ui.state.geometry, original)
+        self.assertIn("poprzedni model", self.ui.apply_hint.cget("text"))
+        self.assertIn("prześwit 0 mm", self.ui.apply_hint.cget("text"))
+        self.ui.fields["G"].set("4")
+        self.ui.apply_button.invoke()
+        self.assertAlmostEqual(self.ui.state.geometry.wires[0].length_m, .060)
+        self.assertEqual(self.ui.apply_hint.cget("text"), APPLY_HINT)
+
 
 if __name__ == "__main__":
     unittest.main()

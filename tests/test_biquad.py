@@ -76,6 +76,27 @@ class BiquadTests(unittest.TestCase):
         self.assertTrue(state.apply(dict(state.fields, S="54"), state.frequency, state.reflector))
         self.assertAlmostEqual(state.geometry.wires[0].length_m, .054)
 
+    def test_screenshot_values_reject_touching_feed_then_update_geometry(self):
+        from matplotlib.figure import Figure
+        from antenna_lab.visualization.plots import draw_geometry
+        state = EditorState(self.config)
+        original, geometry = deepcopy(state.config), state.geometry
+        entered = dict(state.fields, S="300", G="2", H="15", wire_diameter="2",
+                       reflector_length="122", reflector_width="60", reflector_thickness="2")
+        with self.assertRaisesRegex(ConfigurationError, "prześwit 0 mm"):
+            state.apply(entered, "2450", True)
+        self.assertEqual(state.config, original)
+        self.assertIs(state.geometry, geometry)
+        self.assertTrue(state.apply(dict(entered, G="4"), "2450", True))
+        self.assertAlmostEqual(state.geometry.wires[0].length_m, .3)
+        self.assertAlmostEqual(state.geometry.port.positive[2], .015)
+        self.assertEqual(state.config["simulation"]["frequency_hz"], [2.45e9])
+        fig = Figure()
+        front, side = fig.subplots(2, 1)
+        draw_geometry(front, side, state.geometry)
+        np.testing.assert_allclose(side.lines[0].get_ydata(), [15, 15])
+        self.assertGreater(front.get_xlim()[1], 400)
+
 
 if __name__ == "__main__":
     unittest.main()

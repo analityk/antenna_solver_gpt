@@ -12,7 +12,10 @@ def build(parameters, reflector=True):
     side, gap, height = d["S"], d["G"], d["H"]
     radius = d["wire_diameter"] / 2
     if gap <= 2 * radius:
-        raise ConfigurationError("G musi być większe od średnicy drutu.")
+        raise ConfigurationError(
+            f"G = {gap * 1000:g} mm, drut = {2 * radius * 1000:g} mm: "
+            f"prześwit {(gap - 2 * radius) * 1000:g} mm.\n"
+            f"Ustaw G > {2 * radius * 1000:g} mm, aby rozdzielić zaciski.")
     if reflector and height <= radius:
         raise ConfigurationError("H musi być większe od promienia drutu.")
     q = side / math.sqrt(2)

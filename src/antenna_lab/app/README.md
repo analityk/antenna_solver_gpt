@@ -4,6 +4,11 @@ Polecenie preview otwiera formularz Tk/ttk z podglądem Matplotlib.
 Pola obsługują zwykłe wpisywanie, wklejanie i Tab bez rysowania figury.
 Enter lub Zastosuj zatwierdza komplet zmian; niepoprawne dane nie zastępują
 ostatniej poprawnej konfiguracji. Zmiana częstotliwości i skalowanie są odrębne.
+Błąd zatwierdzenia jest widoczny również obok przycisku Zastosuj; komunikat
+wyjaśnia, że wykres nadal pokazuje poprzedni model. G jest rozstawem osi
+zacisków, a nie wolnym prześwitem. Przykład: G=2 mm i drut 2 mm oznaczają
+styk, więc trzeba ustawić G większe od 2 mm. Dla prześwitu 2 mm przy takim
+drucie należy podać G=4 mm. Po poprawieniu błędu zatwierdź cały formularz.
 
 - Wczytaj parametry: wybór JSON, walidacja i odświeżenie pól oraz podglądu.
   Wczytany wariant zastępuje bieżące pola i staje się punktem przywracania.

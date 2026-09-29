@@ -577,6 +577,28 @@ na Windowsie, źródła i zbieżności E/H pozostaje otwarta, status unverified.
 Nierozwiązana rozbieżność U/I i pracy lokalnej nadal dotyczy amplitud.
 Prądy promiennika i pełna animacja pozostają nieobsługiwane.
 
+## 2026-09-29 — czytelny błąd wymiarów w edytorze biquada
+
+**Powód:** na zrzucie użytkownika model nie aktualizował się po edycji.
+G=2 mm i drut 2 mm oznaczały zerowy prześwit portu. Walidacja prawidłowo
+odrzucała cały formularz, ale komunikat pod wykresem był łatwy do przeoczenia.
+
+**Zmiana:** opisano G jako rozstaw osi zacisków, H jako wysokość osi drutu.
+Błąd podaje G, średnicę, prześwit i wymaganą nierówność. Wyświetla się także
+przy Zastosuj z informacją, że podgląd nadal pokazuje poprzedni model.
+Po udanym zatwierdzeniu komunikat wraca do instrukcji edycji.
+
+**Wpływ:** bez zmian geometrii, definicji G, walidacji styku, solvera,
+formatów i dawnych wyników. Nie dopuszczamy zwartego portu i nie poprawiamy
+wpisów automatycznie. Poprawny zestaw nadal zatwierdza się przez Enter/Zastosuj.
+
+**Sprawdzenie:** odtworzono wszystkie wymiary i częstotliwość ze zrzutu:
+odrzucenie zachowuje poprzedni model; po G=4 mm zmieniają się geometria
+i współrzędne wykresu (bok 300 mm, wysokość 15 mm, 2450 MHz).
+Przeszło 6 testów biquada i 2 testy stanu edytora. Testy natywnego Tk są
+pominięte w tym środowisku; dodano przypadek błędu i powrotu po poprawce.
+Bez FDTD i benchmarków.
+
 ## Wzór kolejnego wpisu
 
 - Data i krótka nazwa zmiany.

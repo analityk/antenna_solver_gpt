@@ -9,8 +9,10 @@ from antenna_lab.core.geometry import check_geometry
 from antenna_lab.visualization.plots import draw_geometry
 from .actions import export_geometry
 
-LABELS = {"S": "S — bok biquada", "wire_diameter": "Średnica drutu", "reflector_length": "Długość reflektora",
+LABELS = {"S": "S — bok biquada", "G": "G — rozstaw osi zacisków", "H": "H — wysokość osi drutu",
+          "wire_diameter": "Średnica drutu", "reflector_length": "Długość reflektora",
           "reflector_width": "Szerokość reflektora", "reflector_thickness": "Grubość reflektora"}
+APPLY_HINT = "Wpisywanie i Tab nie zmieniają podglądu.\nZatwierdź pola: Enter lub Zastosuj."
 
 
 class EditorState:
@@ -125,8 +127,8 @@ class GeometryEditor:
         ttk.Button(form, text="Przywróć początkowe", command=self.reset).grid(
             row=row, column=0, columnspan=2, sticky="ew", pady=(7, 10))
         row += 1
-        ttk.Label(form, text="Wpisywanie i Tab nie zmieniają podglądu.\nZatwierdź pola: Enter lub Zastosuj.",
-                  foreground="#45566b", wraplength=310).grid(row=row, column=0, columnspan=2, sticky="w")
+        self.apply_hint = ttk.Label(form, text=APPLY_HINT, foreground="#45566b", wraplength=310)
+        self.apply_hint.grid(row=row, column=0, columnspan=2, sticky="w")
         row += 1
         ttk.Separator(form).grid(row=row, column=0, columnspan=2, sticky="ew", pady=12)
         row += 1
@@ -211,6 +213,7 @@ class GeometryEditor:
             if self.frequency.get() != self.state.frequency:
                 self.frequency.set(self.state.frequency)
             self.reflector.set(self.state.reflector)
+            self.apply_hint.configure(text=APPLY_HINT, foreground="#45566b")
         finally:
             self.syncing = False
             self.dirty = False
@@ -242,7 +245,9 @@ class GeometryEditor:
             self._show_metrics()
             return True
         except (ValueError, OverflowError) as exc:
-            self._message(str(exc), error=True)
+            text = "Nie zastosowano zmian. Podgląd: poprzedni model.\n" + str(exc)
+            self.apply_hint.configure(text=text, foreground="#b42318")
+            self._message(text, error=True)
             return False
 
     def reset(self):
