@@ -14,6 +14,8 @@ i domyślne parametry. Samodzielna dystrybucja wheel nie jest jeszcze obsługiwa
 | `antennas/` | Rejestr i generatory Quados8 oraz biquada | Bez importu openEMS |
 | `solvers/mesh.py` | Niejednorodna siatka kartezjańska, PML, kontrola limitu | Bez zmian wymiarów anteny |
 | `solvers/feed.py` | Granice portu i audyt pokrycia krawędzi przez box wymuszenia | Korekta zaokrągleń w adapterze; bez zmiany siatki |
+| `solvers/fields.py` | Zapis FD E/H w przekrojach, normalizacja i maski | Pasywne zapisy na istniejących węzłach; bez zmian modelu |
+| `visualization/fields.py` | Statyczne diagramy fazowe i odczyt NPZ | Bez solvera; skala wspólna dla faz danej składowej |
 | `solvers/openems.py` | Materiały, port, FDTD XML, impedancja i NF2FF | Główny adapter natywnego API |
 | `solvers/power.py` | Pasywne sondy, odczyt HDF5, strumień mocy, widmo portu | Diagnostyka adaptera; bez wymuszania bilansu |
 | `solvers/source_work.py` | Lokalne pary U/I, kontrola indeksów i sumowania, praca źródła | Pasywna diagnostyka siatki; bez korekty portu |
@@ -85,7 +87,8 @@ Wariant aligned_feed wykonano natywnie: 450 dodatnich lokalnych wkładów,
 praca 0,949145539 W i strumień zewnętrzny 0,948187885 W. Poprawka granic działa;
 pomiar pojedynczego U·I nadal różni się od pracy o 5,085% odniesienia portu.
 Przypadek referencyjny, definicja/pomiar portu i zbieżność pozostają otwarte.
-Mapy E/H i prądy wymagają dalszej implementacji; adapter odrzuca ich żądanie.
+Przekroje E/H i statyczne diagramy fazowe są obsługiwane; wymagają natywnej
+kontroli i zbieżności (docs/fields.md). Prądy i pełna animacja są odrzucane.
 
 CPU Ryzen 7 7800X3D, RAM 32 GB, Windows 11. Instrukcje używają CMD i `.venv`.
 Nie wymagamy WSL, uv ani GPU. Pole `threads=0` pozostawia wybór openEMS;

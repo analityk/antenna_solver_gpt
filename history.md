@@ -537,6 +537,46 @@ przechodzi check bez ostrzeżeń: 266 × 268 × 83 = 5 916 904 komórki.
 Obejrzano eksport geometrii. Natywnego GUI Windows i FDTD nie uruchamiano;
 nie wykonano benchmarków. Wyniki EM biquada muszą powstać w nowym przebiegu.
 
+## 2026-09-29 — przekroje E/H i diagramy fazowe obu anten
+
+**Powód:** użytkownik chce diagram podobny do pokazanego wzoru: dwie kolumny
+E/H, kolejne fazy co 30° lub 15°, z geometrią anteny w tle.
+
+**Zmiana:** --fields dodaje przekroje xy_front, xz i yz dla biquada oraz
+Quadosa. Adapter zapisuje zespolone FD dumpy 10/11 i NPZ ze wszystkimi
+składowymi. Raport tworzy arkusze fazowe, pliki PNG i odnośniki pobrania.
+--phase-step oraz --field-components odtwarzają diagram z zapisanych pól,
+bez FDTD. --front-offset-mm ustala położenie przed promiennikiem; zapisane
+są współrzędne żądane i przyciągnięte do istniejącej siatki.
+
+**Wpływ fizyczny:** pasywne zapisy 2D nie zmieniają geometrii, źródła ani
+siatki. Dodatkowy koszt stanowi gromadzenie DFT i zapis danych. Wspólna
+normalizacja E/H pochodzi z port_spectra, bez korekty bilansu. Konwencja
+Re(F·exp(+j·faza)) zachowuje referencję napięcia; native dual time H jest
+uwzględnione przez openEMS. Skala danej kolumny jest stała między fazami.
+Metal, halo jednej lokalnej przekątnej komórki i źródło są maskowane NaN.
+Maska jest geometryczna, nie jest mapą natywnych voxeli. Nie pokazujemy
+wyinterpolowanej mapy jako dokładnego pola na powierzchni przewodnika.
+
+**Format i odtwarzalność:** opcjonalne field_front_offset_m w konfiguracji
+v2, field_layout.json, fields/metadata.json (kontrakt pól v1), NPZ i surowe
+HDF5. Stare przebiegi pozostają niezmienne; bez zapisanych pól raport
+pokazuje brak danych i potrzebę nowego run. Wymagania: 0.13; szczegóły:
+docs/fields.md. Nie dodano zależności ani animacji pełnego okresu.
+
+**Sprawdzenie:** 66 testów unittest, OK; dwa pominięcia Tk/Windows UCRT.
+Nowe kontrole: obie anteny i istniejące węzły siatki, parametry natywnego
+API, faza i normalizacja fali płaskiej, maska, błędne położenie, format
+HDF5 i wspólna siatka E/H, zapis NPZ, CLI, wspólna skala kolorów oraz
+niezmienność danych podczas raportowania offline. Obejrzano diagramy
+testowe oznaczone jako syntetyczne; nie są wynikiem symulacji anteny.
+API sprawdzono w przypiętych źródłach wydania 0.37.0rc3.
+
+**Ograniczenia:** nie wykonano natywnego FDTD ani benchmarków. Kontrola
+na Windowsie, źródła i zbieżności E/H pozostaje otwarta, status unverified.
+Nierozwiązana rozbieżność U/I i pracy lokalnej nadal dotyczy amplitud.
+Prądy promiennika i pełna animacja pozostają nieobsługiwane.
+
 ## Wzór kolejnego wpisu
 
 - Data i krótka nazwa zmiany.

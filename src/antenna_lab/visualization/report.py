@@ -226,6 +226,8 @@ def _metadata(data):
         body += '<p>Brak zapisanych ostrzeżeń. To nie oznacza zaliczonej walidacji fizycznej.</p>'
     hashes = []
     files = ["summary.json", "parameters.resolved.json", "manifest.json", "mesh.json", "solver.log", "impedance.csv", "impedance_dense.csv", "power_balance.json", "source_work_spectra.npz", "far_field.npz", "openems/port_ut_1", "openems/port_it_1"]
+    files += ["geometry.json", "field_layout.json", "fields/metadata.json"]
+    files += [f"fields/{plane}.npz" for plane in ("xy_front", "xz", "yz")]
     for name in files:
         # The parent finalizes this manifest after automatic reporting. Its
         # provisional digest would misidentify the file subsequently on disk.
@@ -238,7 +240,8 @@ def _metadata(data):
     return '<section class="panel"><h2>Przebieg i wiarygodność danych</h2>' + body + '</section>'
 
 
-def render_html(data, *, plots_path=None):
+def render_html(data, *, plots_path=None, phase_step=None, field_components=None):
+    from .fields import field_section
     spectrum, reference = data["spectrum"], data["reference"]
     title = "Raport anteny · " + data["run_id"]
     choices = sorted({50, 75, 100, 200, reference})
@@ -280,14 +283,18 @@ def render_html(data, *, plots_path=None):
 <div class="fallback">{fallback}<p>Wykres statyczny: Zref = {number(reference, 0)} Ω. Interaktywne sterowanie wymaga JavaScript; wydruk używa tej wersji.</p></div>
 <p class="muted">Gęsty krok częstotliwości jest odczytem widma tego samego przebiegu czasowego. Nie zwiększa fizycznej rozdzielczości ani dokładności symulacji. Niski SWR sam nie oznacza dużego zysku.</p>
 <details><summary>Przejścia reaktancji przez zero</summary>{_zeros(spectrum)}</details></section>
-{_power_section(data)}{_far_field(data, plots_path / 'pattern_cuts.png' if plots_path else None)}{geometry}{_metadata(data)}
+{_power_section(data)}{_far_field(data, plots_path / 'pattern_cuts.png' if plots_path else None)}{field_section(data, figure_image, plots_path, phase_step, field_components)}{geometry}{_metadata(data)}
 <p class="footer">Generator raportu v1 · {datetime.now(timezone.utc).isoformat()} · źródło: {escape(str(data['root']))}<br>
 Odczyt i interpretacja według jawnych reguł; bez AI, usług sieciowych i ponownej symulacji FDTD. Dane źródłowe pozostają niezmienione.</p>
 </main><script id="report-data" type="application/json">{encoded}</script><script>{JS}</script></body></html>'''
 
 
 def generate_report(run_path, output=None, *, automatic=False, start_mhz=None, stop_mhz=None, step_mhz=None,
-                    variant_name=None):
+                    variant_name=None, phase_step=None, field_components=None):
+    if phase_step not in (None, 15, 30):
+        raise ValueError("Krok fazy musi wynosić 15 lub 30 stopni.")
+    if field_components is not None and (len(field_components) != 2 or any(c not in (0, 1, 2) for c in field_components)):
+        raise ValueError("Składowe pola muszą wskazywać osie x/y/z.")
     root = Path(run_path).resolve()
     if output is None:
         label = f"{variant_name}__{root.name}" if variant_name else root.name
@@ -307,7 +314,8 @@ def generate_report(run_path, output=None, *, automatic=False, start_mhz=None, s
         data["variant_name"] = variant_name
     if automatic and data["manifest"].get("status") != "running":
         raise ValueError("Raport automatyczny wolno zapisać tylko przed zamknięciem nowego przebiegu.")
-    html = render_html(data, plots_path=root / "plots" if automatic else None)
+    html = render_html(data, plots_path=root / "plots" if automatic else None,
+                       phase_step=phase_step, field_components=field_components)
     output.parent.mkdir(parents=True, exist_ok=True)
     with output.open("x", encoding="utf-8") as stream:
         stream.write(html)

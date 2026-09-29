@@ -55,9 +55,13 @@ i strojenie (docs/power-audit.md). Błąd otwarcia pliku zatrzymuje pracownika.
 Analiza geometrii wskazuje dwie nadmiarowe kule przy (±G/2,0,H), całkowicie
 wewnątrz dwóch przeciwległych walców A. Pozostałe 46 ma własne próbki E.
 To wyjaśnia dwa ostrzeżenia Sphere; nie jest pełnym natywnym audytem połączeń.
-Nie przedstawiaj M2 jako zakończonego. Prądy promiennika i mapy E/H są
-jeszcze niezaimplementowane; żądanie tych danych musi kończyć się jawnym błędem.
-Pasywne sondy portu i powierzchnie diagnostyczne nie zaliczają M3.
+Nie przedstawiaj M2 jako zakończonego. Prądy promiennika i animacja pełnego
+okresu nie są zaimplementowane; ich żądanie kończy się jawnym błędem.
+Przekroje E/H i diagramy fazowe są obsługiwane przez --fields dla obu anten
+(docs/fields.md); testy syntetyczne nie zastępują natywnego FDTD i zbieżności.
+Maskuj metal, obwiednię interpolacji i idealny port. Zachowaj surowe HDF5,
+zespolone pola i wspólną skalę między fazami. Nie koryguj bilansu normalizacją.
+Pasywne sondy portu i powierzchnie diagnostyczne same nie zaliczają M3.
 
 ## Zasady architektury
 

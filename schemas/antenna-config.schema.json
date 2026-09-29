@@ -135,6 +135,11 @@
             ]
           }
         },
+        "field_front_offset_m": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Distance of xy_front in front of the radiator axes, snapped to an existing mesh node; default 0.02 m."
+        },
         "phase_degrees": {
           "type": "array",
           "minItems": 1,

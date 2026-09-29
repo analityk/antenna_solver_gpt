@@ -142,6 +142,10 @@ HDF5. Wkłady bliskie zeru mają próg `max(1e-10 × największy moduł wkładu,
 pełnego porównania z manifestem. Automatyczny raport pomija skrót manifestu,
 który jest zamykany dopiero po zapisaniu raportu.
 
-Nie ma tu map E/H, animacji, automatycznej zmiany geometrii ani zaliczania
+Zapisane przekroje E/H są pokazywane jako diagramy fazowe, z pobieraniem PNG.
+`report ... --phase-step 15` lub `30` zmienia liczbę klatek bez FDTD;
+`--field-components x z` wybiera E_x i H_z. Nowy zapis wymaga `run --fields`.
+Stare wyniki bez pól pokazują jawny brak danych. Opis: [fields.md](fields.md).
+Nie ma tu animacji, automatycznej zmiany geometrii ani zaliczania
 kontroli fizycznej na podstawie progu procentowego. Opisy powstają z jawnych
 reguł i liczb, nie z usługi AI. Stan implementacji pól pozostaje w `goal.md`.

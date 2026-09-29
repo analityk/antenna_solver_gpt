@@ -41,6 +41,11 @@ Przegląd źródeł nie zastępuje wykonania na Windowsie. Repozytorium projektu
 nie dołącza cudzych bibliotek binarnych, artykułu ani rysunków autora anteny.
 Wersje faktycznie importowane przez adapter zapisuje manifest przebiegu.
 
+Przekroje E/H sprawdzono względem tych samych przypiętych wersji:
+[CSPropDumpBox — typy 10/11, dump_mode=1, file_type=1 i ostrzeżenia interpolacji](https://github.com/thliebig/CSXCAD/blob/dcdb62bcfd1111ee3594ba22d06089b41b380990/python/CSXCAD/CSProperties.pyx),
+[openems.cpp — dual time dla H oraz wybór interpolacji](https://github.com/thliebig/openEMS/blob/67d378488ee40de815eed00f8aaa808f0a9e3c6d/openems.cpp)
+oraz processfields_fd.cpp powyżej (DFT ze znakiem minus i współczynnikiem 2·dt).
+
 ## Poprzedni eksperyment
 
 Wcześniejsza symulacja double biquada przy 800 MHz w tej rozmowie korzystała

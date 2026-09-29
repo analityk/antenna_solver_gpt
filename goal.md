@@ -1,6 +1,6 @@
 # Cel projektu
 
-Wersja wymagań: 0.12. Data: 2026-09-29, Europe/Warsaw.
+Wersja wymagań: 0.13. Data: 2026-09-29, Europe/Warsaw.
 
 ## Bieżący stan
 
@@ -25,7 +25,11 @@ krawędzi ma dodatnią pracę. Praca netto 0,949145539 W zgadza się ze strumien
 odniesieniem; różnica wynosi 5,085% tego odniesienia. Poprawka granic źródła
 i limitu strumieni Windows jest potwierdzona. Pomiar portu pozostaje otwarty.
 Nie ma jeszcze zweryfikowanego wyniku obliczeń Quadosa.
-Prądy, mapy E/H, animacje oraz kontrola zbieżności pozostają do wykonania.
+Przekroje zespolonych E/H oraz statyczne diagramy fazowe są zaimplementowane
+dla obu anten: xy_front, xz, yz; 0–180° co 30° lub 15°. Surowe HDF5,
+zespolone NPZ, maski i obrazy trafiają do outcomes; raport działa offline.
+Obowiązują docs/fields.md i wspólna skala kolorów między fazami. Prądy,
+animacja pełnego okresu, natywna kontrola nowych pól i zbieżność pozostają otwarte.
 
 Lokalny raport HTML jest częścią programu: ma działać bez ponownego solve,
 przesyłania danych, API i tokenów. `report` czyta także wcześniejsze wyniki;
@@ -194,7 +198,7 @@ zapisuje dane i lokalny raport; opis: `docs/power-audit.md`, `docs/reports.md`.
 | M0 | Instrukcje, wymagania, historia, moduły, parametry i kontrakt outcomes | Zakończone; kontrakty przeniesione na openEMS |
 | M1 | Generator geometrii odtwarza topologię, długości, symetrię i port; pokazuje model do kontroli | Zaimplementowane i sprawdzone testami geometrii |
 | M2 | openEMS liczy prądy, impedancję i pole dalekie; referencja kontrolna i sprawdzenie zbieżności | Adapter impedancji/pola dalekiego napisany; prądy i walidacja otwarte |
-| M3 | Zespolone E/H, maski, przekroje i animacje fazy oraz komplet outcomes | Planowane |
+| M3 | Zespolone E/H, maski, przekroje i animacje fazy oraz komplet outcomes | Przekroje i statyczne fazy zaimplementowane; natywna walidacja, zbieżność i animacja otwarte |
 | M4 | Lokalny interfejs, porównywanie wariantów i przegląd zapisanych wyników | Edytor i lokalny raport HTML gotowe; porównania wariantów i sterowanie obliczeniami otwarte |
 
 Kontrola M2 obejmuje dipol jako niezależny przypadek fizyczny oraz przynajmniej

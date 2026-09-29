@@ -96,5 +96,10 @@ i profile U/I portu. Znany skok rozmiaru komórek do 1,8667 pozostaje w tym
 wariancie kontrolnym; `growth_ratio` obecnie nie gwarantuje globalnego limitu.
 Brak którejkolwiek z sześciu par plików NF2FF jest teraz jawnym błędem.
 
-Prądy, przekroje E/H i animacje nie są jeszcze zaimplementowane.
-Żądanie takich danych jest odrzucane jawnie. Nie tworzymy zastępczych map.
+Przekroje E/H zapisują pasywne dumpy FD 10/11, z interpolacją do wspólnych
+węzłów (dump_mode=1). Faza H uwzględnia natywne znaczniki czasu; nie dodajemy
+drugiej korekty półkroku. Normalizacja jest taka sama jak w port_spectra.npz.
+Maska obejmuje PEC, lokalną przekątną komórki wokół niego oraz port z otoczeniem.
+Położenia są przyciągane do istniejącej siatki i jawnie zapisane. Szczegóły,
+kontrakt pól oraz ograniczenia: [fields.md](fields.md). Natywna kontrola
+nowych przekrojów pozostaje otwarta. Prądy i pełna animacja są odrzucane.

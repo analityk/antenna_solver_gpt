@@ -129,15 +129,17 @@ zawiera samego manifestu. Archiwum kodu zawiera tylko wybrane źródła;
 nie zawiera kont, środowiska procesu ani DLL. Odtworzenie wymaga instalacji
 zgodnego solvera i wskazania zapisanej konfiguracji.
 
-## Planowane rozszerzenia M2/M3
+## Przekroje E/H — rozszerzenie opcjonalne
 
-Wymagania prądów i pól nie zostały usunięte. Nie ma jeszcze ich pliku ani
-odczytu. Docelowo:
+`run --fields` zapisuje `field_layout.json`, surowe
+`openems/fields_<plane>_E.h5` / `_H.h5`, `fields/metadata.json` oraz
+`fields/xy_front.npz`, `fields/xz.npz`, `fields/yz.npz`. Szczegółowy kontrakt
+pól v1: [docs/fields.md](../docs/fields.md). Główny manifest pozostaje v2.
+NPZ zawierają zespolone E/H, częstotliwości, współrzędne, mnożnik normalizacji
+i maski geometryczne/interpolacyjne; maskowane próbki są NaN, nigdy zerami.
+Obrazy trafiają do `plots/fields_<plane>_<indeks_częstotliwości>.png` i HTML.
+Raport ręczny osadza nowe diagramy i odnośniki pobrania PNG w nowym HTML,
+bez modyfikowania przebiegu. Fazy/składowe zmienia się bez ponownego FDTD.
+Pola są niezweryfikowane; implementacja nie zalicza zbieżności M3.
 
-- `currents.npz`: częstotliwości, prąd zespolony, miejsce i kierunek próbki;
-- `fields/xz.npz`, `fields/yz.npz`, `fields/xy_front.npz`: współrzędne,
-  zespolone E/H, osie siatki, maski i przyczyny niewiarygodnych próbek;
-- mapy faz 0–180° co 30° i pełny okres animacji przy wspólnej skali kolorów.
-
-Próbki niewiarygodne będą oznaczane NaN i maską, nie sztucznym zerem.
-Zmiany konwencji lub formatu wymagają nowej wersji kontraktu.
+Prądy w `currents.npz` i animacja pełnego okresu pozostają do implementacji.

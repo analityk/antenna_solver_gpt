@@ -18,7 +18,11 @@ Wariant aligned_feed wykonano na Windowsie: poprawka granic działa, bilans
 pracy i strumienia pozostaje zgodny do 0,101%. Pojedynczy pomiar U·I nadal
 różni się od pracy lokalnej o 5,085% swojego odniesienia; kontrola portu
 i walidacja M2 pozostają otwarte.
-Nie ma jeszcze zweryfikowanych wyników anteny, map E/H, prądów ani animacji.
+Nie ma jeszcze zweryfikowanych wyników anteny, prądów ani pełnej animacji.
+`run --config parameters\biquad_1420mhz.json --fields` zapisuje przekroje E/H
+i tworzy diagramy fazowe w raporcie; działa też z Quados 8 i własnymi wariantami.
+`report biquad_1420mhz.json --phase-step 15 --open` zmienia krok faz bez FDTD.
+Szczegóły i konwencje: [Diagramy pól E/H](docs/fields.md).
 
 ## Pierwsze uruchomienie — CMD
 

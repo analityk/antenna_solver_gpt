@@ -29,6 +29,8 @@ def parser():
         reflector.add_argument("--no-reflector", dest="reflector", action="store_false")
         reflector.add_argument("--reflector", dest="reflector", action="store_true")
         command.set_defaults(reflector=None)
+        command.add_argument("--fields", action="store_true", help="Zapisz E/H: widok przed anteną i przekroje xz/yz")
+        command.add_argument("--front-offset-mm", type=float, help="Odległość mapy przed osiami drutów (domyślnie 20 mm); włącza --fields")
     report = commands.add_parser("report", help="Lokalny HTML z zapisanych wyników; bez FDTD")
     report.add_argument("run_dir", nargs="?", type=Path, help="Katalog wyników albo plik JSON wariantu (wyszukanie po geometrii)")
     report.add_argument("--latest", action="store_true", help="Najnowsza ukończona symulacja")
@@ -38,6 +40,9 @@ def parser():
     report.add_argument("--start-mhz", type=float, help="Opcjonalny początek widma z surowych sond portu")
     report.add_argument("--stop-mhz", type=float, help="Opcjonalny koniec widma z surowych sond portu")
     report.add_argument("--step-mhz", type=float, help="Krok widma; wymaga obu granic i zapisanych sond")
+    report.add_argument("--phase-step", type=int, choices=[15, 30], help="Diagramy E/H od 0 do 180° co 15 lub 30°; bez FDTD")
+    report.add_argument("--field-components", nargs=2, choices=list("xyz"), metavar=("E", "H"),
+                        help="Składowe diagramów, np. x z; domyślnie zależne od przekroju")
     worker = commands.add_parser("_worker", help=argparse.SUPPRESS)
     worker.add_argument("--run-dir", type=Path, required=True)
     worker.add_argument("--mode", choices=["prepare", "run"], required=True)
@@ -165,7 +170,9 @@ def _report(args):
                   "Raport pokazuje zapisany przebieg, nie przelicza nowych ustawień.", flush=True)
     print(f"Odczyt zapisanych wyników: {run_path}", flush=True)
     path = generate_report(run_path, args.output, start_mhz=args.start_mhz,
-                           stop_mhz=args.stop_mhz, step_mhz=args.step_mhz, variant_name=variant_name)
+                           stop_mhz=args.stop_mhz, step_mhz=args.step_mhz, variant_name=variant_name,
+                           phase_step=args.phase_step,
+                           field_components=tuple("xyz".index(a) for a in args.field_components) if args.field_components else None)
     print(f"Raport HTML: {path}", flush=True)
     if args.open:
         import webbrowser
@@ -192,6 +199,12 @@ def main(argv=None):
             key, value = entry.split("=", 1)
             overrides[key] = float(value.replace(",", "."))
         config = modified_config(load_config(args.config), overrides, args.frequency_mhz, args.reflector, args.scale_to_mhz)
+        if args.fields or args.front_offset_mm is not None:
+            from antenna_lab.core.config import validate_config
+            config["requested_outputs"]["field_planes"] = ["xy_front", "xz", "yz"]
+            if args.front_offset_mm is not None:
+                config["requested_outputs"]["field_front_offset_m"] = args.front_offset_mm * 1e-3
+            validate_config(config)
         if args.command == "preview":
             from antenna_lab.app.editor import show_editor
             show_editor(config, args.output, variant_name=args.config.stem)
@@ -199,8 +212,13 @@ def main(argv=None):
             from antenna_lab.antennas import build_model
             from antenna_lab.core.geometry import check_geometry
             from antenna_lab.solvers.mesh import make_mesh
+            from antenna_lab.solvers.fields import field_layout
+            from antenna_lab.solvers.openems import check_capabilities
             geometry = build_model(config)
-            print(json.dumps({"geometry": check_geometry(geometry), "mesh": make_mesh(geometry, config)[1]}, indent=2, ensure_ascii=False))
+            check_capabilities(config)
+            axes, mesh = make_mesh(geometry, config)
+            print(json.dumps({"geometry": check_geometry(geometry), "mesh": mesh,
+                              "field_planes": field_layout(geometry, axes, mesh, config)}, indent=2, ensure_ascii=False))
         elif args.command == "geometry":
             from antenna_lab.app.actions import export_geometry
             print(export_geometry(config, args.output, variant_name=args.config.stem))

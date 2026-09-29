@@ -27,9 +27,9 @@ def native_modules():
 
 def check_capabilities(config):
     request = config["requested_outputs"]
-    if request["currents"] or request["field_planes"] or request["full_period_animation"]:
-        raise ConfigurationError("Ten adapter obsługuje obecnie impedancję i pole dalekie. "
-                                 "Odczyt prądów (M2), przekroje E/H i animacje (M3) pozostają do implementacji; żądanie nie zostało pominięte.")
+    if request["currents"] or request["full_period_animation"]:
+        raise ConfigurationError("Odczyt prądów i animacja pełnego okresu pozostają do implementacji. "
+                                 "Obsługiwane są statyczne przekroje E/H dla wybranych faz (M3).")
     if config["solver"].get("power_diagnostics") and not request["far_field"]:
         raise ConfigurationError("Diagnostyka mocy wymaga aktywnego zapisu NF2FF (far_field=true).")
 
@@ -37,6 +37,8 @@ def check_capabilities(config):
 def prepare(geometry, config, run):
     check_capabilities(config)
     axes, meta = make_mesh(geometry, config)
+    from .fields import field_layout, install_fields
+    planes = field_layout(geometry, axes, meta, config)
     feed = resolve_feed(geometry.port, axes, config["solver"].get("port_mesh_alignment", "legacy"))
     write_json(run.path / "feed_grid_coverage.json", feed)
     print(f"Granice źródła ({feed['alignment']}): "
@@ -79,6 +81,7 @@ def prepare(geometry, config, run):
     if settings.get("power_diagnostics"):
         from .power import install_monitors
         install_monitors(engine, csx, geometry, axes, meta, config, run)
+    install_fields(csx, planes, config, run)
     native_path = run.path / "openems"
     native_path.mkdir()
     xml = native_path / "model.xml"
@@ -95,7 +98,7 @@ def prepare(geometry, config, run):
                               "settings": settings, "mesh": meta,
                               "feed": feed}
     run.save()
-    return engine, csx, port, nf, native_path
+    return engine, csx, port, nf, native_path, geometry
 
 
 def port_quantities(voltage, current, reference, accepted_power):
@@ -114,7 +117,7 @@ def port_quantities(voltage, current, reference, accepted_power):
 
 
 def solve(prepared, config, run):
-    engine, csx, port, nf, native_path = prepared
+    engine, csx, port, nf, native_path, geometry = prepared
     from .native_io import prepare_native_io
     run.manifest["solver"]["native_io"] = prepare_native_io(native_path / "model.xml")
     run.save()
@@ -173,6 +176,8 @@ def solve(prepared, config, run):
         summary["forward_gain_dbi"] = [float(10 * np.log10(v)) if v > 0 else None for v in gain[:, 0, 0]]
     run.manifest["warnings"].append("Nie wykonano kontroli zbieżności. Osiągnięcie EndCriteria należy sprawdzić w solver.log.")
     run.manifest["normalization"]["applied"] = True
+    from .fields import finish_fields
+    summary["field_planes"] = finish_fields(geometry, config, run, frequency, scale)
     write_json(run.path / "summary.json", summary)
     if config["solver"].get("power_diagnostics"):
         from .power import finish_diagnostics

@@ -108,7 +108,7 @@ class GeometryTests(unittest.TestCase):
 
     def test_unsupported_field_request_is_not_silently_ignored(self):
         config = deepcopy(self.config)
-        config["requested_outputs"]["field_planes"] = ["xz"]
+        config["requested_outputs"]["full_period_animation"] = True
         with self.assertRaisesRegex(ConfigurationError, "M3"):
             check_capabilities(config)
 

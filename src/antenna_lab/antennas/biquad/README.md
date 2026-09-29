@@ -35,7 +35,8 @@ Model korzysta z istniejącego eksperymentalnego portu różnicowego,
 `mesh_anchors`, siatki oraz diagnostyki mocy. Nie zawiera kabla, baluna ani
 strat materiałowych. Walidacja portu i zbieżności pozostaje otwarta.
 Raport domyślnie pokazuje widmo 1200–1650 MHz co 0,25 MHz; pole dalekie
-i bilans są obliczane przy 1420 MHz. Map E/H nadal nie zaimplementowano.
+i bilans są obliczane przy 1420 MHz. `run --fields` dodaje zapis E/H i diagramy
+fazowe: [instrukcja](../../../../docs/fields.md). Walidacja pól pozostaje otwarta.
 
 ```bat
 .\.venv\Scripts\python.exe -m antenna_lab preview --config parameters\biquad_1420mhz.json
