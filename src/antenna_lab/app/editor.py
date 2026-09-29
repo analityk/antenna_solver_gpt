@@ -3,13 +3,13 @@
 from copy import deepcopy
 from pathlib import Path
 
-from antenna_lab.antennas import build_model
+from antenna_lab.antennas import MODEL_NAMES, build_model
 from antenna_lab.core.config import ConfigurationError, ROOT, load_config, modified_config, write_json
 from antenna_lab.core.geometry import check_geometry
 from antenna_lab.visualization.plots import draw_geometry
 from .actions import export_geometry
 
-LABELS = {"wire_diameter": "Średnica drutu", "reflector_length": "Długość reflektora",
+LABELS = {"S": "S — bok biquada", "wire_diameter": "Średnica drutu", "reflector_length": "Długość reflektora",
           "reflector_width": "Szerokość reflektora", "reflector_thickness": "Grubość reflektora"}
 
 
@@ -82,7 +82,8 @@ class GeometryEditor:
         self.dirty = False
         self.fields = {}
         self.entries = {}
-        root.title("antenna_solver_gpt — Quados 8")
+        name = MODEL_NAMES.get(self.state.geometry.model, self.state.geometry.model)
+        root.title(f"antenna_solver_gpt — {name}")
         width = min(1420, max(1050, root.winfo_screenwidth() - 80))
         height = min(880, max(740, root.winfo_screenheight() - 100))
         root.geometry(f"{width}x{height}")
@@ -93,21 +94,15 @@ class GeometryEditor:
         form = ttk.Frame(root, padding=(18, 14))
         form.grid(row=0, column=0, sticky="ns")
         form.columnconfigure(1, weight=1)
-        ttk.Label(form, text="QUADOS 8", font=("Segoe UI", 18, "bold")).grid(
-            row=0, column=0, columnspan=2, sticky="w", pady=(0, 5))
+        self.model_label = ttk.Label(form, text=name.upper(), font=("Segoe UI", 18, "bold"))
+        self.model_label.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 5))
         ttk.Label(form, text="Wymiary [mm]", foreground="#45566b").grid(
             row=1, column=0, columnspan=2, sticky="w", pady=(0, 8))
-        row = 2
-        for key, value in self.state.fields.items():
-            ttk.Label(form, text=LABELS.get(key, key)).grid(row=row, column=0, sticky="w", padx=(0, 12), pady=4)
-            var = tk.StringVar(master=root, value=value)
-            entry = ttk.Entry(form, textvariable=var, width=17)
-            entry.grid(row=row, column=1, sticky="ew", pady=4)
-            entry.bind("<Return>", self.apply)
-            entry.bind("<KP_Enter>", self.apply)
-            var.trace_add("write", self._on_edit)
-            self.fields[key], self.entries[key] = var, entry
-            row += 1
+        self.dimensions_form = ttk.Frame(form)
+        self.dimensions_form.grid(row=2, column=0, columnspan=2, sticky="ew")
+        self.dimensions_form.columnconfigure(1, weight=1)
+        self._build_dimension_fields()
+        row = 3
         ttk.Separator(form).grid(row=row, column=0, columnspan=2, sticky="ew", pady=10)
         row += 1
         ttk.Label(form, text="Częstotliwość [MHz]").grid(row=row, column=0, sticky="w", padx=(0, 12))
@@ -180,6 +175,23 @@ class GeometryEditor:
         self._draw()
         self._show_metrics()
 
+    def _build_dimension_fields(self):
+        import tkinter as tk
+        from tkinter import ttk
+        for child in self.dimensions_form.winfo_children():
+            child.destroy()
+        self.fields, self.entries = {}, {}
+        for row, (key, value) in enumerate(self.state.fields.items()):
+            ttk.Label(self.dimensions_form, text=LABELS.get(key, key)).grid(
+                row=row, column=0, sticky="w", padx=(0, 12), pady=4)
+            var = tk.StringVar(master=self.root, value=value)
+            entry = ttk.Entry(self.dimensions_form, textvariable=var, width=17)
+            entry.grid(row=row, column=1, sticky="ew", pady=4)
+            entry.bind("<Return>", self.apply)
+            entry.bind("<KP_Enter>", self.apply)
+            var.trace_add("write", self._on_edit)
+            self.fields[key], self.entries[key] = var, entry
+
     def _message(self, text, error=False):
         self.status.set(text)
         self.status_label.configure(foreground="#b42318" if error else "#1f4e43")
@@ -212,7 +224,7 @@ class GeometryEditor:
         metrics = check_geometry(self.state.geometry)
         length = next(iter(metrics["branch_lengths_m"].values())) * 1000
         text = (f"Geometria poprawna: {metrics['wire_count']} odcinków; gałąź {length:.6f} mm.\n"
-                "Kolory oznaczają odcinki A–F. To podgląd konstrukcji, bez rozkładu prądów i pól.")
+                "Kolory oznaczają grupy odcinków. To podgląd konstrukcji, bez rozkładu prądów i pól.")
         if metrics["warnings"]:
             text += "\n" + " ".join(metrics["warnings"])
         self._message(text)
@@ -275,10 +287,14 @@ class GeometryEditor:
             return
         self.state = candidate
         self.variant_name = Path(path).stem
+        if list(self.fields) != list(candidate.fields):
+            self._build_dimension_fields()
         self._sync_fields()
         self._draw()
         self.artifact.set(str(Path(path).resolve()))
-        self.root.title(f"antenna_solver_gpt — Quados 8 — {Path(path).name}")
+        name = MODEL_NAMES.get(self.state.geometry.model, self.state.geometry.model)
+        self.model_label.configure(text=name.upper())
+        self.root.title(f"antenna_solver_gpt — {name} — {Path(path).name}")
         self._show_metrics()
         self._message("Wczytano parametry z pliku. " + self.status.get())
 
@@ -287,7 +303,7 @@ class GeometryEditor:
         if not self.apply():
             return
         path = filedialog.asksaveasfilename(title="Zapisz parametry anteny — plik JSON",
-                                           initialdir=str(ROOT / "parameters"), initialfile="quados8_variant.json",
+                                           initialdir=str(ROOT / "parameters"), initialfile=f"{self.state.geometry.model}_variant.json",
                                            defaultextension=".json", filetypes=[("Parametry JSON", "*.json")],
                                            parent=self.root)
         if path:

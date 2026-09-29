@@ -1,0 +1,83 @@
+{
+  "$schema": "../schemas/antenna-config.schema.json",
+  "schema_version": 2,
+  "id": "biquad_1420mhz",
+  "model_status": "unvalidated",
+  "antenna": {
+    "model": "biquad",
+    "parameter_schema": "../schemas/biquad-parameters.schema.json",
+    "parameters": {
+      "dimensions_m": {
+        "S": 0.05278036232394366,
+        "G": 0.006,
+        "H": 0.02639018116197183,
+        "wire_diameter": 0.003,
+        "reflector_length": 0.21112144929577464,
+        "reflector_width": 0.21112144929577464,
+        "reflector_thickness": 0.002
+      }
+    }
+  },
+  "simulation": {
+    "frequency_hz": [
+      1420000000.0
+    ],
+    "medium": "vacuum",
+    "conductor_model": "PEC",
+    "reflector_model": "pec_plate",
+    "feed_model": "differential_lumped_port",
+    "reference_impedance_ohm": 50,
+    "accepted_power_w": 1.0,
+    "phasor_convention": "real(F * exp(+j * phase))"
+  },
+  "requested_outputs": {
+    "currents": false,
+    "impedance": true,
+    "far_field": true,
+    "field_planes": [],
+    "phase_degrees": [
+      0,
+      30,
+      60,
+      90,
+      120,
+      150,
+      180
+    ],
+    "full_period_animation": false
+  },
+  "provenance": {
+    "source_file": "src/antenna_lab/antennas/biquad/README.md",
+    "scaling_reference_frequency_hz": 1420000000.0,
+    "scaling_target_frequency_hz": 1420000000.0,
+    "scale_factor": 1,
+    "reference_frequency_status": "assumed_not_verified",
+    "scaling_mode": "custom_dimensions",
+    "note": "Classic two-loop biquad with finite feed gap. Initial design: S=lambda/4, H=lambda/8, square reflector lambda by lambda, 3 mm PEC wire, 6 mm gap. Not tuned or electromagnetically validated. Shared experimental differential port and aligned mesh anchors; no coax or balun."
+  },
+  "solver": {
+    "name": "openEMS",
+    "cells_per_wire_diameter": 3,
+    "cells_per_wavelength": 20,
+    "growth_ratio": 1.4,
+    "padding_wavelengths": 0.5,
+    "pml_cells": 8,
+    "max_cells": 25000000,
+    "max_timesteps": 200000,
+    "end_criteria": 1e-05,
+    "threads": 0,
+    "excitation_fractional_bandwidth": 0.2,
+    "far_field_step_deg": 5,
+    "power_diagnostics": {
+      "inner_box_fraction": 0.5,
+      "feed_margin_diameters": 2.0,
+      "port_spectrum_hz": {
+        "start": 1200000000.0,
+        "stop": 1650000000.0,
+        "step": 250000.0
+      },
+      "source_edge_work": true
+    },
+    "port_mesh_alignment": "mesh_anchors"
+  }
+}

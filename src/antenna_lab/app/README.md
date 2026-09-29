@@ -9,6 +9,7 @@ ostatniej poprawnej konfiguracji. Zmiana częstotliwości i skalowanie są odrę
   Wczytany wariant zastępuje bieżące pola i staje się punktem przywracania.
   Anulowanie lub błędny plik zachowuje dotychczasowe ustawienia i wpisy.
   Nazwa wybranego pliku służy także jako etykieta kolejnego eksportu geometrii.
+  Można przełączać modele Quados 8 i biquad; pola wymiarów zmieniają się automatycznie.
 - Zapisz parametry (.json): jeden plik ustawień do ponownego wczytania lub użycia przez --config.
 - Eksportuj geometrię: nowy folder z modelem, PNG, parametrami i dokumentacją.
   Eksport nie uruchamia openEMS. Zapis i eksport uwzględniają niezastosowane pola.

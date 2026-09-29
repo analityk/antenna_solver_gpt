@@ -1,12 +1,17 @@
 # Cel projektu
 
-Wersja wymagań: 0.11. Data: 2026-09-29, Europe/Warsaw.
+Wersja wymagań: 0.12. Data: 2026-09-29, Europe/Warsaw.
 
 ## Bieżący stan
 
 Projekt `antenna_solver_gpt` używa openEMS. Kontrakty konfiguracji i manifestu
 mają wersję 2; wycofany szkic NEC2++ nie jest obsługiwany.
 Generator Quadosa, edytor wymiarów, eksport i kontrola geometrii są zaimplementowane.
+Drugi model: klasyczny biquad przy 1420 MHz, osiem odcinków S, szczelina G,
+wysokość H, średnica drutu i wymiary reflektora. Ma osobny generator,
+schemat i konfigurację; używa wspólnego edytora, adaptera oraz raportów.
+Wczytanie parametrów w edytorze zmienia zestaw pól zależnie od modelu.
+Geometria jest sprawdzana, ale nowe wyniki EM nadal wymagają walidacji.
 Adapter openEMS przygotowuje model XML i zawiera odczyt impedancji oraz pola
 dalekiego. Użytkownik potwierdził udane prepare oraz zapis XML na natywnym
 Windowsie 2026-09-28 i ukończył pierwszy FDTD oraz kontrole pasywne.

@@ -4,6 +4,11 @@ Lokalny program do parametrycznego modelowania anten. Pierwszy model to
 **Quados 8 przy dokładnie 1420 MHz**, z czterema połączonymi gałęziami
 i skończonym reflektorem. Silnik obliczeniowy: **openEMS** na Windows 11.
 
+Dostępny jest także **klasyczny biquad z reflektorem**: konfiguracja
+`parameters/biquad_1420mhz.json`, edytor, obliczenia i raport. Parametry
+oraz polecenia: [moduł biquad](src/antenna_lab/antennas/biquad/README.md).
+W edytorze „Wczytaj parametry…” przełącza również model anteny.
+
 **Działa generator, edytor wymiarów i eksport geometrii (M1).**
 Adapter openEMS oraz odczyt impedancji i pola dalekiego są zaimplementowane;
 użytkownik ukończył przebiegi na Windowsie. Lokalny pomiar pracy źródła

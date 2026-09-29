@@ -509,6 +509,34 @@ częstotliwości i reflektora, preferencję ustawień solvera, unikalne nazwy
 i manifesty oraz CLI z nazwą JSON bez prefiksu `parameters/` i etykietę HTML.
 Natywnego FDTD ani interfejsu Windows nie uruchamiano.
 
+## 2026-09-29 — drugi model: klasyczny biquad
+
+**Powód:** użytkownik chce symulować biquad w istniejącym środowisku.
+
+**Zmiana:** osobny generator, schemat i konfiguracja `biquad_1420mhz.json`.
+Parametry obejmują bok S, szczelinę G, wysokość H, średnicę drutu i reflektor.
+Edytor przełącza formularz po wczytaniu modelu; nazwy okna, eksportu i wariantu
+odpowiadają antenie. Wspólne polecenia check/run/report obsługują nowy model.
+
+**Wpływ na fizykę:** dwie gałęzie po cztery równe odcinki, wspólny port
+różnicowy, opcjonalna płyta PEC. Skończona szczelina nieznacznie odkształca
+kąty rombów. Startowe S = ćwierć fali, H = ósma część fali, Zref = 50 Ω
+nie oznaczają dostrojenia. Wykorzystano istniejące mesh_anchors i diagnostykę
+pracy źródła. Nie zmieniono solvera ani modelu Quadosa. Brak kabla, baluna
+i strat; walidacja portu, impedancji i zysku pozostaje otwarta.
+
+**Format i odtwarzalność:** dodatkowy model i schemat parametrów;
+konfiguracje/manifesty pozostają v2. Bez migracji i zmian wcześniejszych
+wyników. Rdzeń pozostaje niezależny od anteny. Wymagania mają wersję 0.12.
+
+**Sprawdzenie:** 60 testów unittest, wynik OK; dwa pominięcia środowiskowe
+(Tk i Windows UCRT). Kontrole nowego modelu obejmują topologię, długości,
+symetrię, szczelinę, odrzucanie błędnych wymiarów, skalowanie, reflektor,
+siatkę, pokrycie portu sondami i parametry edytora. Konfiguracja startowa
+przechodzi check bez ostrzeżeń: 266 × 268 × 83 = 5 916 904 komórki.
+Obejrzano eksport geometrii. Natywnego GUI Windows i FDTD nie uruchamiano;
+nie wykonano benchmarków. Wyniki EM biquada muszą powstać w nowym przebiegu.
+
 ## Wzór kolejnego wpisu
 
 - Data i krótka nazwa zmiany.

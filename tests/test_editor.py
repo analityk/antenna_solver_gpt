@@ -121,6 +121,20 @@ class NativeEditorTests(unittest.TestCase):
         self.assertTrue((run / "plots" / "geometry.png").exists())
         self.assertFalse((run / "openems").exists())
 
+    def test_loading_biquad_and_quados_rebuilds_parameter_fields(self):
+        from tkinter import filedialog
+        for path, model, present, absent in (
+                (ROOT / "parameters/biquad_1420mhz.json", "biquad", "S", "A"),
+                (CONFIG, "quados8", "A", "S")):
+            with patch.object(filedialog, "askopenfilename", return_value=str(path)):
+                self.ui.load_button.invoke()
+            self.root.update()
+            self.assertEqual(self.ui.state.geometry.model, model)
+            self.assertIn(present, self.ui.fields)
+            self.assertNotIn(absent, self.ui.fields)
+            self.assertFalse(self.ui.dirty)
+            self.assertIn(model[:3].lower(), self.root.title().lower())
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -6,6 +6,9 @@ Najpierw przeczytaj `goal.md`, `history.md` i `docs/architecture.md`.
 `goal.md` jest źródłem wymagań; parametry maszynowe znajdują się w `parameters/`.
 Bieżący cel: parametryczna symulacja Quadosa 8 przy 1420 MHz, z możliwością
 dodania innych anten bez zmiany zasad działania rdzenia.
+Dodano model `biquad` (dwa romby, osiem odcinków) i konfigurację
+`parameters/biquad_1420mhz.json`. Wymiary startowe nie są dostrojoną anteną;
+korzysta z tego samego eksperymentalnego portu i statusu unverified.
 
 Platforma docelowa użytkownika: natywny Windows 11. Instrukcje uruchamiania
 mają używać środowiska `.venv` i składni aktualnej powłoki użytkownika.

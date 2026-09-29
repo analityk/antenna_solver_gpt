@@ -2,8 +2,10 @@
 
 from antenna_lab.core.config import ConfigurationError
 from .quados8.model import build as build_quados8
+from .biquad.model import build as build_biquad
 
-MODELS = {"quados8": build_quados8}
+MODELS = {"quados8": build_quados8, "biquad": build_biquad}
+MODEL_NAMES = {"quados8": "Quados 8", "biquad": "Biquad"}
 
 
 def build_model(config):

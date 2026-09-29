@@ -4,8 +4,9 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.figure import Figure
 from matplotlib.patches import Rectangle
 import numpy as np
+from antenna_lab.antennas import MODEL_NAMES
 
-COLORS = {"A": "#d97706", "B": "#e11d48", "C": "#059669", "D": "#7c3aed", "E": "#1676bd", "F": "#a855f7"}
+COLORS = {"A": "#d97706", "B": "#e11d48", "C": "#059669", "D": "#7c3aed", "E": "#1676bd", "F": "#a855f7", "S": "#1676bd"}
 
 
 def draw_geometry(front, side, geometry):
@@ -47,7 +48,8 @@ def geometry_plot(geometry, filename):
     FigureCanvasAgg(fig)
     front, side = fig.subplots(2, 1, gridspec_kw={"height_ratios": [3, 1.5]})
     draw_geometry(front, side, geometry)
-    fig.suptitle("Quados 8 — geometria konstrukcyjna, bez wyników elektromagnetycznych", fontsize=12)
+    name = MODEL_NAMES.get(geometry.model, geometry.model)
+    fig.suptitle(f"{name} — geometria konstrukcyjna, bez wyników elektromagnetycznych", fontsize=12)
     fig.subplots_adjust(top=0.76, bottom=0.12, hspace=0.8, left=0.06, right=0.98)
     Path(filename).parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(filename, dpi=160)
