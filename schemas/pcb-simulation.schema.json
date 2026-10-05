@@ -10,7 +10,8 @@
     "port",
     "mesh",
     "material",
-    "fdtd"
+    "fdtd",
+    "domain"
   ],
   "properties": {
     "schema_version": {
@@ -133,6 +134,24 @@
         "threads": {
           "type": "integer",
           "minimum": 0
+        }
+      }
+    },
+    "domain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "air_padding_wavelengths",
+        "pml_cells"
+      ],
+      "properties": {
+        "air_padding_wavelengths": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "pml_cells": {
+          "type": "integer",
+          "minimum": 1
         }
       }
     }

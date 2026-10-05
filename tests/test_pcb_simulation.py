@@ -14,6 +14,7 @@ from antenna_lab.pcb.simulation import (
 def simulation_config():
     return {
         'schema_version': 1,
+        'domain': {'air_padding_wavelengths': .25, 'pml_cells': 8},
         'result_frequency_hz': [1300000000, 1420000000, 1500000000],
         'excitation': {'center_hz': 1420000000, 'cutoff_hz': 200000000},
         'port': {'reference_impedance_ohm': 50},
@@ -35,6 +36,7 @@ def settings(value=None):
 class PcbSimulationTests(unittest.TestCase):
     def test_all_fields_bom_determinism_frozen(self):
         expected = dict(
+            air_padding_wavelengths=.25, pml_cells=8,
             schema_version=1, result_frequency_hz=(1.3e9, 1.42e9, 1.5e9),
             excitation_center_hz=1.42e9, excitation_cutoff_hz=.2e9,
             reference_impedance_ohm=50, cells_per_wavelength=20,
@@ -111,6 +113,16 @@ class PcbSimulationTests(unittest.TestCase):
         value['mesh']['growth_ratio_target'] = 1.5
         validate_pcb_simulation_config(value)
 
+    def test_domain_values(self):
+        self.assert_invalid_field('domain', 'air_padding_wavelengths',
+                                  (0, -1, float('nan'), float('inf'), -float('inf'), True, '0.25'))
+        self.assert_invalid_field('domain', 'pml_cells', (0, -1, 1.5, True, '8'))
+        value = simulation_config()
+        value['domain'] = dict(air_padding_wavelengths=.5, pml_cells=12)
+        result = settings(value)
+        self.assertEqual(result.air_padding_wavelengths, .5)
+        self.assertEqual(result.pml_cells, 12)
+
     def test_fdtd(self):
         self.assert_invalid_field('fdtd', 'max_timesteps', (0, -1, 1.5, True))
         self.assert_invalid_field('fdtd', 'end_criteria', (0, -1, 1, 2, True))
@@ -129,7 +141,7 @@ class PcbSimulationTests(unittest.TestCase):
 
     def test_missing_unknown_and_version(self):
         self.assert_invalid_field(None, 'schema_version', (0, 2, True, '1'))
-        for section in (None, 'excitation', 'port', 'mesh', 'material', 'fdtd'):
+        for section in (None, 'excitation', 'port', 'mesh', 'material', 'fdtd', 'domain'):
             data = simulation_config()
             target = data if section is None else data[section]
             for key in tuple(target):

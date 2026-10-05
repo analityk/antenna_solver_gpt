@@ -171,8 +171,14 @@ class PcbPhysicalMeshPolicy:
 
     Assumes a homogeneous isotropic substrate with relative permeability 1.
     Growth values are carried forward only; grading is not performed here.
+    air_padding_m is the clearance from structure to START of PML, excluding
+    PML thickness. pml_cells is metadata only; no PML geometry is constructed.
     """
 
+    padding_frequency_hz: float
+    padding_air_wavelength_m: float
+    air_padding_m: float
+    pml_cells: int
     f_mesh_hz: float
     air_wavelength_m: float
     substrate_wavelength_m: float
@@ -199,10 +205,16 @@ def derive_pcb_physical_mesh_policy(
     """
     plan = make_pcb_mesh_anchor_plan(geometry)
     f_mesh = settings.excitation_center_hz + settings.excitation_cutoff_hz
+    padding_frequency = min(settings.result_frequency_hz)
+    padding_wavelength = C0 / padding_frequency
     air = C0 / f_mesh
     substrate = air / sqrt(geometry.substrate.epsilon_r)
     substrate_step = substrate / settings.cells_per_wavelength
     return PcbPhysicalMeshPolicy(
+        padding_frequency_hz=padding_frequency,
+        padding_air_wavelength_m=padding_wavelength,
+        air_padding_m=settings.air_padding_wavelengths * padding_wavelength,
+        pml_cells=settings.pml_cells,
         f_mesh_hz=f_mesh, air_wavelength_m=air, substrate_wavelength_m=substrate,
         max_air_step_m=air / settings.cells_per_wavelength,
         max_substrate_xy_step_m=substrate_step,

@@ -354,7 +354,7 @@ class PcbPhysicalPolicyTests(unittest.TestCase):
         geometry = self.geometry()
         value = simulation_config()
         first = derive_pcb_physical_mesh_policy(geometry, settings(value))
-        value['result_frequency_hz'] = [1.42e9]
+        value['result_frequency_hz'] = [1.3e9, 1.5e9]
         self.assertEqual(first, derive_pcb_physical_mesh_policy(geometry, settings(value)))
         value['excitation']['center_hz'] *= 2
         value['excitation']['cutoff_hz'] *= 2
@@ -363,6 +363,47 @@ class PcbPhysicalPolicyTests(unittest.TestCase):
         self.assertEqual(second.f_mesh_hz, 3.24e9)
         self.assertEqual(second.max_air_step_m, first.max_air_step_m/2)
         self.assertEqual(second.max_substrate_xy_step_m, first.max_substrate_xy_step_m/2)
+
+    def test_padding_limits_and_configured_pml_without_geometry(self):
+        geometry = self.geometry()
+        before = geometry.as_dict()
+        value = simulation_config()
+        first = derive_pcb_physical_mesh_policy(geometry, settings(value))
+        self.assertEqual(first.padding_frequency_hz, 1.3e9)
+        self.assertEqual(first.padding_air_wavelength_m, 299792458.0/1.3e9)
+        self.assertEqual(first.air_padding_m, .25 * first.padding_air_wavelength_m)
+        self.assertEqual(first.pml_cells, 8)
+        value['domain']['air_padding_wavelengths'] = .5
+        second = derive_pcb_physical_mesh_policy(geometry, settings(value))
+        self.assertEqual(second, replace(first, air_padding_m=first.air_padding_m*2))
+        value['domain']['pml_cells'] = 12
+        third = derive_pcb_physical_mesh_policy(geometry, settings(value))
+        self.assertEqual(third, replace(second, pml_cells=12))
+        self.assertEqual(geometry.as_dict(), before)
+
+    def test_lowest_result_controls_padding_only(self):
+        geometry = self.geometry()
+        value = simulation_config()
+        first = derive_pcb_physical_mesh_policy(geometry, settings(value))
+        value['result_frequency_hz'][0] = 1.35e9
+        second = derive_pcb_physical_mesh_policy(geometry, settings(value))
+        self.assertEqual(second.padding_frequency_hz, 1.35e9)
+        self.assertLess(second.air_padding_m, first.air_padding_m)
+        self.assertEqual(second, replace(first, padding_frequency_hz=1.35e9,
+                         padding_air_wavelength_m=299792458.0/1.35e9,
+                         air_padding_m=.25 * (299792458.0/1.35e9)))
+
+    def test_excitation_changes_resolution_not_padding(self):
+        geometry = self.geometry()
+        value = simulation_config()
+        first = derive_pcb_physical_mesh_policy(geometry, settings(value))
+        value['excitation']['cutoff_hz'] = 300000000
+        second = derive_pcb_physical_mesh_policy(geometry, settings(value))
+        self.assertGreater(second.f_mesh_hz, first.f_mesh_hz)
+        self.assertLess(second.max_air_step_m, first.max_air_step_m)
+        self.assertLess(second.max_substrate_xy_step_m, first.max_substrate_xy_step_m)
+        for field in ('padding_frequency_hz', 'padding_air_wavelength_m', 'air_padding_m', 'pml_cells'):
+            self.assertEqual(getattr(second, field), getattr(first, field))
 
     def test_solver_geometry_contract_propagates(self):
         for plane in ('substrate', 'copper'):

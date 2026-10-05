@@ -26,6 +26,8 @@ class PcbSimulationSettings:
     max_timesteps: int
     end_criteria: float
     threads: int
+    air_padding_wavelengths: float
+    pml_cells: int
 
 
 def validate_pcb_simulation_config(value: dict) -> dict:
@@ -68,4 +70,6 @@ def load_pcb_simulation_settings(path) -> PcbSimulationSettings:
         loss_reference_frequency_hz=value["material"]["loss_reference_frequency_hz"],
         max_timesteps=int(fdtd["max_timesteps"]), end_criteria=fdtd["end_criteria"],
         threads=int(fdtd["threads"]),
+        air_padding_wavelengths=value["domain"]["air_padding_wavelengths"],
+        pml_cells=int(value["domain"]["pml_cells"]),
     )
