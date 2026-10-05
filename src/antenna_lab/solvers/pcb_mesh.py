@@ -9,7 +9,7 @@ from math import hypot, ceil, isfinite, prod
 
 from antenna_lab.core.config import ConfigurationError
 from antenna_lab.pcb.model import PcbGeometry
-from antenna_lab.pcb.validation import validate_pcb_geometry
+from antenna_lab.pcb.validation import validate_pcb_geometry, TOLERANCE_M
 
 # Absolute distances in metres. Merge numerical residue, not real features.
 ANCHOR_MERGE_TOLERANCE_M = 1e-10
@@ -43,6 +43,22 @@ def _merge(values, critical=()):
     return tuple(sorted(retained))
 
 
+def _z_interfaces(geometry):
+    """Preserve substrate interfaces; coincident copper uses the exact top.
+
+    Only the anchor representation is canonicalized, never the geometry.
+    PCB v0 has one copper plane; inconsistent planes are rejected.
+    """
+    bottom, top = geometry.substrate.z_min_m, geometry.substrate.z_max_m
+    if top - bottom <= ANCHOR_MERGE_TOLERANCE_M:
+        raise ConfigurationError(
+            "PCB Z: interfejsy laminatu są nierozdzielalne; grubość musi być "
+            f"większa niż {ANCHOR_MERGE_TOLERANCE_M:g} m.")
+    if any(abs(copper.z_m - top) > TOLERANCE_M for copper in geometry.copper):
+        raise ConfigurationError("PCB Z: płaszczyzna miedzi musi pokrywać się z górą laminatu.")
+    return bottom, top
+
+
 def make_pcb_mesh_anchor_plan(geometry: PcbGeometry) -> PcbMeshAnchorPlan:
     """Derive required locations from valid, explicitly normalized PCB geometry."""
     validate_pcb_geometry(geometry)
@@ -55,18 +71,17 @@ def make_pcb_mesh_anchor_plan(geometry: PcbGeometry) -> PcbMeshAnchorPlan:
     board = geometry.outline.vertices_xy_m
     x = [min(v[0] for v in board), max(v[0] for v in board)]
     y = [min(v[1] for v in board), max(v[1] for v in board)]
-    z = [geometry.substrate.z_min_m, geometry.substrate.z_max_m]
+    z = _z_interfaces(geometry)
     for copper in geometry.copper:
         for axis, anchors in ((0, x), (1, y)):
             low = min(v[axis] for v in copper.vertices_xy_m)
             high = max(v[axis] for v in copper.vertices_xy_m)
             anchors.extend((low, (low + high) / 2, high))
-        z.append(copper.z_m)
     half = geometry.port.width_m / 2
     return PcbMeshAnchorPlan(
         _merge(x, (n[0], mx, p[0])),
         _merge(y, (my - half, my, my + half)),
-        _merge(z), hypot(p[0] - n[0], p[1] - n[1]), geometry.port.width_m,
+        z, hypot(p[0] - n[0], p[1] - n[1]), geometry.port.width_m,
         geometry.substrate.z_max_m - geometry.substrate.z_min_m,
     )
 
@@ -127,7 +142,11 @@ def make_pcb_placeholder_mesh(
             divisions.append(ceil(ratio))
         counts.append(divisions)
     shape = tuple(sum(axis_counts) for axis_counts in counts)
+    if any(count <= 0 for count in shape):
+        raise ConfigurationError("PCB: każda oś siatki musi zawierać co najmniej jedną komórkę.")
     cell_count = prod(shape)
+    if cell_count <= 0:
+        raise ConfigurationError("PCB: liczba komórek siatki musi być dodatnia.")
     # Check before allocating axes, including extremely fine caller settings.
     if cell_count > settings.max_cells:
         raise ConfigurationError(f"PCB: {cell_count} komórek przekracza max_cells={settings.max_cells}.")
