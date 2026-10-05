@@ -1,9 +1,11 @@
-"""PCB-v0 CSXCAD geometry installation only: no engine, port, XML or FDTD."""
+"""PCB-v0 native geometry and planar port setup; no waveform, BC, XML or FDTD."""
 
+from dataclasses import asdict
 from math import isfinite, pi
 
 from antenna_lab.core.config import ConfigurationError
 from antenna_lab.pcb.model import PcbGeometry
+from antenna_lab.pcb.port import resolve_pcb_lumped_port
 from antenna_lab.pcb.simulation import PcbSimulationSettings
 from .pcb_mesh import PcbDomainMesh, make_pcb_domain_mesh, make_pcb_mesh_anchor_plan
 
@@ -105,3 +107,51 @@ def prepare_pcb_csx(geometry: PcbGeometry, settings: PcbSimulationSettings):
     csx = csx_module.ContinuousStructure()
     metadata = install_pcb_geometry(csx, geometry, domain_mesh, settings)
     return csx, domain_mesh, metadata
+
+
+def _audit_port_grid(csx, domain_mesh, after=False):
+    grid = csx.GetGrid()
+    unit = grid.GetDeltaUnit()
+    axes = tuple(tuple(grid.GetLines(axis)) for axis in 'xyz')
+    expected = (domain_mesh.x_lines_m, domain_mesh.y_lines_m, domain_mesh.z_lines_m)
+    if unit != 1.0 or axes != expected:
+        detail = 'delta unit' if unit != 1.0 else next(
+            axis for axis, actual, wanted in zip('xyz', axes, expected) if actual != wanted)
+        message = ('Natywna instalacja portu zmodyfikowała zamrożoną siatkę PCB' if after else
+                   'PCB port: siatka CSXCAD nie odpowiada zamrożonej domenie')
+        raise ConfigurationError(f"{message} ({detail}); instalacja przerwana bez naprawiania siatki.")
+
+
+def install_pcb_lumped_port(engine, csx, geometry: PcbGeometry,
+                            domain_mesh: PcbDomainMesh, settings: PcbSimulationSettings):
+    """Install on an engine already associated with csx; never modify the grid.
+
+    Spec resolution and preflight complete before any engine method is called.
+    Metadata describes the resolved contract, not audited native edge internals.
+    """
+    spec = resolve_pcb_lumped_port(geometry, domain_mesh, settings)
+    _audit_port_grid(csx, domain_mesh)
+    port = engine.AddLumpedPort(spec.port_nr, spec.reference_impedance_ohm,
+                               list(spec.start_m), list(spec.stop_m), spec.exc_dir,
+                               spec.excite, priority=spec.priority)
+    _audit_port_grid(csx, domain_mesh, after=True)
+    if port is None:
+        raise ConfigurationError("PCB port: AddLumpedPort zwrócił None; sprawdź natywną instalację openEMS.")
+    metadata = asdict(spec)
+    metadata.update(surface_plane_z_m=0.0, model='planar_lumped_port')
+    return port, spec, metadata
+
+
+def prepare_pcb_native_model(geometry: PcbGeometry, settings: PcbSimulationSettings):
+    """Return engine, CSX, port, mesh, spec, metadata; no waveform, BC, XML or run."""
+    domain_mesh = make_pcb_domain_mesh(geometry, settings)
+    from .openems import native_modules
+    ems_module, csx_module = native_modules()
+    csx = csx_module.ContinuousStructure()
+    engine = ems_module.openEMS(NrTS=settings.max_timesteps, EndCriteria=settings.end_criteria)
+    engine.SetCSX(csx)
+    geometry_metadata = install_pcb_geometry(csx, geometry, domain_mesh, settings)
+    port, spec, port_metadata = install_pcb_lumped_port(engine, csx, geometry, domain_mesh, settings)
+    metadata = {'geometry': geometry_metadata, 'port': port_metadata,
+                'engine': {'max_timesteps': settings.max_timesteps, 'end_criteria': settings.end_criteria}}
+    return engine, csx, port, domain_mesh, spec, metadata

@@ -6,7 +6,9 @@ from unittest.mock import patch
 
 from antenna_lab.core.config import ConfigurationError
 from antenna_lab.pcb.model import BoardOutline
-from antenna_lab.solvers.openems_pcb import install_pcb_geometry, prepare_pcb_csx
+from antenna_lab.solvers.openems_pcb import (install_pcb_geometry, prepare_pcb_csx,
+    install_pcb_lumped_port, prepare_pcb_native_model)
+from antenna_lab.pcb.port import resolve_pcb_lumped_port
 from antenna_lab.solvers.pcb_mesh import make_pcb_domain_mesh, make_pcb_mesh_anchor_plan
 import test_pcb_mesh as fixtures
 from test_pcb_simulation import settings
@@ -212,6 +214,105 @@ class OpenemsPcbTests(unittest.TestCase):
                 install_pcb_geometry(csx,geometry,mesh,experiment)
                 for axis,lines in zip('xyz',(mesh.x_lines_m,mesh.y_lines_m,mesh.z_lines_m)):
                     self.assertEqual(csx.grid.GetLines(axis),lines)
+
+
+class Engine:
+    def __init__(self, mutation=None, null=False, **kwargs):
+        self.kwargs=kwargs
+        self.calls=[]
+        self.mutation=mutation
+        self.port=None if null else object()
+
+    def SetCSX(self, csx):
+        self.csx=csx
+        self.calls.append(('SetCSX',csx))
+
+    def AddLumpedPort(self,*args,**kwargs):
+        # Geometry must be installed before the port; no other native methods exist.
+        assert self.csx.materials and len(self.csx.metals[0][1].polygons)>0
+        self.calls.append(('AddLumpedPort',args,kwargs))
+        if self.mutation: self.mutation(self.csx.grid)
+        return self.port
+
+
+class NativePcbPortTests(unittest.TestCase):
+    def setup_model(self, gap=2., width=1., angled=False, mutation=None, null=False):
+        geometry=fixtures.PcbMeshTests().geometry(gap=gap,width=width,angled=angled).normalized_geometry
+        experiment=replace(settings(),reference_impedance_ohm=75)
+        mesh=make_pcb_domain_mesh(geometry,experiment)
+        csx=CSX()
+        install_pcb_geometry(csx,geometry,mesh,experiment)
+        engine=Engine(mutation=mutation,null=null)
+        engine.SetCSX(csx)
+        return engine,csx,geometry,mesh,experiment
+
+    def test_exact_call_residue_wide_small_metadata_no_mutation(self):
+        for gap,width,angled in ((2.,1.,False),(.5,4.,False),(.1,.3,False),(.5,4.,True)):
+            with self.subTest(gap=gap,width=width,angled=angled):
+                engine,csx,g,m,s=self.setup_model(gap,width,angled)
+                before=(g.as_dict(),asdict(m),asdict(s),dict(csx.grid.lines))
+                native,spec,meta=install_pcb_lumped_port(engine,csx,g,m,s)
+                self.assertIs(native,engine.port)
+                self.assertEqual(spec,resolve_pcb_lumped_port(g,m,s))
+                self.assertEqual(engine.calls,[('SetCSX',csx),('AddLumpedPort',
+                    (spec.port_nr,75,list(spec.start_m),list(spec.stop_m),'x',1.),{'priority':5})])
+                self.assertEqual(meta,{**asdict(spec),'surface_plane_z_m':0.,'model':'planar_lumped_port'})
+                second=Engine();second.SetCSX(csx)
+                self.assertEqual(meta,install_pcb_lumped_port(second,csx,g,m,s)[2])
+                meta['start_m']=(123.,456.,789.)
+                self.assertEqual(before,(g.as_dict(),asdict(m),asdict(s),dict(csx.grid.lines)))
+                if angled:
+                    self.assertNotEqual((g.port.negative_xy_m[1]+g.port.positive_xy_m[1])/2,0.)
+
+    def test_native_mutations_and_null(self):
+        def remove(grid): grid.lines['z']=tuple(z for z in grid.lines['z'] if z!=0.)
+        def add(grid): grid.lines['x']=tuple(sorted((*grid.lines['x'],123.)))
+        def change(grid): grid.lines['y']=(grid.lines['y'][0]-.001,*grid.lines['y'][1:])
+        def unit(grid): grid.unit=.001
+        for mutation in (remove,add,change,unit):
+            with self.subTest(mutation=mutation.__name__):
+                e,c,g,m,s=self.setup_model(mutation=mutation)
+                with self.assertRaisesRegex(ConfigurationError,'instalacja portu zmodyfikowała zamrożoną siatkę'):
+                    install_pcb_lumped_port(e,c,g,m,s)
+                self.assertEqual(len(e.calls),2)
+        e,c,g,m,s=self.setup_model(null=True)
+        with self.assertRaisesRegex(ConfigurationError,'AddLumpedPort.*None'):
+            install_pcb_lumped_port(e,c,g,m,s)
+
+    def test_preflight_does_not_touch_engine(self):
+        for failure in ('anchor','contact','grid','unit'):
+            e,c,g,m,s=self.setup_model()
+            before=list(e.calls)
+            if failure=='anchor': m=replace(m,z_lines_m=tuple(z for z in m.z_lines_m if z!=0.))
+            elif failure=='contact':
+                copper=g.copper[0]
+                g.copper[0]=replace(copper,vertices_xy_m=tuple((x,y/4) for x,y in copper.vertices_xy_m))
+                m=make_pcb_domain_mesh(g,s)
+            elif failure=='grid': c.grid.lines['x']=c.grid.lines['x'][1:]
+            else: c.grid.unit=.001
+            with self.subTest(failure=failure), self.assertRaises(ConfigurationError):
+                install_pcb_lumped_port(e,c,g,m,s)
+            self.assertEqual(e.calls,before)
+
+    def test_preparation_order_and_engine_settings(self):
+        g=fixtures.PcbMeshTests().geometry().normalized_geometry
+        s=replace(settings(),max_timesteps=12345,end_criteria=2e-5)
+        csx=CSX();created=[]
+        def factory(**kwargs):
+            engine=Engine(**kwargs);created.append(engine);return engine
+        with patch('antenna_lab.solvers.openems.native_modules',return_value=(
+                SimpleNamespace(openEMS=factory),SimpleNamespace(ContinuousStructure=lambda:csx))):
+            engine,actual,port,mesh,spec,meta=prepare_pcb_native_model(g,s)
+        self.assertEqual(created,[engine])
+        self.assertIs(actual,csx)
+        self.assertIs(port,engine.port)
+        self.assertEqual(engine.kwargs,{'NrTS':12345,'EndCriteria':2e-5})
+        self.assertEqual([call[0] for call in engine.calls],['SetCSX','AddLumpedPort'])
+        self.assertEqual(mesh,make_pcb_domain_mesh(g,s))
+        self.assertEqual(meta['engine'],{'max_timesteps':12345,'end_criteria':2e-5})
+        self.assertEqual(meta['port'],{**asdict(spec),'surface_plane_z_m':0.,'model':'planar_lumped_port'})
+        import json
+        json.dumps(meta,allow_nan=False)  # no native objects leaked into metadata
 
 
 if __name__=='__main__':
