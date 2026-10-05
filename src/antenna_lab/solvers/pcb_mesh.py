@@ -1,7 +1,11 @@
-"""Feature anchors only: no axis filling, cell sizes or simulation settings."""
+"""PCB feature anchors and placeholder Cartesian subdivision.
+
+Axes span required anchors only: no air domain or absorbing boundaries.
+This infrastructure mesh is not a complete runnable FDTD domain.
+"""
 
 from dataclasses import dataclass
-from math import hypot
+from math import hypot, ceil, isfinite, prod
 
 from antenna_lab.core.config import ConfigurationError
 from antenna_lab.pcb.model import PcbGeometry
@@ -65,3 +69,68 @@ def make_pcb_mesh_anchor_plan(geometry: PcbGeometry) -> PcbMeshAnchorPlan:
         _merge(z), hypot(p[0] - n[0], p[1] - n[1]), geometry.port.width_m,
         geometry.substrate.z_max_m - geometry.substrate.z_min_m,
     )
+
+
+@dataclass(frozen=True)
+class PcbPlaceholderMeshSettings:
+    max_step_xy_m: float
+    max_step_z_m: float
+    max_cells: int
+
+
+@dataclass(frozen=True)
+class PcbPlaceholderMesh:
+    """Anchor-bounded infrastructure mesh, not a complete FDTD domain."""
+
+    x_lines_m: tuple[float, ...]
+    y_lines_m: tuple[float, ...]
+    z_lines_m: tuple[float, ...]
+    shape_cells: tuple[int, int, int]
+    cell_count: int
+    min_step_m: float
+    max_step_m: float
+
+
+def _subdivide(anchors, counts):
+    """Equal cells within each interval; append original endpoints verbatim."""
+    lines = [anchors[0]]
+    for left, right, count in zip(anchors, anchors[1:], counts):
+        lines.extend(left + (right - left) * (i / count) for i in range(1, count))
+        lines.append(right)
+    if any(b <= a for a, b in zip(lines, lines[1:])):
+        raise ConfigurationError("PCB: podział przekracza precyzję współrzędnych.")
+    return tuple(lines)
+
+
+def make_pcb_placeholder_mesh(
+    geometry: PcbGeometry, settings: PcbPlaceholderMeshSettings,
+) -> PcbPlaceholderMesh:
+    """Subdivide using caller-supplied steps; no physical resolution policy."""
+    for name in ("max_step_xy_m", "max_step_z_m"):
+        value = getattr(settings, name)
+        if (isinstance(value, bool) or not isinstance(value, (int, float))
+                or not isfinite(value) or value <= ANCHOR_MERGE_TOLERANCE_M):
+            raise ConfigurationError(f"{name}: wymagany skończony krok większy od tolerancji kotwic.")
+    if (isinstance(settings.max_cells, bool) or not isinstance(settings.max_cells, int)
+            or settings.max_cells <= 0):
+        raise ConfigurationError("max_cells: wymagana dodatnia liczba całkowita.")
+    plan = make_pcb_mesh_anchor_plan(geometry)
+    axes = (plan.x_required_m, plan.y_required_m, plan.z_required_m)
+    targets = (settings.max_step_xy_m, settings.max_step_xy_m, settings.max_step_z_m)
+    counts = []
+    for anchors, target in zip(axes, targets):
+        divisions = []
+        for a, b in zip(anchors, anchors[1:]):
+            ratio = (b - a) / target
+            if not isfinite(ratio):
+                raise ConfigurationError("PCB: liczba komórek przekracza zakres obliczeń.")
+            divisions.append(ceil(ratio))
+        counts.append(divisions)
+    shape = tuple(sum(axis_counts) for axis_counts in counts)
+    cell_count = prod(shape)
+    # Check before allocating axes, including extremely fine caller settings.
+    if cell_count > settings.max_cells:
+        raise ConfigurationError(f"PCB: {cell_count} komórek przekracza max_cells={settings.max_cells}.")
+    lines = tuple(_subdivide(axis, divisions) for axis, divisions in zip(axes, counts))
+    steps = [b - a for axis in lines for a, b in zip(axis, axis[1:])]
+    return PcbPlaceholderMesh(*lines, shape, cell_count, min(steps), max(steps))
