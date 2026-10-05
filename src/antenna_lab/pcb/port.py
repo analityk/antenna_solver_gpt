@@ -39,14 +39,13 @@ def resolve_pcb_lumped_port(
     """
     plan = make_pcb_mesh_anchor_plan(geometry)
     n, p = geometry.port.negative_xy_m, geometry.port.positive_xy_m
-    if n[1] != p[1]:
-        raise ConfigurationError("PCB port: port płaski +X wymaga dokładnie negative.y == positive.y.")
+    mx = (n[0]+p[0])/2
     ym, half = (n[1]+p[1])/2, geometry.port.width_m/2
     start, stop = (n[0], ym-half, 0.0), (p[0], ym+half, 0.0)
     axes = (domain_mesh.x_lines_m, domain_mesh.y_lines_m, domain_mesh.z_lines_m)
     if domain_mesh.pml_cells != settings.pml_cells:
         raise ConfigurationError("PCB port: niezgodne pml_cells geometrii domeny i eksperymentu.")
-    required = (plan.x_required_m+(n[0],0.0,p[0]),
+    required = (plan.x_required_m+(n[0],mx,p[0]),
                 plan.y_required_m+(start[1],ym,stop[1]), plan.z_required_m+(0.0,))
     for axis, lines, anchors in zip('xyz', axes, required):
         if len(lines)<2 or any(not isfinite(v) for v in lines) or any(a>=b for a,b in zip(lines,lines[1:])):

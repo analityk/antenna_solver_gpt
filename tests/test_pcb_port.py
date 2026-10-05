@@ -1,23 +1,21 @@
 from dataclasses import asdict, replace, FrozenInstanceError
 import unittest
 from unittest.mock import patch
-from antenna_lab.pcb.transform import normalize_port_orientation
 from antenna_lab.pcb.validation import _contains
 
 from antenna_lab.core.config import ConfigurationError
 from antenna_lab.pcb.model import CopperPolygon
 from antenna_lab.pcb.port import resolve_pcb_lumped_port
 from antenna_lab.pcb.validation import validate_pcb_geometry
-from antenna_lab.solvers.pcb_mesh import make_pcb_domain_mesh
+from antenna_lab.solvers.pcb_mesh import (make_pcb_domain_mesh, make_pcb_mesh_anchor_plan,
+                                        NORMALIZED_FRAME_TOLERANCE_M)
 import test_pcb_mesh as fixtures
 from test_pcb_simulation import settings
 
 
 class PcbPortTests(unittest.TestCase):
     def geometry(self, **kwargs):
-        geometry = fixtures.PcbMeshTests().geometry(**kwargs).normalized_geometry
-        # Explicit fixture preparation: enforce the requested exact X-zero frame.
-        return normalize_port_orientation(geometry)[0]
+        return fixtures.PcbMeshTests().geometry(**kwargs).normalized_geometry
 
     def test_exact_contract_counts_ids_frozen_no_mutation(self):
         for gap,width in ((2.,1.),(.5,4.),(.1,.3)):
@@ -109,9 +107,50 @@ class PcbPortTests(unittest.TestCase):
         s=settings();m=make_pcb_domain_mesh(g,s)
         self.assertNotIn(0.,m.x_lines_m)
         before=(g.as_dict(),asdict(m))
-        with self.assertRaisesRegex(ConfigurationError,'x=0.0'):
-            resolve_pcb_lumped_port(g,m,s)
+        mx=(g.port.negative_xy_m[0]+g.port.positive_xy_m[0])/2
+        self.assertNotEqual(mx,0.)
+        self.assertIn(mx,make_pcb_mesh_anchor_plan(g).x_required_m)
+        self.assertIn(mx,m.x_lines_m)
+        spec=resolve_pcb_lumped_port(g,m,s)
+        self.assertEqual(spec.start_m[0],g.port.negative_xy_m[0])
+        self.assertEqual(spec.stop_m[0],g.port.positive_xy_m[0])
+        bad=replace(m,x_lines_m=tuple(x for x in m.x_lines_m if x!=mx))
+        with self.assertRaisesRegex(ConfigurationError,'brak dokładnej linii x='):
+            resolve_pcb_lumped_port(g,bad,s)
         self.assertEqual(before,(g.as_dict(),asdict(m)))
+
+    def test_arbitrary_angle_actual_y_anchors(self):
+        g=self.geometry(gap=.5,width=4.,angled=True)
+        s=settings();m=make_pcb_domain_mesh(g,s)
+        n,p=g.port.negative_xy_m,g.port.positive_xy_m
+        my=(n[1]+p[1])/2
+        self.assertNotEqual(my,0.)
+        self.assertNotEqual(n[1],p[1])
+        before=(g.as_dict(),asdict(m),asdict(s))
+        spec=resolve_pcb_lumped_port(g,m,s)
+        self.assertEqual(spec.start_m,(n[0],my-g.port.width_m/2,0.))
+        self.assertEqual(spec.stop_m,(p[0],my+g.port.width_m/2,0.))
+        for y in (my-g.port.width_m/2,my,my+g.port.width_m/2):
+            self.assertIn(y,m.y_lines_m)
+            bad=replace(m,y_lines_m=tuple(v for v in m.y_lines_m if v!=y))
+            with self.assertRaisesRegex(ConfigurationError,'brak dokładnej linii y='):
+                resolve_pcb_lumped_port(g,bad,s)
+        without_zero=replace(m,y_lines_m=tuple(v for v in m.y_lines_m if v!=0.))
+        self.assertEqual(spec,resolve_pcb_lumped_port(g,without_zero,s))
+        self.assertEqual(before,(g.as_dict(),asdict(m),asdict(s)))
+
+    def test_out_of_tolerance_frame_rejected_by_planner(self):
+        for offsets in ((4*NORMALIZED_FRAME_TOLERANCE_M,4*NORMALIZED_FRAME_TOLERANCE_M),
+                        (-2*NORMALIZED_FRAME_TOLERANCE_M,2*NORMALIZED_FRAME_TOLERANCE_M)):
+            g=self.geometry();s=settings();m=make_pcb_domain_mesh(g,s)
+            n,p=g.port.negative_xy_m,g.port.positive_xy_m
+            g.port=replace(g.port,negative_xy_m=(n[0],n[1]+offsets[0]),
+                           positive_xy_m=(p[0],p[1]+offsets[1]))
+            validate_pcb_geometry(g)
+            with self.assertRaisesRegex(ConfigurationError,'znormalizowany'):
+                make_pcb_mesh_anchor_plan(g)
+            with self.assertRaisesRegex(ConfigurationError,'znormalizowany'):
+                resolve_pcb_lumped_port(g,m,s)
 
     def test_reordered_closed_polygons(self):
         g,s=self.geometry(),settings();m=make_pcb_domain_mesh(g,s)
