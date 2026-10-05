@@ -1,13 +1,16 @@
 from dataclasses import asdict, replace
 from math import pi
 from types import SimpleNamespace
+from pathlib import Path
+from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
 from antenna_lab.core.config import ConfigurationError
 from antenna_lab.pcb.model import BoardOutline
 from antenna_lab.solvers.openems_pcb import (install_pcb_geometry, prepare_pcb_csx,
-    install_pcb_lumped_port, prepare_pcb_native_model)
+    install_pcb_lumped_port, prepare_pcb_native_model, configure_pcb_fdtd,
+    write_pcb_xml, prepare_pcb_xml_model)
 from antenna_lab.pcb.port import resolve_pcb_lumped_port
 from antenna_lab.solvers.pcb_mesh import make_pcb_domain_mesh, make_pcb_mesh_anchor_plan
 import test_pcb_mesh as fixtures
@@ -313,6 +316,115 @@ class NativePcbPortTests(unittest.TestCase):
         self.assertEqual(meta['port'],{**asdict(spec),'surface_plane_z_m':0.,'model':'planar_lumped_port'})
         import json
         json.dumps(meta,allow_nan=False)  # no native objects leaked into metadata
+
+
+class XmlEngine(Engine):
+    def __init__(self, fault=None, xml_mode='valid', **kwargs):
+        super().__init__(**kwargs)
+        self.fault=fault
+        self.xml_mode=xml_mode
+
+    def SetGaussExcite(self, center, cutoff):
+        self.calls.append(('SetGaussExcite',center,cutoff))
+        if self.fault=='excitation': self.csx.grid.lines['x']=self.csx.grid.lines['x'][1:]
+
+    def SetBoundaryCond(self, boundaries):
+        self.calls.append(('SetBoundaryCond',list(boundaries)))
+        if self.fault=='boundary': self.csx.grid.unit=.001
+
+    def Write2XML(self, path):
+        self.calls.append(('Write2XML',path))
+        if self.fault=='xml': self.csx.grid.lines['z']=self.csx.grid.lines['z'][1:]
+        if self.xml_mode=='missing': return
+        target=Path(path)
+        if self.xml_mode=='directory': target.mkdir();return
+        target.write_text({'valid':'<model/>','empty':'','malformed':'<broken>'}[self.xml_mode],encoding='utf-8')
+
+    def Run(self,*args,**kwargs):
+        raise AssertionError('FDTD forbidden')
+
+
+class PcbXmlTests(unittest.TestCase):
+    def installed(self, **kwargs):
+        _,csx,g,m,s=NativePcbPortTests().setup_model()
+        engine=XmlEngine(**kwargs);engine.SetCSX(csx)
+        return engine,csx,g,m,s
+
+    def test_configure_exact_calls_metadata_determinism(self):
+        for count in (8,12):
+            e,c,g,m,s=self.installed()
+            m=replace(m,pml_cells=count);s=replace(s,pml_cells=count)
+            before=(g.as_dict(),asdict(m),asdict(s),dict(c.grid.lines))
+            meta=configure_pcb_fdtd(e,c,m,s)
+            self.assertEqual(e.calls,[('SetCSX',c),('SetGaussExcite',s.excitation_center_hz,s.excitation_cutoff_hz),
+                                     ('SetBoundaryCond',[f'PML_{count}']*6)])
+            self.assertEqual(meta['excitation'],{'type':'gaussian','center_hz':1.42e9,'cutoff_hz':.2e9,
+                                                 'mesh_design_frequency_hz':1.62e9})
+            self.assertEqual(meta['boundary_conditions'],{'order':['x_min','x_max','y_min','y_max','z_min','z_max'],
+                                                          'values':[f'PML_{count}']*6,'pml_cells':count})
+            other=XmlEngine();other.SetCSX(c)
+            self.assertEqual(meta,configure_pcb_fdtd(other,c,m,s))
+            meta['boundary_conditions']['values'].clear()
+            self.assertEqual(before,(g.as_dict(),asdict(m),asdict(s),dict(c.grid.lines)))
+
+    def test_configure_grid_mutation_and_pml_preflight(self):
+        for fault,context in (('excitation','SetGaussExcite'),('boundary','SetBoundaryCond')):
+            e,c,g,m,s=self.installed(fault=fault)
+            with self.assertRaisesRegex(ConfigurationError,context): configure_pcb_fdtd(e,c,m,s)
+            if fault=='excitation': self.assertNotIn('SetBoundaryCond',[v[0] for v in e.calls])
+        for count in (5,21,True,1.5,12):
+            e,c,g,m,s=self.installed()
+            with self.assertRaisesRegex(ConfigurationError,'pml_cells'):
+                configure_pcb_fdtd(e,c,m,replace(s,pml_cells=count))
+            self.assertEqual(e.calls,[('SetCSX',c)])
+        e,c,g,m,s=self.installed();c.grid.unit=.001
+        with self.assertRaisesRegex(ConfigurationError,'before FDTD'): configure_pcb_fdtd(e,c,m,s)
+        self.assertEqual(e.calls,[('SetCSX',c)])
+
+    def test_xml_failure_modes_and_grid(self):
+        for mode in ('missing','empty','malformed','directory'):
+            with self.subTest(mode=mode), TemporaryDirectory() as directory:
+                e,c,g,m,s=self.installed(xml_mode=mode)
+                with self.assertRaisesRegex(ConfigurationError,'PCB XML'):
+                    write_pcb_xml(e,c,m,Path(directory)/'model.xml')
+        with TemporaryDirectory() as directory:
+            e,c,g,m,s=self.installed(fault='xml')
+            with self.assertRaisesRegex(ConfigurationError,'after Write2XML'):
+                write_pcb_xml(e,c,m,Path(directory)/'model.xml')
+        with TemporaryDirectory() as directory:
+            e,c,g,m,s=self.installed();c.grid.unit=.001
+            with self.assertRaisesRegex(ConfigurationError,'before Write2XML'):
+                write_pcb_xml(e,c,m,Path(directory)/'model.xml')
+            self.assertEqual(e.calls,[('SetCSX',c)])
+
+    def test_full_xml_path_order_wide_small_metadata_no_mutation(self):
+        for gap,width in ((2.,1.),(.5,4.),(.1,.3)):
+            with self.subTest(gap=gap,width=width), TemporaryDirectory() as directory:
+                g=fixtures.PcbMeshTests().geometry(gap=gap,width=width).normalized_geometry
+                s=settings();before=(g.as_dict(),asdict(s))
+                path=Path(directory)/'nested'/'deeper'/'model.xml'
+                outputs=[]
+                for supplied in (path,str(path)):
+                    csx=CSX();engine=XmlEngine(NrTS=s.max_timesteps,EndCriteria=s.end_criteria)
+                    with patch('antenna_lab.solvers.openems.native_modules',return_value=(
+                            SimpleNamespace(openEMS=lambda **kw:engine),SimpleNamespace(ContinuousStructure=lambda:csx))):
+                        result=prepare_pcb_xml_model(g,s,supplied)
+                    e,c,p,m,spec,meta=result
+                    self.assertIs(e,engine);self.assertIs(c,csx);self.assertIs(p,engine.port)
+                    self.assertEqual([v[0] for v in engine.calls],
+                                     ['SetCSX','AddLumpedPort','SetGaussExcite','SetBoundaryCond','Write2XML'])
+                    self.assertEqual(engine.calls[-1],('Write2XML',str(supplied)))
+                    self.assertEqual(meta['xml'],{'path':str(supplied),'size_bytes':path.stat().st_size,'parse_status':'passed'})
+                    self.assertGreater(meta['xml']['size_bytes'],0)
+                    self.assertEqual(meta['port'],{**asdict(spec),'surface_plane_z_m':0.,'model':'planar_lumped_port'})
+                    self.assertEqual(set(meta),{'geometry','port','engine','excitation','boundary_conditions','xml'})
+                    self.assertEqual(m,make_pcb_domain_mesh(g,s))
+                    import json
+                    json.dumps(meta,allow_nan=False)
+                    outputs.append(meta)
+                self.assertEqual(outputs[0],outputs[1])
+                self.assertEqual(before,(g.as_dict(),asdict(s)))
+                self.assertEqual([p for p in Path(directory).rglob('*') if p.is_file()],[path])
 
 
 if __name__=='__main__':

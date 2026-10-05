@@ -1,5 +1,7 @@
-"""PCB-v0 native geometry and planar port setup; no waveform, BC, XML or FDTD."""
+"""PCB-v0 native preparation through audited XML; no FDTD execution."""
 
+from pathlib import Path
+from xml.etree import ElementTree
 from dataclasses import asdict
 from math import isfinite, pi
 
@@ -109,7 +111,7 @@ def prepare_pcb_csx(geometry: PcbGeometry, settings: PcbSimulationSettings):
     return csx, domain_mesh, metadata
 
 
-def _audit_port_grid(csx, domain_mesh, after=False):
+def _audit_port_grid(csx, domain_mesh, after=False, context=None):
     grid = csx.GetGrid()
     unit = grid.GetDeltaUnit()
     axes = tuple(tuple(grid.GetLines(axis)) for axis in 'xyz')
@@ -119,6 +121,8 @@ def _audit_port_grid(csx, domain_mesh, after=False):
             axis for axis, actual, wanted in zip('xyz', axes, expected) if actual != wanted)
         message = ('Natywna instalacja portu zmodyfikowała zamrożoną siatkę PCB' if after else
                    'PCB port: siatka CSXCAD nie odpowiada zamrożonej domenie')
+        if context:
+            message = f"PCB frozen grid audit ({context}): siatka lub jednostka różni się od domeny"
         raise ConfigurationError(f"{message} ({detail}); instalacja przerwana bez naprawiania siatki.")
 
 
@@ -155,3 +159,50 @@ def prepare_pcb_native_model(geometry: PcbGeometry, settings: PcbSimulationSetti
     metadata = {'geometry': geometry_metadata, 'port': port_metadata,
                 'engine': {'max_timesteps': settings.max_timesteps, 'end_criteria': settings.end_criteria}}
     return engine, csx, port, domain_mesh, spec, metadata
+
+
+def configure_pcb_fdtd(engine, csx, domain_mesh: PcbDomainMesh,
+                       settings: PcbSimulationSettings) -> dict:
+    """Activate the specified waveform and PML; never execute the engine."""
+    _audit_port_grid(csx, domain_mesh, context='before FDTD configuration')
+    count = settings.pml_cells
+    if (isinstance(count, bool) or not isinstance(count, int) or not 6 <= count <= 20
+            or domain_mesh.pml_cells != count):
+        raise ConfigurationError("PCB FDTD: pml_cells musi być zgodne z domeną i należeć do zakresu 6–20.")
+    engine.SetGaussExcite(settings.excitation_center_hz, settings.excitation_cutoff_hz)
+    _audit_port_grid(csx, domain_mesh, context='after SetGaussExcite')
+    boundaries = [f'PML_{count}'] * 6
+    engine.SetBoundaryCond(list(boundaries))
+    _audit_port_grid(csx, domain_mesh, context='after SetBoundaryCond')
+    return {'excitation': {'type': 'gaussian', 'center_hz': settings.excitation_center_hz,
+                           'cutoff_hz': settings.excitation_cutoff_hz,
+                           'mesh_design_frequency_hz': settings.excitation_center_hz+settings.excitation_cutoff_hz},
+            'boundary_conditions': {'order': ['x_min','x_max','y_min','y_max','z_min','z_max'],
+                                    'values': boundaries, 'pml_cells': count}}
+
+
+def write_pcb_xml(engine, csx, domain_mesh: PcbDomainMesh, xml_path) -> dict:
+    """Write only the requested XML and audit syntax, size and frozen grid."""
+    _audit_port_grid(csx, domain_mesh, context='before Write2XML')
+    path = Path(xml_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    engine.Write2XML(str(xml_path))
+    _audit_port_grid(csx, domain_mesh, context='after Write2XML')
+    if not path.is_file():
+        raise ConfigurationError(f"PCB XML: brak zwykłego pliku {path} po Write2XML.")
+    size = path.stat().st_size
+    if size == 0:
+        raise ConfigurationError(f"PCB XML: pusty plik {path}.")
+    try:
+        ElementTree.parse(path)
+    except (ElementTree.ParseError, OSError) as exc:
+        raise ConfigurationError(f"PCB XML: nie można odczytać poprawnego XML {path}: {exc}") from exc
+    return {'path': str(xml_path), 'size_bytes': size, 'parse_status': 'passed'}
+
+
+def prepare_pcb_xml_model(geometry: PcbGeometry, settings: PcbSimulationSettings, xml_path):
+    """Prepare reusable XML; no Run, result processing or additional files."""
+    engine, csx, port, mesh, spec, metadata = prepare_pcb_native_model(geometry, settings)
+    metadata = {**metadata, **configure_pcb_fdtd(engine, csx, mesh, settings),
+                'xml': write_pcb_xml(engine, csx, mesh, xml_path)}
+    return engine, csx, port, mesh, spec, metadata
