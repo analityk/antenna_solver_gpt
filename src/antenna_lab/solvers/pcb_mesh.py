@@ -5,11 +5,14 @@ This infrastructure mesh is not a complete runnable FDTD domain.
 """
 
 from dataclasses import dataclass
-from math import hypot, ceil, isfinite, prod
+from math import hypot, ceil, isfinite, prod, sqrt
 
 from antenna_lab.core.config import ConfigurationError
 from antenna_lab.pcb.model import PcbGeometry
+from antenna_lab.pcb.simulation import PcbSimulationSettings
 from antenna_lab.pcb.validation import validate_pcb_geometry
+
+C0 = 299792458.0
 
 # Absolute distances in metres. Merge numerical residue, not real features.
 ANCHOR_MERGE_TOLERANCE_M = 1e-10
@@ -160,3 +163,55 @@ def make_pcb_placeholder_mesh(
     lines = tuple(_subdivide(axis, divisions) for axis, divisions in zip(axes, counts))
     steps = [b - a for axis in lines for a, b in zip(axis, axis[1:])]
     return PcbPlaceholderMesh(*lines, shape, cell_count, min(steps), max(steps))
+
+
+@dataclass(frozen=True)
+class PcbPhysicalMeshPolicy:
+    """Independent local step limits, not mesh axes or a complete FDTD domain.
+
+    Assumes a homogeneous isotropic substrate with relative permeability 1.
+    Growth values are carried forward only; grading is not performed here.
+    """
+
+    f_mesh_hz: float
+    air_wavelength_m: float
+    substrate_wavelength_m: float
+    max_air_step_m: float
+    max_substrate_xy_step_m: float
+    max_substrate_z_step_m: float
+    max_port_gap_step_m: float
+    max_port_width_step_m: float
+    min_substrate_cells_z: int
+    min_port_gap_cells: int
+    min_port_width_cells: int
+    growth_ratio_target: float
+    growth_ratio_limit: float
+    max_cells: int
+
+
+def derive_pcb_physical_mesh_policy(
+    geometry: PcbGeometry, settings: PcbSimulationSettings,
+) -> PcbPhysicalMeshPolicy:
+    """Derive local limits from validated experiment settings and anchor features.
+
+    Result sampling never determines resolution. The excitation sets f_mesh.
+    No full-domain cell estimate, geometry changes, or solver operations occur.
+    """
+    plan = make_pcb_mesh_anchor_plan(geometry)
+    f_mesh = settings.excitation_center_hz + settings.excitation_cutoff_hz
+    air = C0 / f_mesh
+    substrate = air / sqrt(geometry.substrate.epsilon_r)
+    substrate_step = substrate / settings.cells_per_wavelength
+    return PcbPhysicalMeshPolicy(
+        f_mesh_hz=f_mesh, air_wavelength_m=air, substrate_wavelength_m=substrate,
+        max_air_step_m=air / settings.cells_per_wavelength,
+        max_substrate_xy_step_m=substrate_step,
+        max_substrate_z_step_m=min(substrate_step, plan.substrate_thickness_m / settings.min_substrate_cells_z),
+        max_port_gap_step_m=plan.port_length_m / settings.min_port_gap_cells,
+        max_port_width_step_m=plan.port_width_m / settings.min_port_width_cells,
+        min_substrate_cells_z=settings.min_substrate_cells_z,
+        min_port_gap_cells=settings.min_port_gap_cells,
+        min_port_width_cells=settings.min_port_width_cells,
+        growth_ratio_target=settings.growth_ratio_target,
+        growth_ratio_limit=settings.growth_ratio_limit, max_cells=settings.max_cells,
+    )

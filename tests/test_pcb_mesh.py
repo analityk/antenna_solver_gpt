@@ -15,6 +15,8 @@ from antenna_lab.solvers.pcb_mesh import (
     PcbPlaceholderMeshSettings, PcbPlaceholderMesh, make_pcb_placeholder_mesh,
 )
 from test_pcb_config import config
+from test_pcb_simulation import settings, simulation_config
+from antenna_lab.solvers.pcb_mesh import derive_pcb_physical_mesh_policy
 
 
 class PcbMeshTests(unittest.TestCase):
@@ -288,6 +290,101 @@ class PcbMeshTests(unittest.TestCase):
             with self.subTest(gap=gap, width=width):
                 geometry = self.geometry(gap, width, angled=True).normalized_geometry
                 self.assert_mesh(geometry, PcbPlaceholderMeshSettings(.0001, .0002, 1000000))
+
+
+class PcbPhysicalPolicyTests(unittest.TestCase):
+    def geometry(self, **kwargs):
+        return PcbMeshTests().geometry(**kwargs).normalized_geometry
+
+    def test_limits_metadata_determinism_no_mutation(self):
+        geometry = self.geometry(gap=.5, width=4.)
+        experiment = settings()
+        before = geometry.as_dict()
+        policy = derive_pcb_physical_mesh_policy(geometry, experiment)
+        self.assertEqual(policy.f_mesh_hz, 1.62e9)
+        self.assertAlmostEqual(policy.air_wavelength_m, 299792458.0/1.62e9, delta=1e-15)
+        substrate = 299792458.0/(1.62e9 * 4.3**.5)
+        self.assertAlmostEqual(policy.substrate_wavelength_m, substrate, delta=1e-15)
+        self.assertAlmostEqual(policy.max_air_step_m, 299792458.0/1.62e9/20, delta=1e-16)
+        self.assertAlmostEqual(policy.max_substrate_xy_step_m, substrate/20, delta=1e-16)
+        self.assertLess(policy.max_substrate_xy_step_m, policy.max_air_step_m)
+        self.assertEqual(policy.max_substrate_z_step_m, .0016/4)
+        self.assertAlmostEqual(policy.max_port_gap_step_m, .0005/2, delta=1e-17)
+        self.assertEqual(policy.max_port_width_step_m, .004/2)
+        for name in ('min_substrate_cells_z', 'min_port_gap_cells', 'min_port_width_cells',
+                     'growth_ratio_target', 'growth_ratio_limit', 'max_cells'):
+            self.assertEqual(getattr(policy, name), getattr(experiment, name))
+        self.assertEqual(geometry.as_dict(), before)
+        self.assertEqual(experiment, settings())
+        self.assertEqual(policy, derive_pcb_physical_mesh_policy(geometry, experiment))
+        with self.assertRaises(FrozenInstanceError):
+            policy.max_cells = 1
+
+    def test_configured_counts_and_growth(self):
+        value = simulation_config()
+        value['mesh'].update(cells_per_wavelength=32, min_substrate_cells_z=8,
+                             min_port_gap_cells=5, min_port_width_cells=3,
+                             growth_ratio_target=1.2, growth_ratio_limit=1.3, max_cells=12345)
+        geometry = self.geometry()
+        policy = derive_pcb_physical_mesh_policy(geometry, settings(value))
+        plan = make_pcb_mesh_anchor_plan(geometry)
+        self.assertEqual(policy.max_air_step_m, policy.air_wavelength_m/32)
+        self.assertEqual(policy.max_substrate_xy_step_m, policy.substrate_wavelength_m/32)
+        self.assertEqual(policy.max_substrate_z_step_m, .0016/8)
+        self.assertEqual(policy.max_port_gap_step_m, plan.port_length_m/5)
+        self.assertEqual(policy.max_port_width_step_m, plan.port_width_m/3)
+        self.assertEqual((policy.min_substrate_cells_z, policy.min_port_gap_cells,
+                          policy.min_port_width_cells), (8,5,3))
+        self.assertEqual((policy.growth_ratio_target, policy.growth_ratio_limit, policy.max_cells),
+                         (1.2,1.3,12345))
+
+    def test_wavelength_dominates_z_and_epsilon_effect(self):
+        geometry = self.geometry()
+        geometry.substrate = replace(geometry.substrate, z_min_m=-1.)
+        first = derive_pcb_physical_mesh_policy(geometry, settings())
+        self.assertEqual(first.max_substrate_z_step_m, first.max_substrate_xy_step_m)
+        geometry.substrate = replace(geometry.substrate, epsilon_r=9.)
+        second = derive_pcb_physical_mesh_policy(geometry, settings())
+        self.assertLess(second.substrate_wavelength_m, first.substrate_wavelength_m)
+        self.assertLess(second.max_substrate_xy_step_m, first.max_substrate_xy_step_m)
+        self.assertLess(second.max_substrate_z_step_m, first.max_substrate_z_step_m)
+        self.assertEqual(second.max_air_step_m, first.max_air_step_m)
+
+    def test_excitation_not_result_sampling_controls_resolution(self):
+        geometry = self.geometry()
+        value = simulation_config()
+        first = derive_pcb_physical_mesh_policy(geometry, settings(value))
+        value['result_frequency_hz'] = [1.42e9]
+        self.assertEqual(first, derive_pcb_physical_mesh_policy(geometry, settings(value)))
+        value['excitation']['center_hz'] *= 2
+        value['excitation']['cutoff_hz'] *= 2
+        value['result_frequency_hz'] = [2.84e9]
+        second = derive_pcb_physical_mesh_policy(geometry, settings(value))
+        self.assertEqual(second.f_mesh_hz, 3.24e9)
+        self.assertEqual(second.max_air_step_m, first.max_air_step_m/2)
+        self.assertEqual(second.max_substrate_xy_step_m, first.max_substrate_xy_step_m/2)
+
+    def test_solver_geometry_contract_propagates(self):
+        for plane in ('substrate', 'copper'):
+            for residue in (-5e-11, 5e-11):
+                with self.subTest(plane=plane, residue=residue):
+                    geometry = self.geometry()
+                    if plane == 'substrate':
+                        geometry.substrate = replace(geometry.substrate, z_max_m=residue)
+                    else:
+                        geometry.copper[0] = replace(geometry.copper[0], z_m=residue)
+                    validate_pcb_geometry(geometry)
+                    before = geometry.as_dict()
+                    with self.assertRaisesRegex(ConfigurationError, 'dokładnie z=0'):
+                        derive_pcb_physical_mesh_policy(geometry, settings())
+                    self.assertEqual(before, geometry.as_dict())
+        geometry = PcbMeshTests().geometry().source_geometry
+        with self.assertRaisesRegex(ConfigurationError, 'znormalizowany'):
+            derive_pcb_physical_mesh_policy(geometry, settings())
+        geometry = self.geometry()
+        geometry.substrate = replace(geometry.substrate, z_min_m=-TOL)
+        with self.assertRaisesRegex(ConfigurationError, 'nierozdzielalne'):
+            derive_pcb_physical_mesh_policy(geometry, settings())
 
 
 if __name__ == '__main__':

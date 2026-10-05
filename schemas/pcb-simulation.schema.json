@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PCB v0 simulation settings",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "result_frequency_hz",
+    "excitation",
+    "port",
+    "mesh",
+    "material",
+    "fdtd"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "result_frequency_hz": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "number",
+        "exclusiveMinimum": 0
+      }
+    },
+    "excitation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "center_hz",
+        "cutoff_hz"
+      ],
+      "properties": {
+        "center_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "cutoff_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "port": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reference_impedance_ohm"
+      ],
+      "properties": {
+        "reference_impedance_ohm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "mesh": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cells_per_wavelength",
+        "min_substrate_cells_z",
+        "min_port_gap_cells",
+        "min_port_width_cells",
+        "growth_ratio_target",
+        "growth_ratio_limit",
+        "max_cells"
+      ],
+      "properties": {
+        "cells_per_wavelength": {
+          "type": "number",
+          "minimum": 4
+        },
+        "min_substrate_cells_z": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "min_port_gap_cells": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "min_port_width_cells": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "growth_ratio_target": {
+          "type": "number",
+          "exclusiveMinimum": 1
+        },
+        "growth_ratio_limit": {
+          "type": "number",
+          "exclusiveMinimum": 1
+        },
+        "max_cells": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "material": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "loss_reference_frequency_hz"
+      ],
+      "properties": {
+        "loss_reference_frequency_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "fdtd": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_timesteps",
+        "end_criteria",
+        "threads"
+      ],
+      "properties": {
+        "max_timesteps": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "end_criteria": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "threads": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}
