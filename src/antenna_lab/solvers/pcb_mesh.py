@@ -9,7 +9,7 @@ from math import hypot, ceil, isfinite, prod
 
 from antenna_lab.core.config import ConfigurationError
 from antenna_lab.pcb.model import PcbGeometry
-from antenna_lab.pcb.validation import validate_pcb_geometry, TOLERANCE_M
+from antenna_lab.pcb.validation import validate_pcb_geometry
 
 # Absolute distances in metres. Merge numerical residue, not real features.
 ANCHOR_MERGE_TOLERANCE_M = 1e-10
@@ -44,19 +44,26 @@ def _merge(values, critical=()):
 
 
 def _z_interfaces(geometry):
-    """Preserve substrate interfaces; coincident copper uses the exact top.
+    """Require the exact shared PCB-v0 solver plane, without moving geometry.
 
-    Only the anchor representation is canonicalized, never the geometry.
-    PCB v0 has one copper plane; inconsistent planes are rejected.
+    Geometry validation tolerates residue; solver-facing export does not.
     """
     bottom, top = geometry.substrate.z_min_m, geometry.substrate.z_max_m
     if top - bottom <= ANCHOR_MERGE_TOLERANCE_M:
         raise ConfigurationError(
             "PCB Z: interfejsy laminatu są nierozdzielalne; grubość musi być "
             f"większa niż {ANCHOR_MERGE_TOLERANCE_M:g} m.")
-    if any(abs(copper.z_m - top) > TOLERANCE_M for copper in geometry.copper):
-        raise ConfigurationError("PCB Z: płaszczyzna miedzi musi pokrywać się z górą laminatu.")
-    return bottom, top
+    if top != 0.0:
+        raise ConfigurationError(
+            "PCB v0: eksport do siatki solvera wymaga dokładnie z=0 dla góry laminatu "
+            "(substrate.z_max_m). Tolerancja walidacji geometrii nie obowiązuje przy eksporcie; "
+            "popraw geometrię wejściową.")
+    for copper in geometry.copper:
+        if copper.z_m != 0.0:
+            raise ConfigurationError(
+                f"PCB v0: eksport do siatki solvera wymaga dokładnie z=0 dla miedzi {copper.id!r}. "
+                "Tolerancja walidacji geometrii nie obowiązuje przy eksporcie; popraw geometrię wejściową.")
+    return bottom, 0.0
 
 
 def make_pcb_mesh_anchor_plan(geometry: PcbGeometry) -> PcbMeshAnchorPlan:

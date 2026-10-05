@@ -147,29 +147,34 @@ class PcbMeshTests(unittest.TestCase):
             make_pcb_mesh_anchor_plan(geometry)
 
 
-    def test_copper_z_residue_preserves_substrate_interfaces(self):
+    def test_copper_z_residue_rejected_without_mutation(self):
+        for residue in (-5e-11, 5e-11):
+            for index in (0, 1):
+                with self.subTest(residue=residue, copper=index):
+                    geometry = self.geometry().normalized_geometry
+                    geometry.copper[index] = replace(geometry.copper[index], z_m=residue)
+                    validate_pcb_geometry(geometry)
+                    before = geometry.as_dict()
+                    with self.assertRaisesRegex(ConfigurationError, 'PCB v0.*dokładnie z=0.*miedzi'):
+                        make_pcb_mesh_anchor_plan(geometry)
+                    self.assertEqual(before, geometry.as_dict())
+                    with self.assertRaisesRegex(ConfigurationError, 'PCB v0.*dokładnie z=0'):
+                        make_pcb_placeholder_mesh(geometry, PcbPlaceholderMeshSettings(.001, .001, 1000000))
+                    self.assertEqual(before, geometry.as_dict())
+
+    def test_substrate_top_residue_rejected_without_mutation(self):
         for residue in (-5e-11, 5e-11):
             with self.subTest(residue=residue):
                 geometry = self.geometry().normalized_geometry
-                geometry.copper[0] = replace(geometry.copper[0], z_m=residue)
+                geometry.substrate = replace(geometry.substrate, z_max_m=residue)
                 validate_pcb_geometry(geometry)
                 before = geometry.as_dict()
-                plan = make_pcb_mesh_anchor_plan(geometry)
-                self.assertEqual(plan.z_required_m, (geometry.substrate.z_min_m, 0.0))
-                self.assertNotIn(residue, plan.z_required_m)
+                with self.assertRaisesRegex(ConfigurationError, 'PCB v0.*dokładnie z=0.*laminatu'):
+                    make_pcb_mesh_anchor_plan(geometry)
                 self.assertEqual(before, geometry.as_dict())
-
-    def test_authoritative_nonzero_top_and_inconsistent_copper(self):
-        geometry = self.geometry().normalized_geometry
-        geometry.substrate = replace(geometry.substrate, z_max_m=5e-11)
-        before = geometry.as_dict()
-        plan = make_pcb_mesh_anchor_plan(geometry)
-        self.assertEqual(plan.z_required_m, (geometry.substrate.z_min_m, 5e-11))
-        self.assertEqual(before, geometry.as_dict())
-        geometry.copper[0] = replace(geometry.copper[0], z_m=-8e-11)
-        validate_pcb_geometry(geometry)
-        with self.assertRaisesRegex(ConfigurationError, 'PCB Z.*miedzi'):
-            make_pcb_mesh_anchor_plan(geometry)
+                with self.assertRaisesRegex(ConfigurationError, 'PCB v0.*dokładnie z=0'):
+                    make_pcb_placeholder_mesh(geometry, PcbPlaceholderMeshSettings(.001, .001, 1000000))
+                self.assertEqual(before, geometry.as_dict())
 
     def test_collapsed_substrate_interfaces_rejected(self):
         for thickness in (5e-11, TOL):
