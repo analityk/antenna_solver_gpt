@@ -1,16 +1,13 @@
 """Real supported native binaries through XML only; never execute FDTD."""
 
 import importlib.metadata
-from math import cos, sin, radians
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 from xml.etree import ElementTree
 
 from antenna_lab.core.config import ConfigurationError
-from antenna_lab.pcb.model import BoardOutline, CopperPolygon, PcbGeometry, PcbPort, Substrate
-from antenna_lab.pcb.simulation import PcbSimulationSettings
-from antenna_lab.pcb.transform import normalize_port_orientation
+from antenna_lab.pcb.control import make_synthetic_control_case
 from antenna_lab.solvers.openems import native_modules
 from antenna_lab.solvers.openems_pcb import prepare_pcb_xml_model
 
@@ -31,30 +28,7 @@ class NativePcbXmlSmokeTest(unittest.TestCase):
             self.assertEqual(csx_version, '0.7.0rc3', 'Unsupported native CSXCAD version')
         self.assertIsNotNone(csx_module)
 
-        # Rotate the complete source by 37 degrees, then normalize exactly once.
-        angle = radians(37)
-        c, s = cos(angle), sin(angle)
-        def point(x, y):
-            return (c*x-s*y+.012, s*x+c*y-.007)
-        def polygon(vertices):
-            return tuple(point(x,y) for x,y in vertices)
-        outline = BoardOutline(polygon(((-.01,-.01),(.01,-.01),(.01,.01),(-.01,.01))))
-        negative = CopperPolygon('negative_pad', polygon(((-.004,-.001),(-.0005,-.001),
-                                   (-.0005,.001),(-.004,.001))), 0.0)
-        positive = CopperPolygon('positive_pad', polygon(((.0005,-.001),(.004,-.001),
-                                   (.004,.001),(.0005,.001))), 0.0)
-        source = PcbGeometry('pcb', outline, [negative,positive],
-                            Substrate(outline,-.0016,0.,4.3,.018),
-                            PcbPort('native_smoke',point(-.0005,0.),point(.0005,0.),.002))
-        geometry, _ = normalize_port_orientation(source)
-        settings = PcbSimulationSettings(
-            schema_version=1, result_frequency_hz=(1.30e9,1.42e9,1.50e9),
-            excitation_center_hz=1.42e9, excitation_cutoff_hz=.20e9,
-            reference_impedance_ohm=50., cells_per_wavelength=20,
-            min_substrate_cells_z=4, min_port_gap_cells=2, min_port_width_cells=2,
-            growth_ratio_target=1.4, growth_ratio_limit=1.5, max_cells=20_000_000,
-            loss_reference_frequency_hz=1.42e9, max_timesteps=100000,
-            end_criteria=1e-5, threads=0, air_padding_wavelengths=.25, pml_cells=8)
+        geometry, settings = make_synthetic_control_case()
         with TemporaryDirectory() as directory:
             path = Path(directory)/'model.xml'
             engine, csx, port, mesh, spec, metadata = prepare_pcb_xml_model(geometry, settings, path)

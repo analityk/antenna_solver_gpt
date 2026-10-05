@@ -599,6 +599,28 @@ Przeszło 6 testów biquada i 2 testy stanu edytora. Testy natywnego Tk są
 pominięte w tym środowisku; dodano przypadek błędu i powrotu po poprawce.
 Bez FDTD i benchmarków.
 
+
+## 2026-10-06 — PCB-009A: syntetyczny kontrolny FDTD
+
+Dodano osobną komendę `python -m antenna_lab.pcb.control` z opcją `--output`.
+Wspólny przypadek kontrolny i test natywnego XML używają tej samej geometrii
+20 × 20 mm, dwóch padów i jednorazowej normalizacji. Kontrakty siatki,
+portu, materiału, pobudzenia i PML pozostają bez zmian.
+
+Przygotowany model przechodzi audyt zamrożonej siatki, Run z zachowaniem
+plików natywnych i przywróceniem cwd, a potem CalcPort dla trzech zadanych
+częstotliwości. Z, S11 i SWR są ilorazami widm, bez normalizacji mocy.
+Niepoprawne widma i |S11| ≥ 1 przerywają obliczenia. Wynik jest unverified.
+Zapis: impedance.csv i ścisły summary.json z metadanymi przygotowania oraz
+ustawieniami; zerowe odbicie ma s11_db=null (puste pole CSV). Nowe katalogi
+UTC są unikalne, jawny katalog musi być pusty. Bez pól, NF2FF i Gerbera.
+
+Sprawdzenie: 10 nowych testów kontrolnych, 132 testy PCB (1 pominięty),
+pełny zestaw 199 testów (3 pominięte), bez błędów. Natywny smoke XML
+pominięty z powodu braku openEMS; użytkownik wcześniej potwierdził XML
+na Windowsie. Rzeczywisty kontrolny FDTD i zbieżność pozostają do wykonania
+lokalnie; testy tej zmiany używały atrap, bez natywnego Run.
+
 ## Wzór kolejnego wpisu
 
 - Data i krótka nazwa zmiany.

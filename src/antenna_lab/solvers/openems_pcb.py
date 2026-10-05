@@ -1,4 +1,4 @@
-"""PCB-v0 native preparation through audited XML; no FDTD execution."""
+"""PCB-v0 native preparation and isolated, unverified control solve."""
 
 from pathlib import Path
 from xml.etree import ElementTree
@@ -206,3 +206,90 @@ def prepare_pcb_xml_model(geometry: PcbGeometry, settings: PcbSimulationSettings
     metadata = {**metadata, **configure_pcb_fdtd(engine, csx, mesh, settings),
                 'xml': write_pcb_xml(engine, csx, mesh, xml_path)}
     return engine, csx, port, mesh, spec, metadata
+
+
+def run_pcb_fdtd(engine, csx, port, domain_mesh: PcbDomainMesh,
+                 settings: PcbSimulationSettings, native_dir) -> dict:
+    """Execute an already prepared control model; port ratios remain unverified."""
+    import os
+    import numpy as np
+
+    _audit_port_grid(csx, domain_mesh, context='before Run')
+    native_dir = Path(native_dir).resolve()
+    xml = native_dir / 'model.xml'
+    if not native_dir.is_dir() or not xml.is_file() or xml.stat().st_size == 0:
+        raise ConfigurationError(f'PCB Run: wymagany istniejący, niepusty {xml}; przygotuj XML najpierw.')
+    cwd = Path.cwd()
+    try:
+        status = engine.Run(str(native_dir), cleanup=False, numThreads=settings.threads)
+    finally:
+        os.chdir(cwd)
+    if status not in (None, 0):
+        raise RuntimeError(f'PCB Run: openEMS zwrócił kod {status!r}; sprawdź pliki natywne w {native_dir}.')
+    frequencies = np.asarray(settings.result_frequency_hz, dtype=float)
+    port.CalcPort(str(native_dir), frequencies, ref_impedance=settings.reference_impedance_ohm)
+
+    def spectrum(name):
+        try:
+            values = np.asarray(getattr(port, name), dtype=complex)
+        except (AttributeError, TypeError, ValueError) as exc:
+            raise ConfigurationError(f'PCB port: brak lub niepoprawne widmo {name}: {exc}') from exc
+        # Only singleton dimensions can be removed; never flatten a true matrix.
+        values = np.atleast_1d(values.squeeze())
+        if values.ndim != 1 or values.size != frequencies.size or not np.isfinite(values).all():
+            raise ConfigurationError(f'PCB port: {name} musi zawierać {frequencies.size} skończonych próbek widma 1D.')
+        return values
+
+    voltage, current = spectrum('uf_tot'), spectrum('if_tot')
+    if np.any(current == 0):
+        raise ConfigurationError('PCB port: zerowy prąd w widmie; nie można obliczyć Z.')
+    reference = settings.reference_impedance_ohm
+    with np.errstate(over='ignore', invalid='ignore', divide='ignore'):
+        impedance = voltage / current
+        denominator = impedance + reference
+        if not np.isfinite(impedance).all() or not np.isfinite(denominator).all() or np.any(denominator == 0):
+            raise ConfigurationError('PCB port: nieskończone Z lub zerowy/nieskończony mianownik S11 (Z + Z0).')
+        s11 = (impedance - reference) / denominator
+        rho = np.abs(s11)
+        if not np.isfinite(s11).all() or not np.isfinite(rho).all():
+            raise ConfigurationError('PCB port: nieskończone S11.')
+        if np.any(rho >= 1):
+            raise ConfigurationError('PCB control: non-passive or unconverged port data (|S11| >= 1); wymaga zbadania, bez ograniczania wartości.')
+        swr = (1 + rho) / (1 - rho)
+        db = [None if r == 0 else float(20*np.log10(r)) for r in rho]
+    if not np.isfinite(swr).all():
+        raise ConfigurationError('PCB port: nieskończone SWR.')
+    return {
+        'validation_status': 'unverified',
+        'note': 'First synthetic PCB FDTD control result. Port, mesh, PML and material convergence have not yet been established. Exact zero reflection is stored as s11_db=null (minus infinity dB).',
+        'frequency_hz': frequencies.tolist(), 'reference_impedance_ohm': reference,
+        'resistance_ohm': impedance.real.tolist(), 'reactance_ohm': impedance.imag.tolist(),
+        's11_real': s11.real.tolist(), 's11_imag': s11.imag.tolist(),
+        's11_magnitude': rho.tolist(), 's11_db': db, 'swr': swr.tolist(),
+        'mesh': {'shape_cells': list(domain_mesh.shape_cells), 'cell_count': domain_mesh.cell_count,
+                 'pml_cells': domain_mesh.pml_cells},
+    }
+
+
+def write_pcb_port_results(result: dict, output_dir) -> dict:
+    """Write only CSV and strict JSON; null dB is an empty CSV cell."""
+    import csv
+    import json
+
+    serialized = json.dumps(result, allow_nan=False, indent=2)
+    detached = json.loads(serialized)
+    keys = ('frequency_hz', 'resistance_ohm', 'reactance_ohm', 's11_real',
+            's11_imag', 's11_magnitude', 's11_db', 'swr')
+    count = len(detached['frequency_hz'])
+    if any(len(detached[key]) != count for key in keys):
+        raise ConfigurationError('PCB wyniki: niezgodne długości kolumn.')
+    directory = Path(output_dir)
+    directory.mkdir(parents=True, exist_ok=True)
+    with (directory/'impedance.csv').open('w', encoding='utf-8', newline='') as stream:
+        writer = csv.writer(stream)
+        writer.writerow((*keys[:3], 'reference_ohm', *keys[3:]))
+        for i in range(count):
+            writer.writerow((*[detached[k][i] for k in keys[:3]], detached['reference_impedance_ohm'],
+                             *[detached[k][i] for k in keys[3:]]))
+    (directory/'summary.json').write_text(serialized+'\n', encoding='utf-8')
+    return detached
