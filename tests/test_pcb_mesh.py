@@ -1,4 +1,4 @@
-from dataclasses import replace, FrozenInstanceError
+from dataclasses import replace, FrozenInstanceError, asdict
 import json
 from math import cos, sin, pi, hypot, ceil, prod
 from pathlib import Path
@@ -14,6 +14,8 @@ from antenna_lab.solvers.pcb_mesh import make_pcb_mesh_anchor_plan, ANCHOR_MERGE
 from antenna_lab.solvers.pcb_mesh import (
     PcbPlaceholderMeshSettings, PcbPlaceholderMesh, make_pcb_placeholder_mesh,
 )
+from antenna_lab.solvers import pcb_mesh
+from antenna_lab.solvers.pcb_mesh import PcbDomainMesh, make_pcb_domain_mesh
 from test_pcb_config import config
 from test_pcb_simulation import settings, simulation_config
 from antenna_lab.solvers.pcb_mesh import derive_pcb_physical_mesh_policy
@@ -426,6 +428,208 @@ class PcbPhysicalPolicyTests(unittest.TestCase):
         geometry.substrate = replace(geometry.substrate, z_min_m=-TOL)
         with self.assertRaisesRegex(ConfigurationError, 'nierozdzielalne'):
             derive_pcb_physical_mesh_policy(geometry, settings())
+
+
+class PcbDomainMeshTests(unittest.TestCase):
+    # Relative arithmetic tolerance, not a geometry/anchor merging tolerance.
+    REL_TOL = 1e-9
+
+    def geometry(self, **kwargs):
+        return PcbMeshTests().geometry(**kwargs).normalized_geometry
+
+    def assert_domain(self, geometry, experiment):
+        before = geometry.as_dict()
+        settings_before = asdict(experiment)
+        plan = make_pcb_mesh_anchor_plan(geometry)
+        policy = derive_pcb_physical_mesh_policy(geometry, experiment)
+        mesh = make_pcb_domain_mesh(geometry, experiment)
+        self.assertIsInstance(mesh, PcbDomainMesh)
+        self.assertEqual(before, geometry.as_dict())
+        self.assertEqual(settings_before, asdict(experiment))
+        self.assertEqual(mesh, make_pcb_domain_mesh(geometry, experiment))
+        axes = (mesh.x_lines_m, mesh.y_lines_m, mesh.z_lines_m)
+        required = (plan.x_required_m, plan.y_required_m, plan.z_required_m)
+        n, p = geometry.port.negative_xy_m, geometry.port.positive_xy_m
+        mid_y = (n[1]+p[1])/2
+        ranges = ((n[0], p[0]), (mid_y-plan.port_width_m/2, mid_y+plan.port_width_m/2))
+        all_steps, all_ratios = [], []
+        for axis, (lines, anchors) in enumerate(zip(axes, required)):
+            self.assertIsInstance(lines, tuple)
+            for anchor in anchors:
+                self.assertIn(anchor, lines)
+            lo, hi = anchors[0]-policy.air_padding_m, anchors[-1]+policy.air_padding_m
+            self.assertIn(lo, lines)
+            self.assertIn(hi, lines)
+            self.assertEqual(mesh.pml_start_min_m[axis], lo)
+            self.assertEqual(mesh.pml_start_max_m[axis], hi)
+            # The boundary expressions are exact; subtracting them can round.
+            self.assertAlmostEqual(anchors[0]-lo, policy.air_padding_m, delta=1e-15)
+            self.assertAlmostEqual(hi-anchors[-1], policy.air_padding_m, delta=1e-15)
+            self.assertLess(lines[0], lo)
+            self.assertLess(hi, lines[-1])
+            self.assertEqual(mesh.outer_min_m[axis], lines[0])
+            self.assertEqual(mesh.outer_max_m[axis], lines[-1])
+            ilo, ihi = lines.index(lo), lines.index(hi)
+            self.assertEqual(ilo, experiment.pml_cells)
+            self.assertEqual(len(lines)-1-ihi, experiment.pml_cells)
+            steps = [b-a for a,b in zip(lines, lines[1:])]
+            self.assertTrue(all(v > TOL for v in steps))
+            for actual, expected in ((steps[:ilo], steps[ilo]), (steps[ihi:], steps[ihi-1])):
+                for step in actual:
+                    self.assertAlmostEqual(step, expected, delta=expected*self.REL_TOL)
+            ordinary = lines[ilo:ihi+1]
+            core_count = 0
+            port_count = 0
+            for a,b in zip(ordinary, ordinary[1:]):
+                if b <= anchors[0] or a >= anchors[-1]:
+                    maximum = policy.max_air_step_m
+                else:
+                    core_count += 1
+                    maximum = policy.max_substrate_z_step_m if axis == 2 else policy.max_substrate_xy_step_m
+                    if axis < 2 and ranges[axis][0] <= a and b <= ranges[axis][1]:
+                        port_count += 1
+                        maximum = min(maximum, (policy.max_port_gap_step_m, policy.max_port_width_step_m)[axis])
+                self.assertLessEqual(b-a, maximum*(1+self.REL_TOL))
+            if axis == 2:
+                self.assertGreaterEqual(core_count, experiment.min_substrate_cells_z)
+            else:
+                self.assertGreaterEqual(port_count, (experiment.min_port_gap_cells, experiment.min_port_width_cells)[axis])
+            ratios = [max(a,b)/min(a,b) for a,b in zip(steps, steps[1:])]
+            self.assertLessEqual(max(ratios), experiment.growth_ratio_limit*(1+self.REL_TOL))
+            ordinary_steps = steps[ilo:ihi]
+            self.assertLessEqual(max(max(a,b)/min(a,b) for a,b in zip(ordinary_steps, ordinary_steps[1:])),
+                                 experiment.growth_ratio_target*(1+self.REL_TOL))
+            all_steps.extend(steps)
+            all_ratios.extend(ratios)
+        for x in (n[0], (n[0]+p[0])/2, p[0]):
+            self.assertIn(x, mesh.x_lines_m)
+        for y in (mid_y-plan.port_width_m/2, mid_y, mid_y+plan.port_width_m/2):
+            self.assertIn(y, mesh.y_lines_m)
+        self.assertIn(0., mesh.z_lines_m)
+        self.assertEqual(mesh.shape_cells, tuple(len(a)-1 for a in axes))
+        self.assertTrue(all(n > 0 for n in mesh.shape_cells))
+        self.assertEqual(mesh.cell_count, prod(mesh.shape_cells))
+        self.assertGreater(mesh.cell_count, 0)
+        self.assertLessEqual(mesh.cell_count, experiment.max_cells)
+        self.assertEqual(mesh.min_step_m, min(all_steps))
+        self.assertEqual(mesh.max_step_m, max(all_steps))
+        self.assertEqual(mesh.worst_growth_ratio, max(all_ratios))
+        with self.assertRaises(FrozenInstanceError):
+            mesh.cell_count = 1
+        return mesh
+
+    def test_complete_domain_and_pml_faces(self):
+        for count in (8,12):
+            with self.subTest(pml_cells=count):
+                self.assert_domain(self.geometry(), replace(settings(), pml_cells=count))
+
+    def test_wide_and_small_ports_and_grading(self):
+        for gap,width in ((.5,4.), (.1,.3)):
+            with self.subTest(gap=gap,width=width):
+                geometry = self.geometry(gap=gap,width=width)
+                experiment = settings()
+                mesh = self.assert_domain(geometry, experiment)
+                plan = make_pcb_mesh_anchor_plan(geometry)
+                policy = derive_pcb_physical_mesh_policy(geometry, experiment)
+                # Strong transition from the explicit small X port interval.
+                initial_count = 0
+                for a,b in zip(plan.x_required_m, plan.x_required_m[1:]):
+                    step = policy.max_substrate_xy_step_m
+                    if geometry.port.negative_xy_m[0] <= a and b <= geometry.port.positive_xy_m[0]:
+                        step = min(step, policy.max_port_gap_step_m)
+                    count = ceil((b-a)/step)
+                    initial_count += count
+                    # Grading retains ALL initial subdivision lines as well as anchors.
+                    for k in range(1,count):
+                        self.assertIn(a+(b-a)*(k/count), mesh.x_lines_m)
+                initial_count += 2*ceil(policy.air_padding_m/policy.max_air_step_m)
+                self.assertGreater(mesh.shape_cells[0]-2*experiment.pml_cells, initial_count)
+
+    def test_logical_port_extents_beyond_board(self):
+        geometry = self.geometry()
+        geometry.port = replace(geometry.port, width_m=.04)
+        plan = make_pcb_mesh_anchor_plan(geometry)
+        self.assertLess(plan.y_required_m[0], min(y for x,y in geometry.outline.vertices_xy_m))
+        self.assert_domain(geometry, settings())
+
+    def test_custom_minimum_port_resolution(self):
+        self.assert_domain(self.geometry(gap=.5,width=4), replace(
+            settings(), min_port_gap_cells=5, min_port_width_cells=7, min_substrate_cells_z=9))
+
+    def test_resource_guards_and_exact_budget(self):
+        geometry = self.geometry()
+        experiment = settings()
+        with patch.object(pcb_mesh, '_subdivide', side_effect=AssertionError('must guard before allocation')):
+            with self.assertRaisesRegex(ConfigurationError, 'max_cells'):
+                make_pcb_domain_mesh(geometry, replace(experiment, max_cells=1))
+            with self.assertRaisesRegex(ConfigurationError, 'max_cells'):
+                make_pcb_domain_mesh(geometry, replace(experiment, cells_per_wavelength=1e12))
+        mesh = make_pcb_domain_mesh(geometry, experiment)
+        self.assertEqual(mesh, make_pcb_domain_mesh(geometry, replace(experiment, max_cells=mesh.cell_count)))
+        with self.assertRaisesRegex(ConfigurationError, 'max_cells'):
+            make_pcb_domain_mesh(geometry, replace(experiment, max_cells=mesh.cell_count-1))
+        with self.assertRaisesRegex(ConfigurationError, 'shape=.*cell_count=.*max_cells='):
+            pcb_mesh._domain_count_guard((2,3,4), 23)
+
+    def test_grading_progress_and_independent_audits(self):
+        with self.assertRaisesRegex(ConfigurationError, 'max_cells'):
+            pcb_mesh._grade_domain_axis((0., .001, .1), 1.4, 2)
+        with self.assertRaisesRegex(ConfigurationError, 'tolerancji'):
+            pcb_mesh._grade_domain_axis((0., TOL, .1), 1.4, 100)
+        # Every initial step is legal, but splitting the larger cell cannot be.
+        with self.assertRaisesRegex(ConfigurationError, 'postępu.*|tolerancji'):
+            pcb_mesh._grade_domain_axis((0., 1.01*TOL, 2.51*TOL), 1.4, 100)
+        with self.assertRaisesRegex(ConfigurationError, 'growth_ratio_limit'):
+            pcb_mesh._audit_domain_axis((0., .001, .01), (0., .01), (.1,), 1.5)
+        with self.assertRaisesRegex(ConfigurationError, 'maksimum'):
+            pcb_mesh._audit_domain_axis((0., .01, .02), (0., .02), (.001,), 1.5)
+        with self.assertRaisesRegex(ConfigurationError, 'kotwicę'):
+            pcb_mesh._audit_domain_axis((0., .01, .02), (0., .005, .02), (.1,.1), 1.5)
+        with patch.object(pcb_mesh, '_grade_domain_axis', side_effect=lambda lines, target, budget: lines):
+            with self.assertRaisesRegex(ConfigurationError, 'growth_ratio_limit'):
+                make_pcb_domain_mesh(self.geometry(), settings())
+
+    def test_padding_frequency_changes_domain_not_inner_resolution(self):
+        geometry = self.geometry()
+        value = simulation_config()
+        first = self.assert_domain(geometry, settings(value))
+        value['result_frequency_hz'][0] = 1.35e9
+        second = self.assert_domain(geometry, settings(value))
+        self.assertNotEqual(first.pml_start_min_m, second.pml_start_min_m)
+        plan = make_pcb_mesh_anchor_plan(geometry)
+        for required,a,b in zip((plan.x_required_m,plan.y_required_m,plan.z_required_m),
+                               (first.x_lines_m,first.y_lines_m,first.z_lines_m),
+                               (second.x_lines_m,second.y_lines_m,second.z_lines_m)):
+            self.assertEqual(tuple(x for x in a if required[0]<=x<=required[-1]),
+                             tuple(x for x in b if required[0]<=x<=required[-1]))
+
+    def test_excitation_changes_resolution_not_requested_padding(self):
+        geometry = self.geometry(gap=20,width=8)
+        value = simulation_config()
+        first = self.assert_domain(geometry, settings(value))
+        value['excitation'] = dict(center_hz=1.6e9, cutoff_hz=.5e9)
+        second = self.assert_domain(geometry, settings(value))
+        self.assertEqual(first.pml_start_min_m, second.pml_start_min_m)
+        self.assertEqual(first.pml_start_max_m, second.pml_start_max_m)
+        plan = make_pcb_mesh_anchor_plan(geometry)
+        def inner_x(mesh):
+            return tuple(x for x in mesh.x_lines_m if plan.x_required_m[0]<=x<=plan.x_required_m[-1])
+        self.assertNotEqual(inner_x(first), inner_x(second))
+
+    def test_solver_plane_protection(self):
+        for plane in ('copper','substrate'):
+            for residue in (-5e-11,5e-11):
+                with self.subTest(plane=plane,residue=residue):
+                    geometry = self.geometry()
+                    if plane == 'copper':
+                        geometry.copper[0] = replace(geometry.copper[0], z_m=residue)
+                    else:
+                        geometry.substrate = replace(geometry.substrate, z_max_m=residue)
+                    validate_pcb_geometry(geometry)
+                    before = geometry.as_dict()
+                    with self.assertRaisesRegex(ConfigurationError, 'dokładnie z=0'):
+                        make_pcb_domain_mesh(geometry, settings())
+                    self.assertEqual(before, geometry.as_dict())
 
 
 if __name__ == '__main__':

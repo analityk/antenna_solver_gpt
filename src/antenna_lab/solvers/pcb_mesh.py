@@ -1,7 +1,7 @@
-"""PCB feature anchors and placeholder Cartesian subdivision.
+"""PCB anchors, physical policy, and deterministic Cartesian meshes.
 
-Axes span required anchors only: no air domain or absorbing boundaries.
-This infrastructure mesh is not a complete runnable FDTD domain.
+The placeholder spans anchors only. The domain mesh adds graded air and PML
+coordinates; neither API instantiates a solver or claims convergence.
 """
 
 from dataclasses import dataclass
@@ -226,4 +226,192 @@ def derive_pcb_physical_mesh_policy(
         min_port_width_cells=settings.min_port_width_cells,
         growth_ratio_target=settings.growth_ratio_target,
         growth_ratio_limit=settings.growth_ratio_limit, max_cells=settings.max_cells,
+    )
+
+
+# Relative allowance for subtraction/ratio arithmetic, not coordinate snapping.
+_DOMAIN_REL_TOL = 1e-10
+
+
+@dataclass(frozen=True)
+class PcbDomainMesh:
+    """Complete coordinate domain; no solver objects or convergence claim.
+
+    PML starts exclude absorber thickness. Exact metal-edge anchors are kept;
+    the deferred 1/3–2/3 edge correction is not applied.
+    """
+
+    x_lines_m: tuple[float, ...]
+    y_lines_m: tuple[float, ...]
+    z_lines_m: tuple[float, ...]
+    shape_cells: tuple[int, int, int]
+    cell_count: int
+    pml_start_min_m: tuple[float, float, float]
+    pml_start_max_m: tuple[float, float, float]
+    outer_min_m: tuple[float, float, float]
+    outer_max_m: tuple[float, float, float]
+    pml_cells: int
+    min_step_m: float
+    max_step_m: float
+    worst_growth_ratio: float
+
+
+def _domain_count_guard(shape, maximum):
+    cells = prod(shape)
+    if any(n <= 0 for n in shape) or cells <= 0 or cells > maximum:
+        raise ConfigurationError(
+            f"PCB domain: shape={tuple(shape)}, cell_count={cells}, max_cells={maximum}. "
+            "Zwiększ limit lub zmień jawne ustawienia rozdzielczości/domeny.")
+    return cells
+
+
+def _domain_steps(lines):
+    steps = [b - a for a, b in zip(lines, lines[1:])]
+    if not steps or any(not isfinite(v) for v in lines) or any(
+            step <= ANCHOR_MERGE_TOLERANCE_M for step in steps):
+        raise ConfigurationError(
+            "PCB domain: brak postępu numerycznego lub komórka nie większa od tolerancji kotwic.")
+    return steps
+
+
+def _worst_growth(steps):
+    return max((max(a, b) / min(a, b) for a, b in zip(steps, steps[1:])), default=1.)
+
+
+def _grade_domain_axis(lines, target, cell_budget):
+    """Deterministic left-to-right insertion, bounded by the axis cell budget.
+
+    Split next to the smaller neighbour. Cap the adjacent piece at
+    L*target/(1+target) so a barely excessive ratio cannot create a tiny
+    remainder. Every iteration either advances or adds one line; insertions
+    are bounded and both new cells must exceed the coordinate tolerance.
+    No original coordinate is moved or removed.
+    """
+    lines = list(lines)
+    _domain_steps(lines)
+    i = 1
+    while i < len(lines) - 1:
+        left, right = lines[i] - lines[i-1], lines[i+1] - lines[i]
+        if max(left, right) <= min(left, right) * target * (1 + _DOMAIN_REL_TOL):
+            i += 1
+            continue
+        if len(lines) - 1 >= cell_budget:
+            raise ConfigurationError(
+                f"PCB grading: max_cells ogranicza oś do {cell_budget} komórek; "
+                "zwiększ limit lub zmień ustawienia rozdzielczości.")
+        large, small = max(left, right), min(left, right)
+        adjacent = min(small * target, large * (target / (1 + target)))
+        index = i if left > right else i + 1
+        point = lines[i] - adjacent if left > right else lines[i] + adjacent
+        if not (lines[index-1] < point < lines[index]) or min(
+                point - lines[index-1], lines[index] - point) <= ANCHOR_MERGE_TOLERANCE_M:
+            raise ConfigurationError(
+                "PCB grading: brak postępu numerycznego; podział tworzy komórkę "
+                "nie większą od tolerancji kotwic. Zmień ustawienia gradingu/rozdzielczości.")
+        lines.insert(index, point)
+        i = max(1, index - 1)
+    return tuple(lines)
+
+
+def _audit_domain_axis(lines, boundaries, limits, growth_limit):
+    """Independent final audits against each original local restriction."""
+    steps = _domain_steps(lines)
+    if _worst_growth(steps) > growth_limit * (1 + _DOMAIN_REL_TOL):
+        raise ConfigurationError("PCB domain: końcowy audyt growth_ratio_limit nie przeszedł.")
+    if not set(boundaries).issubset(lines):
+        raise ConfigurationError("PCB domain: utracono dokładną kotwicę lub granicę PML.")
+    interval = 0
+    for a, b, step in zip(lines, lines[1:], steps):
+        while interval < len(limits)-1 and a >= boundaries[interval+1]:
+            interval += 1
+        if b > boundaries[interval+1] or step > limits[interval] * (1 + _DOMAIN_REL_TOL):
+            raise ConfigurationError("PCB domain: końcowy audyt lokalnego maksimum kroku nie przeszedł.")
+
+
+def _add_domain_pml(lines, count):
+    left_step, right_step = lines[1] - lines[0], lines[-1] - lines[-2]
+    result = (tuple(lines[0] - i * left_step for i in range(count, 0, -1))
+              + lines + tuple(lines[-1] + i * right_step for i in range(1, count+1)))
+    steps = _domain_steps(result)
+    if result.index(lines[0]) != count or len(result)-1-result.index(lines[-1]) != count:
+        raise ConfigurationError("PCB PML: nieprawidłowa liczba komórek.")
+    for actual, expected in ((steps[:count], left_step), (steps[-count:], right_step)):
+        if any(abs(step - expected) > expected * _DOMAIN_REL_TOL for step in actual):
+            raise ConfigurationError("PCB PML: precyzja współrzędnych nie pozwala na równe komórki.")
+    return result
+
+
+def make_pcb_domain_mesh(
+    geometry: PcbGeometry, settings: PcbSimulationSettings,
+) -> PcbDomainMesh:
+    """Refine local PCB/air intervals, audit, then attach uniform PML cells.
+
+    Requires validated simulation settings. Stores only 1-D axes, never a
+    Cartesian cell array. Intermediate count estimates are lower bounds;
+    all refinements only increase counts. No native solver is instantiated.
+    """
+    plan = make_pcb_mesh_anchor_plan(geometry)
+    policy = derive_pcb_physical_mesh_policy(geometry, settings)
+    pml = policy.pml_cells
+    if isinstance(pml, bool) or not isinstance(pml, int) or not 6 <= pml <= 20:
+        raise ConfigurationError("PCB domain: pml_cells musi być liczbą całkowitą od 6 do 20.")
+    if not (isfinite(policy.growth_ratio_target) and isfinite(policy.growth_ratio_limit)
+            and 1 < policy.growth_ratio_target <= policy.growth_ratio_limit):
+        raise ConfigurationError("PCB domain: wymagane 1 < growth_ratio_target <= growth_ratio_limit.")
+    anchors = (plan.x_required_m, plan.y_required_m, plan.z_required_m)
+    n, p = geometry.port.negative_xy_m, geometry.port.positive_xy_m
+    mid_y = (n[1] + p[1]) / 2
+    local_ranges = ((n[0], p[0]), (mid_y-plan.port_width_m/2, mid_y+plan.port_width_m/2))
+    local_steps = (policy.max_port_gap_step_m, policy.max_port_width_step_m)
+    boundaries, limits, counts = [], [], []
+    for axis, required in enumerate(anchors):
+        edges = (required[0]-policy.air_padding_m, *required, required[-1]+policy.air_padding_m)
+        if not all(isfinite(x) for x in edges) or any(b <= a for a, b in zip(edges, edges[1:])):
+            raise ConfigurationError("PCB domain: odstęp powietrza nie daje rozdzielnych, skończonych granic.")
+        core_limits = []
+        for a, b in zip(required, required[1:]):
+            maximum = policy.max_substrate_z_step_m if axis == 2 else policy.max_substrate_xy_step_m
+            if axis < 2 and local_ranges[axis][0] <= a and b <= local_ranges[axis][1]:
+                maximum = min(maximum, local_steps[axis])
+            core_limits.append(maximum)
+        axis_limits = (policy.max_air_step_m, *core_limits, policy.max_air_step_m)
+        divisions = []
+        for a, b, maximum in zip(edges, edges[1:], axis_limits):
+            if not isfinite(maximum) or maximum <= 0:
+                raise ConfigurationError("PCB domain: fizyczny limit kroku musi być dodatni i skończony.")
+            ratio = (b-a) / maximum
+            if not isfinite(ratio) or ratio > policy.max_cells:
+                raise ConfigurationError("PCB domain: wymagany podział osi przekracza max_cells.")
+            divisions.append(ceil(ratio))
+        boundaries.append(edges)
+        limits.append(axis_limits)
+        counts.append(divisions)
+    shape = [sum(divisions) + 2*pml for divisions in counts]
+    _domain_count_guard(shape, policy.max_cells)  # Before allocating even 1-D axes.
+    ordinary = []
+    for axis in range(3):
+        initial = _subdivide(boundaries[axis], counts[axis])
+        # Other axes' known lower bounds include PML; safe also at exact budget.
+        budget = policy.max_cells // prod(shape[j] for j in range(3) if j != axis) - 2*pml
+        graded = _grade_domain_axis(initial, policy.growth_ratio_target, budget)
+        _audit_domain_axis(graded, boundaries[axis], limits[axis], policy.growth_ratio_limit)
+        shape[axis] = len(graded)-1 + 2*pml
+        _domain_count_guard(shape, policy.max_cells)
+        ordinary.append(graded)
+    _domain_count_guard(tuple(len(a)-1 for a in ordinary), policy.max_cells)
+    axes = tuple(_add_domain_pml(a, pml) for a in ordinary)
+    shape = tuple(len(a)-1 for a in axes)
+    cell_count = _domain_count_guard(shape, policy.max_cells)
+    all_steps = [_domain_steps(axis) for axis in axes]
+    worst = max(_worst_growth(steps) for steps in all_steps)
+    if worst > policy.growth_ratio_limit * (1 + _DOMAIN_REL_TOL):
+        raise ConfigurationError("PCB domain: końcowy audyt wzrostu z PML nie przeszedł.")
+    for axis, core in zip(axes, anchors):
+        if not axis[0] < axis[pml] < core[0] < core[-1] < axis[-pml-1] < axis[-1]:
+            raise ConfigurationError("PCB domain: nieprawidłowy porządek granic struktury, powietrza i PML.")
+    return PcbDomainMesh(
+        *axes, shape, cell_count,
+        tuple(a[0] for a in ordinary), tuple(a[-1] for a in ordinary),
+        tuple(a[0] for a in axes), tuple(a[-1] for a in axes), pml,
+        min(min(s) for s in all_steps), max(max(s) for s in all_steps), worst,
     )

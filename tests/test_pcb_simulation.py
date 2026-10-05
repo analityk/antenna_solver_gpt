@@ -116,8 +116,11 @@ class PcbSimulationTests(unittest.TestCase):
     def test_domain_values(self):
         self.assert_invalid_field('domain', 'air_padding_wavelengths',
                                   (0, -1, float('nan'), float('inf'), -float('inf'), True, '0.25'))
-        self.assert_invalid_field('domain', 'pml_cells', (0, -1, 1.5, True, '8'))
+        self.assert_invalid_field('domain', 'pml_cells', (0, 1, 5, 21, -1, 1.5, True, '8'))
         value = simulation_config()
+        for count in (6, 8, 12, 20):
+            value['domain']['pml_cells'] = count
+            self.assertEqual(settings(value).pml_cells, count)
         value['domain'] = dict(air_padding_wavelengths=.5, pml_cells=12)
         result = settings(value)
         self.assertEqual(result.air_padding_wavelengths, .5)
