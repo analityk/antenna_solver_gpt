@@ -109,6 +109,24 @@ class PcbWorkflowTests(unittest.TestCase):
                 validate_pcb_geometry(make_synthetic_pcb_geometry(cfg))
                 self.assert_geometry(prepare_pcb_placeholder(self.path))
 
+    def test_inner_copper_edges_cover_wide_ports(self):
+        for gap, width in ((.5, 4.), (.1, .3)):
+            with self.subTest(gap_mm=gap, width_mm=width):
+                self.write_config(gap, width, angle=37.)
+                result = prepare_pcb_placeholder(self.path)
+                self.assert_geometry(result)
+                geometry = result.normalized_geometry
+                half_width = geometry.port.width_m / 2
+                endpoints = (geometry.port.negative_xy_m, geometry.port.positive_xy_m)
+                for copper, endpoint in zip(geometry.copper, endpoints):
+                    # Check the actual inner edge, not just the polygon's bounds.
+                    inner_edge = [y for x, y in copper.vertices_xy_m
+                                  if abs(x - endpoint[0]) <= COORDINATE_TOL_M]
+                    self.assertEqual(len(inner_edge), 2)
+                    self.assertLessEqual(min(inner_edge), -half_width + COORDINATE_TOL_M)
+                    self.assertGreaterEqual(max(inner_edge), half_width - COORDINATE_TOL_M)
+                validate_pcb_geometry(geometry)
+
     def test_invalid_config_propagates(self):
         value = self.write_config()
         value['port']['width_mm'] = 0

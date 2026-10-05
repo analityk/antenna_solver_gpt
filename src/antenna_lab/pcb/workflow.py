@@ -24,7 +24,8 @@ def make_synthetic_pcb_geometry(config: ResolvedPcbConfig) -> PcbGeometry:
     """Build two rectangles around configured endpoints, in their local basis.
 
     Depth and board margin are max(gap, port width); conductor half-width is
-    min(width/2, gap/4). Dimensions are temporary infrastructure, not Gerbers.
+    width/2, covering the full transverse port width. Dimensions are temporary
+    infrastructure, not Gerbers.
     The caller validates the result before normalization.
     """
     n, p = config.port_negative_xy_m, config.port_positive_xy_m
@@ -35,7 +36,7 @@ def make_synthetic_pcb_geometry(config: ResolvedPcbConfig) -> PcbGeometry:
     ux, uy = dx / gap, dy / gap
     vx, vy = -uy, ux
     depth = margin = max(gap, config.port_width_m)
-    half_width = min(config.port_width_m / 2, gap / 4)
+    half_width = config.port_width_m / 2
 
     def rectangle(origin, left, right, half):
         return tuple((origin[0] + x * ux + y * vx,
