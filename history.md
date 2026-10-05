@@ -621,6 +621,38 @@ pominięty z powodu braku openEMS; użytkownik wcześniej potwierdził XML
 na Windowsie. Rzeczywisty kontrolny FDTD i zbieżność pozostają do wykonania
 lokalnie; testy tej zmiany używały atrap, bez natywnego Run.
 
+
+## 2026-10-06 — PCB-009A1: parametry częstotliwości kontrolnej PCB
+
+Dodano jawne parametry Hz w API przypadku kontrolnego i runnera oraz opcje
+CLI --center-mhz, --cutoff-mhz, --frequencies-mhz i --loss-reference-mhz.
+Domyślny eksperyment pozostaje identyczny. Brak jawnego odniesienia strat
+oznacza wybrany środek pobudzenia. Geometria nie jest skalowana ani zmieniana.
+
+Konstruowane ustawienia przechodzą istniejący schemat i walidator JSON
+przez mały adapter w simulation.py: jedna polityka dodatniości, skończoności,
+kolejności i okna ±0,8 cutoff. Błąd zatrzymuje ścieżkę przed natywnym API.
+Pobudzenie, CalcPort, siatka, odstęp do PML i kappa korzystają z ustawień
+istniejącą ścieżką. CSV i summary.json zachowują wybraną listę oraz ustawienia.
+Bez zmian wzorów Z/S11/SWR, schematu, portu, meshera i statusu unverified.
+
+Przykłady CMD (po aktualizacji repozytorium):
+```bat
+.\.venv\Scripts\python.exe -m antenna_lab.pcb.control
+.\.venv\Scripts\python.exe -m antenna_lab.pcb.control --center-mhz 2450 --cutoff-mhz 400 --frequencies-mhz 2200 2400 2450 2500 2700
+.\.venv\Scripts\python.exe -m antenna_lab.pcb.control --center-mhz 900 --cutoff-mhz 150 --frequencies-mhz 800 900 1000
+.\.venv\Scripts\python.exe -m antenna_lab.pcb.control --center-mhz 2450 --cutoff-mhz 400 --loss-reference-mhz 2400 --frequencies-mhz 2200 2450 2700
+```
+
+Sprawdzenie: control 15, simulation 12, adapter 15, mesh 34 — OK;
+138 testów PCB (1 pominięty), pełny zestaw 205 (3 pominięte), bez błędów.
+Testy obejmują domyślne i zmienione pasma, niezmienność geometrii, błędne
+wartości, jedno- i pięciopunktowe widma, rzeczywisty pipeline z atrapami
+natywnego API oraz zapis ustawień i strat materiału. W ścieżkach solvera,
+meshera i portu brak wymogu 1,42 GHz. Natywny XML pominięto z braku openEMS.
+Użytkownik potwierdził wcześniejszy pierwszy FDTD na Windowsie; tej zmiany
+nie uruchamiano natywnie. Badanie zbieżności pozostaje odrębnym etapem.
+
 ## Wzór kolejnego wpisu
 
 - Data i krótka nazwa zmiany.

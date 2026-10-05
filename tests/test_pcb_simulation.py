@@ -1,5 +1,5 @@
 from copy import deepcopy
-from dataclasses import asdict, FrozenInstanceError
+from dataclasses import asdict, FrozenInstanceError, replace
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -8,6 +8,7 @@ import unittest
 from antenna_lab.core.config import ConfigurationError
 from antenna_lab.pcb.simulation import (
     PcbSimulationSettings, load_pcb_simulation_settings, validate_pcb_simulation_config,
+    validate_pcb_simulation_settings,
 )
 
 
@@ -54,6 +55,18 @@ class PcbSimulationTests(unittest.TestCase):
                 self.assertIsInstance(result.result_frequency_hz, tuple)
                 with self.assertRaises(FrozenInstanceError):
                     result.threads = 2
+
+    def test_runtime_validation_shares_json_policy(self):
+        base=settings()
+        before=asdict(base)
+        self.assertIs(validate_pcb_simulation_settings(base),base)
+        self.assertEqual(asdict(base),before)
+        for changes in ({'result_frequency_hz': ()}, {'result_frequency_hz': (1.42e9,1.42e9)},
+                        {'excitation_center_hz': float('nan')}, {'excitation_cutoff_hz': 1.42e9},
+                        {'loss_reference_frequency_hz': 0}, {'result_frequency_hz': (1.6e9,)},
+                        {'threads': -1}, {'pml_cells': 5}):
+            with self.subTest(changes=changes), self.assertRaises(ConfigurationError):
+                validate_pcb_simulation_settings(replace(base,**changes))
 
     def test_validation_no_mutation(self):
         value = simulation_config()

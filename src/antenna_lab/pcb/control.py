@@ -10,12 +10,18 @@ from tempfile import mkdtemp
 
 from antenna_lab.core.config import ConfigurationError
 from antenna_lab.pcb.model import BoardOutline, CopperPolygon, PcbGeometry, PcbPort, Substrate
-from antenna_lab.pcb.simulation import PcbSimulationSettings
+from antenna_lab.pcb.simulation import PcbSimulationSettings, validate_pcb_simulation_settings
 from antenna_lab.pcb.transform import normalize_port_orientation
 from antenna_lab.solvers.openems_pcb import prepare_pcb_xml_model, run_pcb_fdtd, write_pcb_port_results
 
 
-def make_synthetic_control_case():
+def make_synthetic_control_case(
+    *,
+    excitation_center_hz: float = 1.42e9,
+    excitation_cutoff_hz: float = .20e9,
+    result_frequency_hz: tuple[float, ...] = (1.30e9, 1.42e9, 1.50e9),
+    loss_reference_frequency_hz: float | None = None,
+):
     """The PCB-008A native XML case, rigidly normalized exactly once, in SI."""
     # Rotate the complete source by 37 degrees, then normalize exactly once.
     angle = radians(37)
@@ -34,25 +40,34 @@ def make_synthetic_control_case():
                         PcbPort('native_smoke',point(-.0005,0.),point(.0005,0.),.002))
     geometry, _ = normalize_port_orientation(source)
     settings = PcbSimulationSettings(
-        schema_version=1, result_frequency_hz=(1.30e9,1.42e9,1.50e9),
-        excitation_center_hz=1.42e9, excitation_cutoff_hz=.20e9,
+        schema_version=1, result_frequency_hz=tuple(result_frequency_hz),
+        excitation_center_hz=excitation_center_hz, excitation_cutoff_hz=excitation_cutoff_hz,
         reference_impedance_ohm=50., cells_per_wavelength=20,
         min_substrate_cells_z=4, min_port_gap_cells=2, min_port_width_cells=2,
         growth_ratio_target=1.4, growth_ratio_limit=1.5, max_cells=20_000_000,
-        loss_reference_frequency_hz=1.42e9, max_timesteps=100000,
+        loss_reference_frequency_hz=(excitation_center_hz if loss_reference_frequency_hz is None
+                                     else loss_reference_frequency_hz), max_timesteps=100000,
         end_criteria=1e-5, threads=0, air_padding_wavelengths=.25, pml_cells=8)
+    validate_pcb_simulation_settings(settings)
     return geometry, settings
 
 
-def run_synthetic_control(output_dir) -> dict:
+def run_synthetic_control(output_dir, *,
+    excitation_center_hz: float = 1.42e9,
+    excitation_cutoff_hz: float = .20e9,
+    result_frequency_hz: tuple[float, ...] = (1.30e9, 1.42e9, 1.50e9),
+    loss_reference_frequency_hz: float | None = None,
+) -> dict:
     """Require an empty/new run directory; retain native output even on failure."""
+    geometry, settings = make_synthetic_control_case(
+        excitation_center_hz=excitation_center_hz, excitation_cutoff_hz=excitation_cutoff_hz,
+        result_frequency_hz=result_frequency_hz, loss_reference_frequency_hz=loss_reference_frequency_hz)
     output = Path(output_dir).resolve()
     if output.exists() and (not output.is_dir() or any(output.iterdir())):
         raise ConfigurationError(f'PCB control: katalog musi być pusty lub nowy: {output}')
     output.mkdir(parents=True, exist_ok=True)
     native = output/'native'
     native.mkdir()  # also prevents concurrent runs from claiming the same directory
-    geometry, settings = make_synthetic_control_case()
     engine, csx, port, mesh, spec, metadata = prepare_pcb_xml_model(geometry, settings, native/'model.xml')
     result = run_pcb_fdtd(engine, csx, port, mesh, settings, native)
     result['preparation'] = metadata
@@ -63,7 +78,17 @@ def run_synthetic_control(output_dir) -> dict:
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description='Synthetic PCB FDTD control (UNVERIFIED)')
     parser.add_argument('--output', type=Path)
+    parser.add_argument('--center-mhz', type=float, default=1420.)
+    parser.add_argument('--cutoff-mhz', type=float, default=200.)
+    parser.add_argument('--frequencies-mhz', type=float, nargs='+', default=[1300., 1420., 1500.])
+    parser.add_argument('--loss-reference-mhz', type=float)
     args = parser.parse_args(argv)
+    # MHz exists only at this command-line boundary; all downstream values are Hz.
+    band = dict(excitation_center_hz=args.center_mhz*1e6,
+                excitation_cutoff_hz=args.cutoff_mhz*1e6,
+                result_frequency_hz=tuple(f*1e6 for f in args.frequencies_mhz),
+                loss_reference_frequency_hz=(args.center_mhz if args.loss_reference_mhz is None
+                                             else args.loss_reference_mhz)*1e6)
     try:
         output = args.output
         if output is None:
@@ -73,7 +98,12 @@ def main(argv=None) -> int:
             output = Path(mkdtemp(prefix=stamp, dir=root))
         output = output.resolve()
         print(f'PCB synthetic FDTD control\nOutput: {output}', flush=True)
-        result = run_synthetic_control(output)
+        print(f"Excitation center: {band['excitation_center_hz']/1e9:.3f} GHz\n"
+              f"Excitation cutoff: {band['excitation_cutoff_hz']/1e9:.3f} GHz\n"
+              f"Loss reference: {band['loss_reference_frequency_hz']/1e9:.3f} GHz\n"
+              "Result frequencies: " + ', '.join(f'{f/1e9:.3f}' for f in band['result_frequency_hz']) + ' GHz',
+              flush=True)
+        result = run_synthetic_control(output, **band)
         for i, frequency in enumerate(result['frequency_hz']):
             db = result['s11_db'][i]
             print(f"\nFrequency: {frequency/1e9:.3f} GHz\n"

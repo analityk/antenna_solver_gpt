@@ -73,3 +73,22 @@ def load_pcb_simulation_settings(path) -> PcbSimulationSettings:
         air_padding_wavelengths=value["domain"]["air_padding_wavelengths"],
         pml_cells=int(value["domain"]["pml_cells"]),
     )
+
+
+def validate_pcb_simulation_settings(settings: PcbSimulationSettings) -> PcbSimulationSettings:
+    """Validate constructed settings through the same schema/policy as JSON input."""
+    validate_pcb_simulation_config({
+        'schema_version': settings.schema_version,
+        'result_frequency_hz': list(settings.result_frequency_hz),
+        'excitation': {'center_hz': settings.excitation_center_hz,
+                       'cutoff_hz': settings.excitation_cutoff_hz},
+        'port': {'reference_impedance_ohm': settings.reference_impedance_ohm},
+        'mesh': {name: getattr(settings, name) for name in (
+            'cells_per_wavelength', 'min_substrate_cells_z', 'min_port_gap_cells',
+            'min_port_width_cells', 'growth_ratio_target', 'growth_ratio_limit', 'max_cells')},
+        'material': {'loss_reference_frequency_hz': settings.loss_reference_frequency_hz},
+        'fdtd': {name: getattr(settings, name) for name in ('max_timesteps', 'end_criteria', 'threads')},
+        'domain': {'air_padding_wavelengths': settings.air_padding_wavelengths,
+                   'pml_cells': settings.pml_cells},
+    })
+    return settings

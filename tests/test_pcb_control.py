@@ -217,5 +217,99 @@ class ControlTests(unittest.TestCase):
             os.chdir(cwd)
 
 
+class FrequencyControlTests(unittest.TestCase):
+    band = dict(excitation_center_hz=2.45e9, excitation_cutoff_hz=.4e9,
+                result_frequency_hz=(2.2e9,2.4e9,2.45e9,2.5e9,2.7e9))
+
+    def test_defaults_custom_geometry_policy_and_loss(self):
+        from antenna_lab.solvers.pcb_mesh import derive_pcb_physical_mesh_policy
+        g0,s0=control.make_synthetic_control_case()
+        before=g0.as_dict()
+        self.assertEqual((s0.excitation_center_hz,s0.excitation_cutoff_hz,s0.result_frequency_hz,
+                          s0.loss_reference_frequency_hz),(1.42e9,.2e9,(1.3e9,1.42e9,1.5e9),1.42e9))
+        g,s=control.make_synthetic_control_case(**self.band)
+        for key,value in self.band.items(): self.assertEqual(getattr(s,key),value)
+        self.assertEqual(s.loss_reference_frequency_hz,2.45e9)
+        self.assertEqual(control.make_synthetic_control_case(**self.band,
+                         loss_reference_frequency_hz=2.4e9)[1].loss_reference_frequency_hz,2.4e9)
+        self.assertEqual(g.as_dict(),before)
+        self.assertEqual(g0.as_dict(),before)
+        a,b=derive_pcb_physical_mesh_policy(g0,s0),derive_pcb_physical_mesh_policy(g,s)
+        self.assertEqual((a.f_mesh_hz,b.f_mesh_hz),(1.62e9,2.85e9))
+        self.assertEqual((a.padding_frequency_hz,b.padding_frequency_hz),(1.3e9,2.2e9))
+        self.assertAlmostEqual(b.max_air_step_m,299792458/2.85e9/20)
+        self.assertAlmostEqual(b.max_substrate_xy_step_m,b.max_air_step_m/math.sqrt(4.3))
+        self.assertNotEqual(a.air_padding_m,b.air_padding_m)
+        self.assertNotEqual(make_pcb_domain_mesh(g0,s0),make_pcb_domain_mesh(g,s))
+        g900,s900=control.make_synthetic_control_case(excitation_center_hz=.9e9,
+            excitation_cutoff_hz=.15e9,result_frequency_hz=(.8e9,.9e9,1e9))
+        self.assertEqual(g900.as_dict(),before)
+        make_pcb_domain_mesh(g900,s900)
+
+    def test_invalid_internal_frequencies_before_native(self):
+        cases=[]
+        for key in ('excitation_center_hz','excitation_cutoff_hz','loss_reference_frequency_hz','result_frequency_hz'):
+            for v in (0,-1,float('nan'),float('inf'),-float('inf'),True,'bad'):
+                cases.append({key:(v,) if key=='result_frequency_hz' else v})
+        cases += [dict(excitation_cutoff_hz=1.42e9), dict(excitation_cutoff_hz=2e9),
+                  dict(excitation_center_hz=1.7e308,excitation_cutoff_hz=1e308)]
+        cases += [dict(result_frequency_hz=v) for v in ((),(1.5e9,1.3e9),(1.42e9,1.42e9),(1.26e9-1,),(1.58e9+1,))]
+        with TemporaryDirectory() as directory, patch.object(control,'prepare_pcb_xml_model') as prepare:
+            for case in cases:
+                with self.subTest(case=case), self.assertRaises(ConfigurationError):
+                    control.run_synthetic_control(Path(directory)/'bad',**case)
+            prepare.assert_not_called()
+            self.assertFalse((Path(directory)/'bad').exists())
+
+    def test_cli_conversion_and_explicit_loss(self):
+        result=dict(frequency_hz=[],s11_db=[])
+        with TemporaryDirectory() as directory:
+            for extra,loss in (([],2.45e9),(['--loss-reference-mhz','2400'],2.4e9)):
+                with patch.object(control,'run_synthetic_control',return_value=result) as runner, contextlib.redirect_stdout(io.StringIO()) as out:
+                    code=control.main(['--output',directory,'--center-mhz','2450','--cutoff-mhz','400',
+                        '--frequencies-mhz','2200','2400','2450','2500','2700',*extra])
+                self.assertEqual(code,0)
+                self.assertEqual(runner.call_args.kwargs,{**self.band,'loss_reference_frequency_hz':loss})
+                self.assertIn('Excitation cutoff: 0.400 GHz',out.getvalue())
+                self.assertIn('2.200, 2.400, 2.450, 2.500, 2.700 GHz',out.getvalue())
+
+    def test_invalid_cli_frequencies_before_native(self):
+        with TemporaryDirectory() as directory, patch.object(control,'prepare_pcb_xml_model') as prepare:
+            for flag in ('--center-mhz','--cutoff-mhz','--frequencies-mhz','--loss-reference-mhz'):
+                for value in ('0','-1','nan','inf','-inf'):
+                    with self.subTest(flag=flag,value=value), contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                        self.assertEqual(control.main(['--output',directory,flag+'='+value]),1)
+            prepare.assert_not_called()
+
+    def test_custom_pipeline_native_arguments_and_serialization(self):
+        # Actual preparation, material conversion and result path, only native APIs faked.
+        from test_openems_pcb import CSX, XmlEngine
+        class SolveEngine(XmlEngine):
+            def Run(self,path,**kwargs):
+                self.calls.append(('Run',path,kwargs))
+                return 0
+        for frequencies in (self.band['result_frequency_hz'],(2.4e9,)):
+            for loss in (None,2.4e9):
+                band={**self.band,'result_frequency_hz':frequencies,'loss_reference_frequency_hz':loss}
+                with self.subTest(frequencies=frequencies,loss=loss), TemporaryDirectory() as directory:
+                    csx=CSX();engine=SolveEngine();engine.port=Port([50]*len(frequencies),[1]*len(frequencies))
+                    with patch('antenna_lab.solvers.openems.native_modules',return_value=(
+                        SimpleNamespace(openEMS=lambda **kw:engine),SimpleNamespace(ContinuousStructure=lambda:csx))):
+                        summary=control.run_synthetic_control(directory,**band)
+                    self.assertIn(('SetGaussExcite',2.45e9,.4e9),engine.calls)
+                    self.assertEqual(engine.port.calls[0][1].tolist(),list(frequencies))
+                    self.assertEqual(engine.port.calls[0][2],{'ref_impedance':50.})
+                    selected_loss=2.45e9 if loss is None else loss
+                    self.assertAlmostEqual(csx.materials[0][1]['kappa'],
+                        2*math.pi*selected_loss*8.8541878128e-12*4.3*.018)
+                    stored=json.loads((Path(directory)/'summary.json').read_text())
+                    for key,value in {**band,'loss_reference_frequency_hz':selected_loss}.items():
+                        self.assertEqual(stored['simulation_settings'][key],list(value) if isinstance(value,tuple) else value)
+                    self.assertEqual(stored['frequency_hz'],list(frequencies))
+                    with (Path(directory)/'impedance.csv').open(newline='') as stream: rows=list(csv.reader(stream))
+                    self.assertEqual(len(rows),len(frequencies)+1)
+                    self.assertEqual([float(row[0]) for row in rows[1:]],list(frequencies))
+
+
 if __name__ == '__main__':
     unittest.main()
