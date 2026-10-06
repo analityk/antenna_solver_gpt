@@ -127,6 +127,23 @@ def load_report_data(run_path, *, start_mhz=None, stop_mhz=None, step_mhz=None,
             "last_energy_line": energy_lines[-1] if energy_lines else None,
             "power": read_json(root / "power_balance.json"),
             "coverage": read_json(root / "feed_grid_coverage.json")}
+    geometry = read_json(root / "geometry.json")
+    if geometry.get("model") == "pcb" or "import" in summary and "resolved_config" in summary["import"]:
+        data.update(is_pcb=True, geometry=geometry, mesh=summary.get("mesh", {}),
+                    execution_status=summary.get("status", "not recorded"))
+        data["target_mhz"] = summary.get("simulation_settings", {}).get("excitation_center_hz", target*1e6)/1e6
+        data["warnings"].extend(summary.get("warnings", []))
+        # Diagnostics use the same saved spectrum displayed in the report.
+        from antenna_lab.pcb.gerber_sweep import sampled_diagnostics
+        r,x = np.asarray(spectrum["r"]),np.asarray(spectrum["x"])
+        rho = np.abs((r+1j*x-reference)/(r+1j*x+reference))
+        if np.any(rho >= 1) or not np.all(np.isfinite(rho)):
+            raise ValueError("PCB spectrum cannot produce finite passive SWR.")
+        data["pcb_diagnostics"] = sampled_diagnostics(dict(
+            frequency_hz=[v*1e6 for v in spectrum["frequency_mhz"]],
+            resistance_ohm=r.tolist(), reactance_ohm=x.tolist(),
+            s11_magnitude=rho.tolist(), s11_db=[None if v==0 else float(20*np.log10(v)) for v in rho],
+            swr=((1+rho)/(1-rho)).tolist()))
     return data
 
 

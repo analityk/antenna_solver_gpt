@@ -56,10 +56,13 @@ class PcbValidationTests(unittest.TestCase):
         geometry.port = replace(geometry.port, negative_xy_m=(.010, .010))
         self.assert_invalid(geometry, "port.negative")
 
-    def test_same_conductor(self):
+    def test_same_conductor_loop_with_clear_local_gap(self):
         geometry = fixture()
-        geometry.port = replace(geometry.port, positive_xy_m=(.008, .010))
-        self.assert_invalid(geometry, "tej samej wyspy")
+        # One U-shaped copper polygon joins the terminals away from the feed.
+        geometry.copper = [replace(geometry.copper[0], vertices_xy_m=(
+            (.004,.008),(.009,.008),(.009,.012),(.011,.012),
+            (.011,.008),(.016,.008),(.016,.014),(.004,.014)))]
+        self.assertEqual(validate_pcb_geometry(geometry)['copper_count'], 1)
 
     def test_ambiguous_membership(self):
         geometry = fixture()

@@ -1,27 +1,116 @@
-# PCB-010A: pierwszy import EasyEDA
+# PCB: katalog Gerberów → pojedynczy FDTD → raport lokalny
 
-Importer czyta wyłącznie jawnie wskazane pliki top copper i board outline.
-Gerbonara 1.6.3 parsuje RS-274X; Shapely 2.1.x łączy nachodzące i stykające
-się powierzchnie. Regiony, pady oraz linie/łuki o kołowym przekroju pisaka
-wchodzą do tej samej sumy miedzi. Każda rozłączna wyspa daje jeden rekord
-CopperPolygon. GKO opisuje linię środka zamkniętego obrysu, nie zewnętrzną
-krawędź pisaka. Współrzędne zostają przeliczone na metry na granicy importera,
-a następnie normalizowane dokładnie raz istniejącą transformacją portu.
+Podstawowym wejściem jest katalog, nie plik JSON. Program rozpoznaje top copper,
+obrys, maskę, pastę, sitodruk, dolną/wewnętrzną miedź i pliki wierceń.
+Gerbonara 1.6.3 parsuje RS-274X i metadane FileFunction; nazwy/rozszerzenia
+konwencjonalne uzupełniają role. Lista plików, role, SHA256 i pominięcia są
+zapisywane w import.json oraz summary.json. Przeglądany jest bezpośrednio
+wskazany katalog (bez rekurencji).
 
-## Instalacja i uruchomienie w CMD
+Wymagane są dokładnie jedna górna miedź i jeden użyteczny zamknięty obrys.
+Niejednoznaczność wyświetla nazwy kandydatów. Maska, pasta i sitodruk zostają
+zidentyfikowane i pominięte. Dolna/wewnętrzna miedź, wiercenia oraz Gerber
+bez ustalonej roli blokują PCB-v0, zamiast udawać ich obsługę.
+
+Shapely 2.1.x sumuje regiony, pady oraz linie/łuki o kołowym przekroju pisaka.
+Każdy połączony obszar daje jeden CopperPolygon. GKO opisuje środek linii
+obrysu, nie krawędź pisaka. Importer przelicza współrzędne na SI; potem
+istniejąca transformacja normalizuje port dokładnie raz.
+
+## Uruchomienie w CMD
 
 ```bat
 git pull --ff-only
 .\.venv\Scripts\python.exe -m pip install -e .
 set "CSXCAD_INSTALL_PATH=C:\dev\openems\openEMS"
-.\.venv\Scripts\python.exe -m antenna_lab.pcb.gerber_control parameters\pcb_easyeda_stroked_feed.json --prepare-only
+
+.\.venv\Scripts\python.exe -m antenna_lab.pcb.gerber_control gerbs\emstest ^
+  --quality preview ^
+  --sweep-start-mhz 1260 --sweep-stop-mhz 1580 --sweep-step-mhz 5
+
+.\.venv\Scripts\python.exe -m antenna_lab.pcb.gerber_control gerbs\emstest2 ^
+  --quality preview --center-mhz 2000 --cutoff-mhz 625 ^
+  --sweep-start-mhz 1500 --sweep-stop-mhz 2500 --sweep-step-mhz 10
 ```
 
-To przygotowuje XML, bez FDTD. Aby wykonać pojedynczy przebieg, usuń
-`--prepare-only`. Każde wywołanie tworzy nowy katalog w `outcomes/pcb_gerber`.
-Opcjonalny `--output` wymaga pustego/nowego katalogu. Dostępne są te same
-opcje częstotliwości co w pcb.control: `--center-mhz`, `--cutoff-mhz`,
-`--frequencies-mhz`, `--loss-reference-mhz`.
+Każde wywołanie tworzy nowy katalog outcomes/pcb_gerber. `--output` wymaga
+pustego/nowego katalogu. `--prepare-only` kończy po XML, bez FDTD i raportu
+widma. Dostępne są też jawne `--frequencies-mhz` i `--loss-reference-mhz`.
+
+## Założenia fizyczne i port
+
+Bez `--pcb-config` używane są jawnie drukowane i zapisane **założenia unverified**:
+laminat 1,6 mm, epsilon_r=4,3, loss_tangent=0,018; miedź PEC, nominalnie
+35 µm i 58000000 S/m (grubość i przewodność nie są modelowane w PEC).
+Gerbery nie określają tych parametrów. Opcjonalny plik opisuje wyłącznie
+fizykę, bez nazw Gerberów — ten sam plik działa z każdym katalogiem:
+
+```bat
+.\.venv\Scripts\python.exe -m antenna_lab.pcb.gerber_control gerbs\emstest2 ^
+  --pcb-config parameters\pcb_fr4_1p6.json --quality preview ^
+  --center-mhz 2000 --cutoff-mhz 625 ^
+  --sweep-start-mhz 1500 --sweep-stop-mhz 2500 --sweep-step-mhz 10
+```
+
+Schemat: schemas/pcb-physical.schema.json. Przykład parameters/pcb_fr4_1p6.json:
+
+```json
+{
+  "schema_version": 1,
+  "substrate": {"thickness_mm": 1.6, "epsilon_r": 4.3, "loss_tangent": 0.018},
+  "copper": {"thickness_um": 35, "conductivity_s_m": 58000000, "model": "pec"},
+  "port": {"mode": "auto"}
+}
+```
+
+Auto obsługuje dokładnie dwa zgodne prostokątne pady typu flash, ustawione
+poziomo lub pionowo. Pady wyznaczają oś, środek i szerokość. Przecięcie osi
+z **pełną sumą miedzi** wyznacza rzeczywistą szczelinę. Potem sprawdzane są
+całe powierzchnie styku i pusty prostokątny port oraz dotychczasowy audyt
+siatki. Tolerancja geometryczna pozostaje 1e-10 m, bez przesuwania geometrii.
+W emstest szczelina ma 0,64412 mm; w emstest2 0,70024 mm przy szerokości
+0,86401 mm. Port pionowy normalizuje się do +X tak samo jak poziomy.
+
+Oba końce mogą należeć do tej samej miedzi, np. pętli emstest2. Połączenie
+odległą ścieżką nie oznacza wypełnienia lokalnej szczeliny. Miedź w szczelinie
+lub brak pełnego styku blokują przebieg. Nie są wyznaczane ogólne sieci PCB.
+
+Jeżeli auto jest niejednoznaczne, użyj jawnego portu w układzie Gerbera,
+w milimetrach, np. dla emstest:
+
+```json
+"port": {
+  "mode": "explicit",
+  "negative_mm": [12.22288, 12.57300],
+  "positive_mm": [12.86700, 12.57300],
+  "width_mm": 0.86401
+}
+```
+
+Starsze polecenie z JSON-em zawierającym `files` nadal działa, np.
+`python -m antenna_lab.pcb.gerber_control parameters\pcb_easyeda_stroked_feed.json`.
+To osobny format zgodności wstecznej; nie łącz go z `--pcb-config`.
+
+## Raport lokalny
+
+Udany solve automatycznie tworzy report.html i plots/geometry.png,
+plots/impedance.png, plots/s11.png, plots/swr.png. Konsola wypisuje
+`Raport HTML: ...`. Błąd prezentacji zapisuje ostrzeżenie; nie unieważnia FDTD.
+Raport współdzieli renderer, CSS, JS i interaktywne widmo z raportem anteny.
+Wszystkie obrazy/skrypty są osadzone; nie ma internetu ani serwera.
+Geometria pochodzi z geometry.json, widmo z impedance.csv/summary.json;
+Gerbery i natywne biblioteki nie są potrzebne do odtworzenia:
+
+```bat
+.\.venv\Scripts\python.exe -m antenna_lab report outcomes\pcb_gerber\NAZWA_PRZEBIEGU --open
+```
+
+Jak w istniejących raportach antenowych, ręczna regeneracja zapisuje nowy
+HTML w outcomes/reports, nie nadpisuje ukończonego przebiegu. Raport pokazuje
+próbkowane minima, przedziały zmiany znaku X, ostrzeżenie o minimum na granicy,
+założenia, SHA256, profil i stan wykonania. Zmiana Zref w części interaktywnej
+nie zmienia statycznych wykresów/minimów dla zapisanego Zref. Nie ma E/H,
+NF2FF ani bilansu mocy; nie są zastępowane fikcyjnymi danymi.
 
 ## Profile jakości (PCB-010B)
 
@@ -85,7 +174,7 @@ completed_before_limit i rzeczywistą actual_iterations. Przy samym XML
 termination_status to not_run, a actual_iterations to null. Brak prawidłowych
 statystyk nie może dać statusu completed. Wynik pozostaje unverified.
 
-## Istotna różnica między podanymi wymiarami a rzeczywistym GTL
+## Historyczne konfiguracje emstest i rzeczywisty GTL
 
 Repozytorium zawiera pliki użytkownika w `gerbs/emstest`. Nie są częścią
 zmiany PCB-010A. W rzeczywistym GTL regiony mają odstęp 0,87820 mm, ale
@@ -102,12 +191,12 @@ wzdłuż całej szerokości tego portu wynosi zatem 0,64412 mm.
   przechodzi, lecz audyt portu wykrywa miedź w szczelinie i blokuje solver.
 - `parameters/pcb_easyeda_stroked_feed.json` jest osobnym, jawnym wariantem:
   zmienia tylko dodatni koniec na [12,86700; 12,57300] mm. Szerokość
-  0,86401 mm i cała miedź pozostają bez zmian. To konfiguracja wskazana
-  w poleceniu powyżej. Nie jest wynikiem automatycznego wykrywania portu.
+  0,86401 mm i cała miedź pozostają bez zmian. To historyczny jawny
+  wariant; wejście katalogowe obecnie wykrywa tę szczelinę automatycznie.
 
 Obie konfiguracje używają startowych parametrów laminatu 1,6 mm, epsilon_r
 4,3 i tan(delta) 0,018. Gerber ich nie określa — należy wpisać rzeczywiste
-wartości w pcb.json przed interpretacją wyników.
+wartości w opcjonalnej konfiguracji fizycznej przed interpretacją wyników.
 
 ## Wyniki i ograniczenia
 

@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PCB physical assumptions (Gerber folder input)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "substrate",
+    "copper",
+    "port"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "copper": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "thickness_um",
+        "conductivity_s_m",
+        "model"
+      ],
+      "properties": {
+        "thickness_um": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "conductivity_s_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "model": {
+          "const": "pec"
+        }
+      }
+    },
+    "substrate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "thickness_mm",
+        "epsilon_r",
+        "loss_tangent"
+      ],
+      "properties": {
+        "thickness_mm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "epsilon_r": {
+          "type": "number",
+          "minimum": 1
+        },
+        "loss_tangent": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "port": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mode"
+          ],
+          "properties": {
+            "mode": {
+              "const": "auto"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mode",
+            "negative_mm",
+            "positive_mm",
+            "width_mm"
+          ],
+          "properties": {
+            "negative_mm": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "number"
+              }
+            },
+            "positive_mm": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "number"
+              }
+            },
+            "width_mm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "mode": {
+              "const": "explicit"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

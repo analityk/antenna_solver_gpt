@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "substrate": {
+    "thickness_mm": 1.6,
+    "epsilon_r": 4.3,
+    "loss_tangent": 0.018
+  },
+  "copper": {
+    "thickness_um": 35,
+    "conductivity_s_m": 58000000,
+    "model": "pec"
+  },
+  "port": {
+    "mode": "auto"
+  }
+}

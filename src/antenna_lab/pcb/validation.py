@@ -111,6 +111,8 @@ def validate_pcb_geometry(geometry: PcbGeometry):
 
     Each CopperPolygon record is treated as one conductor. Endpoint membership
     in several records is rejected as ambiguous; unions/nets are not inferred.
+    A remote conductive path may join both terminals. Physical and solver-grid
+    feed audits, not conductor IDs, establish whether the local gap is clear.
     This check does not establish physical validity or solver convergence.
     """
     _require(geometry.model == "pcb", "model: wymagane 'pcb'.")
@@ -145,12 +147,9 @@ def validate_pcb_geometry(geometry: PcbGeometry):
     _require(_finite(port.width_m) and port.width_m > 0, "port.width_m: wymagana dodatnia skończona szerokość.")
     _require(_distance(port.negative_xy_m, port.positive_xy_m) > TOLERANCE_M,
              "port: końce muszą być różne.")
-    conductors = []
     for name, point in (("negative", port.negative_xy_m), ("positive", port.positive_xy_m)):
         _require(_contains(point, board), f"port.{name}: koniec poza obrysem PCB.")
         members = [i for i, polygon in enumerate(polygons) if _contains(point, polygon)]
         _require(len(members) == 1, f"port.{name}: wymagana przynależność do dokładnie jednej wyspy miedzi.")
-        conductors.append(members[0])
-    _require(conductors[0] != conductors[1], "port: oba końce należą do tej samej wyspy miedzi.")
     return {"geometry_status": "passed", "electromagnetic_status": "unverified",
             "copper_count": len(polygons)}

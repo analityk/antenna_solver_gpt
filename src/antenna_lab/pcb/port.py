@@ -91,7 +91,7 @@ def resolve_pcb_lumped_port(
     def members(point):
         return [i for i, polygon in enumerate(polygons) if _contains(point, polygon)]
 
-    # The anchor planner already validated unique, distinct endpoint ownership.
+    # The anchor planner already validated unique endpoint ownership (possibly the same RF loop).
     negative, positive = members(n)[0], members(p)[0]
     rows = y[iy0:iy1+1]
     for side, coordinate, owner in (('negative',n[0],negative), ('positive',p[0],positive)):

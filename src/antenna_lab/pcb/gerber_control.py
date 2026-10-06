@@ -27,10 +27,19 @@ def _write_json(path, value):
     path.write_text(json.dumps(value, indent=2, allow_nan=False)+'\n', encoding='utf-8')
 
 
-def run_gerber_control(config_path, output_dir, *, prepare_only=False, quality='design', sweep_request=None, **frequency_settings):
+def run_gerber_control(config_path, output_dir, *, prepare_only=False, quality='design', sweep_request=None, pcb_config=None, **frequency_settings):
     """Import, normalize once, preflight, then XML or one solve for all frequencies."""
-    config = load_pcb_config(config_path)
-    source = load_pcb_geometry(config)
+    bundle_metadata = {}
+    if Path(config_path).is_dir():
+        from .bundle import load_bundle_geometry
+        config, source, bundle_metadata = load_bundle_geometry(config_path, pcb_config)
+    else:
+        if pcb_config is not None:
+            raise ConfigurationError('--pcb-config is for directory input; legacy JSON already specifies physical parameters.')
+        config = load_pcb_config(config_path)
+        source = load_pcb_geometry(config)
+        from .bundle import audit_physical_feed
+        audit_physical_feed(source)
     geometry, transform = normalize_port_orientation(source)
     settings, exact = gerber_quality_settings(quality, **frequency_settings)
     frequencies = settings.result_frequency_hz
@@ -46,7 +55,7 @@ def run_gerber_control(config_path, output_dir, *, prepare_only=False, quality='
     if output.exists() and (not output.is_dir() or any(output.iterdir())):
         raise ConfigurationError(f'PCB Gerber: wymagany pusty/nowy katalog {output}.')
     metadata = {
-        'config_path': str(Path(config_path).resolve()),
+        'config_path': str(Path(pcb_config or config_path).resolve()) if pcb_config or not Path(config_path).is_dir() else None,
         'resolved_config': {key: str(value) if isinstance(value, Path) else value
                             for key,value in asdict(config).items()},
         'files': {role: {'path': str(path), 'sha256': sha256(path.read_bytes()).hexdigest()}
@@ -55,7 +64,12 @@ def run_gerber_control(config_path, output_dir, *, prepare_only=False, quality='
         'normalization': asdict(transform), 'assumptions': list(geometry.assumptions),
         'port_edge_mode': 'aligned', 'validation_status': 'unverified',
     }
+    metadata.update(bundle_metadata)
+    metadata.setdefault('source_directory', str(config.copper_top_path.parent))
     print('PCB Gerber: '+str(output), flush=True)
+    print(f'Material assumptions (unverified): substrate {config.substrate_thickness_m*1e3:g} mm, '
+          f'epsilon_r={config.substrate_epsilon_r:g}, loss_tangent={config.substrate_loss_tangent:g}; '
+          f'copper PEC, nominal thickness {config.copper_thickness_m*1e6:g} um (not modeled)', flush=True)
     for assumption in geometry.assumptions:
         print('  '+assumption, flush=True)
     output.mkdir(parents=True, exist_ok=True)
@@ -121,12 +135,27 @@ def run_gerber_control(config_path, output_dir, *, prepare_only=False, quality='
             _write_json(output/'geometry.source.json', source.as_dict())
             _write_json(output/'geometry.json', geometry.as_dict())
             _write_json(output/'import.json', metadata)
+    if not prepare_only:
+        # Match antenna best-effort reporting: presentation never invalidates FDTD.
+        try:
+            from antenna_lab.visualization.report import generate_report
+            report = generate_report(output, automatic=True)
+            print(f'Raport HTML: {report}', flush=True)
+        except Exception as exc:
+            warning = f'Nie utworzono raportu HTML: {type(exc).__name__}: {exc}. Wyniki FDTD są zachowane; użyj polecenia report.'
+            result.setdefault('warnings', []).append(warning)
+            print(warning, file=sys.stderr, flush=True)
+            try:
+                _write_json(output/'summary.json', result)
+            except OSError as write_error:
+                print(f'Nie zapisano ostrzeżenia raportu: {write_error}; ukończony wynik pozostaje zachowany.', file=sys.stderr)
     return json.loads(json.dumps(result, allow_nan=False))
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description='Import top-copper/outline Gerbers and run one unverified PCB model')
-    parser.add_argument('config', type=Path)
+    parser.add_argument('config', type=Path, help='Gerber directory (or legacy PCB JSON)')
+    parser.add_argument('--pcb-config', type=Path, help='Physical assumptions only; default FR4 1.6 mm, auto port')
     parser.add_argument('--output', type=Path)
     parser.add_argument('--quality', choices=('preview','design','verify'), default='design')
     parser.add_argument('--prepare-only', action='store_true', help='Write native XML without running FDTD')
@@ -159,7 +188,7 @@ def main(argv=None):
             root = Path('outcomes/pcb_gerber')
             root.mkdir(parents=True, exist_ok=True)
             output = Path(mkdtemp(prefix=datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ_'), dir=root))
-        result = run_gerber_control(args.config, output, prepare_only=args.prepare_only, quality=args.quality, **sweep_options, **band)
+        result = run_gerber_control(args.config, output, prepare_only=args.prepare_only, quality=args.quality, **sweep_options, pcb_config=args.pcb_config, **band)
         print(f"Status: {result['status']}; validation_status: unverified\n{output.resolve()/'summary.json'}")
         if not args.prepare_only:
             print(output.resolve()/'impedance.csv')

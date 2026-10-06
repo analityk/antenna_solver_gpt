@@ -867,3 +867,35 @@ Liczba próbek nie zmienia siatki przy niezmienionym zakresie częstotliwości;
 padding nadal zależy od minimum częstotliwości. Wyniki nie uzyskują nowej
 kwalifikacji walidacyjnej. Testy fake: Gerber 23, pełny zestaw 262 OK
 (3 pominięte); bez natywnego FDTD i bez modyfikacji historycznych wyników.
+
+## 2026-10-07 — PCB-010D: katalog Gerberów i lokalny raport PCB
+
+Wejściem gerber_control jest teraz katalog. Gerbonara/metadane i konwencje
+nazw identyfikują warstwy; role, SHA256 i pominięcia trafiają do import/summary.
+Nieobsługiwana dolna/wewnętrzna miedź, wiercenia i nieustalone Gerbery blokują
+przebieg. Nowy opcjonalny pcb-physical.schema.json i przykład FR4 opisują
+wyłącznie fizykę; bez konfiguracji używane są jawne założenia unverified.
+Starszy JSON z plikami pozostaje obsługiwany.
+
+Auto feed wymaga dwóch zgodnych prostokątnych flashów. Szczelinę wyznacza
+przecięcie pełnej sumy miedzi z osią między padami, nie same apertury.
+Pełne powierzchnie styku i prostokątna szczelina mają kontrolę geometryczną
+przed normalizacją, a następnie niezmieniony audyt siatki. Usunięto wyłącznie
+uniwersalny zakaz portu na jednym CopperPolygon; pętla może łączyć oba końce
+poza szczeliną. Nie zmieniono geometrii importera, solvera ani profili.
+
+Istniejące report.py/report_data.py i wspólne CSS/JS obsługują zapisane PCB:
+geometria, R/X, S11, SWR, minima i przedziały X=0, metadane i ograniczenia.
+Automatyczny report.html/plots powstaje po sukcesie; awaria prezentacji
+nie odbiera statusu completed. Ręczne report --open działa bez Gerberów
+i natywnych bibliotek, zapisując nowy HTML poza ukończonym przebiegiem.
+Nie dodano pól, NF2FF ani nowego frameworka HTML. Wyniki nadal unverified.
+
+Sprawdzenia: import obu rzeczywistych katalogów bez FDTD — emstest gap
+0,64412 mm, emstest2 gap 0,70024 mm i szerokość 0,86401 mm; drugi ma jeden
+przewodnik. Kontrola normalizacji i portu/siatki zaliczona. Testy PCB: 206 OK
+(1 skip), raporty: 17 OK; pełny zestaw: 273 OK (3 skip). Native Run w testach
+wyłącznie atrapą; istniejące testy raportu antenowego bez zmian. Sprawdzono
+wizualnie rysunek pętli z realnej geometrii; widmo kontrolne pochodziło z atrapy.
+Ograniczenia: auto tylko poziome/pionowe zgodne prostokątne pady; pozostałe
+układy wymagają jawnego portu. Natywne wykonanie pozostaje lokalnie na Windows.

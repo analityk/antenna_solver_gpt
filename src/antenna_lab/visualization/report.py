@@ -16,7 +16,7 @@ import numpy as np
 
 from antenna_lab.core.config import ROOT
 from .report_assets import CSS, JS
-from .report_data import edge_work_counts, load_report_data, matching_index
+from .report_data import edge_work_counts, load_report_data, matching_index, read_json
 
 
 def number(value, digits=3):
@@ -240,29 +240,116 @@ def _metadata(data):
     return '<section class="panel"><h2>Przebieg i wiarygodność danych</h2>' + body + '</section>'
 
 
+def _pcb_geometry(data, plots_path):
+    """Draw only saved SI polygons; never reopen Gerbers or native modules."""
+    from matplotlib.patches import Polygon as PatchPolygon
+    geometry = data['geometry']
+    fig = Figure(figsize=(8, 6)); ax = fig.subplots()
+    board = np.asarray(geometry['outline']['vertices_xy_m'])*1e3
+    ax.add_patch(PatchPolygon(board, facecolor='#f1f4e7', edgecolor='#53604c', label='PCB'))
+    for copper in geometry['copper']:
+        points = np.asarray(copper['vertices_xy_m'])*1e3
+        ax.add_patch(PatchPolygon(points, facecolor='#c77c36', edgecolor='#825323', alpha=.85))
+    port = geometry['port']; n,p = np.asarray(port['negative_xy_m']),np.asarray(port['positive_xy_m'])
+    delta = p-n; normal = np.array([-delta[1],delta[0]])/np.linalg.norm(delta)*port['width_m']/2
+    face = np.asarray([n-normal,p-normal,p+normal,n+normal])*1e3
+    ax.add_patch(PatchPolygon(face, fill=False, edgecolor='#175bc0', linewidth=2, label='Port'))
+    ax.scatter(*np.asarray([n,p]).T*1e3, color=['#143c7a','#e43232'], s=22, zorder=5)
+    ax.autoscale_view(); ax.set_aspect('equal');ax.margins(.08)
+    ax.set(xlabel='x [mm]',ylabel='y [mm]',title='PCB: miedź i port, widok z góry')
+    ax.grid(alpha=.15);ax.legend();fig.tight_layout()
+    return '<section class="panel"><h2>Geometria PCB</h2>'+figure_image(fig,'Geometria PCB z geometry.json',plots_path/'geometry.png' if plots_path else None)+'</section>'
+
+
+def _pcb_spectrum(data, plots_path):
+    spectrum = data['spectrum']; f = np.asarray(spectrum['frequency_mhz'])
+    z = np.asarray(spectrum['r'])+1j*np.asarray(spectrum['x']); reference=data['reference']
+    rho = np.abs((z-reference)/(z+reference))
+    with np.errstate(divide='ignore'):
+        db = 20*np.log10(rho)
+    swr = (1+rho)/(1-rho)
+    html = ''
+    for name,curves,ylabel in (
+        ('impedance',[(z.real,'R'),(z.imag,'X')],'R, X [Ω]'),
+        ('s11',[(db,'S11')],'S11 [dB]'),('swr',[(swr,'SWR')],'SWR')):
+        fig=Figure(figsize=(9,3.3));ax=fig.subplots()
+        for values,label in curves:ax.plot(f,values,'o-' if len(f)<3 else '-',label=label)
+        ax.set(xlabel='Częstotliwość [MHz]',ylabel=ylabel);ax.grid(alpha=.2);ax.legend();fig.tight_layout()
+        html += figure_image(fig,ylabel,plots_path/(name+'.png') if plots_path else None)
+    return html
+
+
+def _pcb_diagnostics(data):
+    diag=data['pcb_diagnostics']; rows=[]; boundary=[]
+    lo,hi=data['spectrum']['frequency_mhz'][0],data['spectrum']['frequency_mhz'][-1]
+    for key,label,value in (('minimum_s11','Minimum próbkowane S11','s11_db'),
+                            ('minimum_swr','Minimum próbkowane SWR','swr'),
+                            ('minimum_abs_reactance','Minimum |X| (pokazano X)','reactance_ohm')):
+        item=diag[key];freq=item['frequency_hz']/1e6
+        rows.append((label,number(freq,6),'−∞' if item[value] is None else number(item[value],6)))
+        if freq in (lo,hi):boundary.append(label)
+    body=table(['Wielkość','MHz','Wartość'],rows)
+    if boundary:body+='<p class="status">Optimum na granicy sweepu: '+escape(', '.join(boundary))+'. Rozszerz zakres, zanim uznasz minimum za wewnętrzne.</p>'
+    crossings=diag['reactance_crossings']
+    body+=table(['Dolne MHz','Górne MHz','X dolne [Ω]','X górne [Ω]'],[
+        [number(c['frequency_low_hz']/1e6,6),number(c['frequency_high_hz']/1e6,6),number(c['x_low_ohm'],6),number(c['x_high_ohm'],6)] for c in crossings]) if crossings else '<p>Brak przejścia X przez zero w zapisanym zakresie.</p>'
+    return body+'<p>Przedziały sąsiednich próbek, bez interpolacji rezonansu. Minima dotyczą zapisanego Zref.</p>'
+
+
+def _pcb_metadata(data):
+    s=data['summary']; imported=s.get('import',read_json(data['root']/'import.json'))
+    rows=[('Katalog Gerberów',imported.get('source_directory','not recorded')),
+          ('Stan wykonania',s.get('status','not recorded')),('Walidacja',s.get('validation_status','unverified')),
+          ('Profil jakości',s.get('quality_profile','not recorded')),('Sweep',s.get('sweep','not recorded')),
+          ('Liczba komórek',s.get('mesh',{}).get('cell_count','not recorded')),
+          ('Minimalne kroki [m]',s.get('min_axis_steps_m','not recorded')),
+          ('Iteracje',s.get('actual_iterations','not recorded')),('Zakończenie',s.get('termination_status','not recorded')),
+          ('Źródło założeń',imported.get('physical_config_source','legacy PCB config')),
+          ('Parametry fizyczne',imported.get('physical_config',imported.get('resolved_config','not recorded')))]
+    body=table(['Przebieg PCB','Wartość'],rows)
+    files=imported.get('discovered_files',[])
+    if not files:
+        files=[dict(name=v['path'],role=k,sha256=v['sha256'],disposition='modeled') for k,v in imported.get('files',{}).items()]
+    body+=table(['Plik','Rola','Obsługa','SHA256'],[(f['name'],f['role'],f['disposition'],f['sha256']) for f in files])
+    assumptions=imported.get('assumptions',data['geometry'].get('assumptions',[]))
+    body+='<h3>Założenia i pominięta fizyka</h3><ul>'+''.join('<li>'+escape(str(a))+'</li>' for a in assumptions)+'</ul>'
+    body+='<p>Model PEC: bez skończonej grubości i chropowatości miedzi. Soldermask, paste i silkscreen pominięto. Dolna/wewnętrzna miedź oraz otwory/vias nie są obsługiwane. E/H, NF2FF i bilans mocy: not recorded.</p>'
+    body+=''.join('<p class="status">'+escape(str(w))+'</p>' for w in data['warnings'])
+    return '<section class="panel"><h2>Przebieg PCB i założenia</h2>'+body+'</section>'
+
+
 def render_html(data, *, plots_path=None, phase_step=None, field_components=None):
     from .fields import field_section
     spectrum, reference = data["spectrum"], data["reference"]
-    title = "Raport anteny · " + data["run_id"]
+    pcb = data.get("is_pcb", False)
+    title = ("Raport PCB · " if pcb else "Raport anteny · ") + data["run_id"]
     choices = sorted({50, 75, 100, 200, reference})
     options = ''.join(f'<option value="{value:g}"' + (' selected' if value == reference else '') + f'>{value:g} Ω</option>' for value in choices)
     payload = dict(spectrum, reference=reference, target_mhz=data["target_mhz"])
     encoded = json.dumps(payload, ensure_ascii=False, allow_nan=False).replace("&", "\\u0026").replace("<", "\\u003c").replace(">", "\\u003e").replace("\u2028", "\\u2028").replace("\u2029", "\\u2029")
     plot_path = plots_path / "impedance.png" if plots_path else None
-    fallback = impedance_figure(data, plot_path)
+    fallback = _pcb_spectrum(data, plots_path) if pcb else impedance_figure(data, plot_path)
     image_path = data["root"] / "plots" / "geometry.png"
     geometry = ""
     if image_path.exists():
         geometry = '<section class="panel"><details><summary>Geometria zapisana w przebiegu</summary><img alt="Zapisany rysunek geometrii anteny" src="data:image/png;base64,' + base64.b64encode(image_path.read_bytes()).decode() + '"></details></section>'
+    if pcb:
+        geometry = _pcb_geometry(data, plots_path)
+        extra_sections = geometry + _pcb_metadata(data)
+        zeros = _pcb_diagnostics(data)
+    else:
+        extra_sections = (_power_section(data) + _far_field(data, plots_path / 'pattern_cuts.png' if plots_path else None)
+                          + field_section(data, figure_image, plots_path, phase_step, field_components) + geometry + _metadata(data))
+        zeros = _zeros(spectrum)
     note = escape(data["summary"].get("note", "Wynik roboczy; wymagana kontrola modelu i zbieżności."))
     points = len(spectrum["r"])
     return f'''<!doctype html>
 <html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{escape(title)}</title><style>{CSS}</style></head><body><main>
-<header><div class="eyebrow">Antenna Solver GPT · raport lokalny</div><h1>Antena pod lupą</h1>
+<header><div class="eyebrow">Antenna Solver GPT · raport lokalny</div><h1>{"PCB pod lupą" if pcb else "Antena pod lupą"}</h1>
 <p class="run">Wariant: <strong>{escape(data['variant_name'])}</strong></p>
 <p class="run">Przebieg: <strong>{escape(data['run_id'])}</strong></p>
-<p class="muted">Widmo, charakterystyka i bilans mocy z zapisanych danych. Ten plik działa samodzielnie, bez internetu.</p></header>
+<p class="muted">{"Geometria PCB i widmo impedancji z zapisanych danych." if pcb else "Widmo, charakterystyka i bilans mocy z zapisanych danych."} Ten plik działa samodzielnie, bez internetu.</p></header>
 <div class="status"><strong>Wynik roboczy — raport nie zatwierdza modelu.</strong><br>{note}</div>
 <section class="panel"><h2>Impedancja i dopasowanie</h2>
 <p>{points} próbek od {number(spectrum['frequency_mhz'][0])} do {number(spectrum['frequency_mhz'][-1])} MHz.
@@ -280,10 +367,10 @@ def render_html(data, *, plots_path=None, phase_step=None, field_components=None
 <p id="mismatch"></p><div class="plots"><div class="plot"><p class="legend"><span class="blue">● R</span> · <span class="orange">● X</span></p><div id="impedance-plot"></div></div>
 <div class="plot"><p class="legend">SWR · zielone tło: 1–2</p><div id="swr-plot"></div></div></div>
 <p id="best-info"></p><p class="muted">Kliknięcie wykresu wybiera najbliższą zapisaną próbkę. Linia przerywana pokazuje wybór; kropkowana — cel z konfiguracji.</p></div>
-<div class="fallback">{fallback}<p>Wykres statyczny: Zref = {number(reference, 0)} Ω. Interaktywne sterowanie wymaga JavaScript; wydruk używa tej wersji.</p></div>
+<div class="{'pcb-spectrum-static' if pcb else 'fallback'}">{fallback}<p>Wykres statyczny: Zref = {number(reference, 0)} Ω. Interaktywne sterowanie wymaga JavaScript; wydruk używa tej wersji.</p></div>
 <p class="muted">Gęsty krok częstotliwości jest odczytem widma tego samego przebiegu czasowego. Nie zwiększa fizycznej rozdzielczości ani dokładności symulacji. Niski SWR sam nie oznacza dużego zysku.</p>
-<details><summary>Przejścia reaktancji przez zero</summary>{_zeros(spectrum)}</details></section>
-{_power_section(data)}{_far_field(data, plots_path / 'pattern_cuts.png' if plots_path else None)}{field_section(data, figure_image, plots_path, phase_step, field_components)}{geometry}{_metadata(data)}
+<details{' open' if pcb else ''}><summary>{'Minima próbkowane i przejścia reaktancji przez zero' if pcb else 'Przejścia reaktancji przez zero'}</summary>{zeros}</details></section>
+{extra_sections}
 <p class="footer">Generator raportu v1 · {datetime.now(timezone.utc).isoformat()} · źródło: {escape(str(data['root']))}<br>
 Odczyt i interpretacja według jawnych reguł; bez AI, usług sieciowych i ponownej symulacji FDTD. Dane źródłowe pozostają niezmienione.</p>
 </main><script id="report-data" type="application/json">{encoded}</script><script>{JS}</script></body></html>'''
@@ -312,7 +399,9 @@ def generate_report(run_path, output=None, *, automatic=False, start_mhz=None, s
                             simulation_completed=automatic)
     if variant_name:
         data["variant_name"] = variant_name
-    if automatic and data["manifest"].get("status") != "running":
+    if automatic and data.get("is_pcb") and data["execution_status"] != "completed":
+        raise ValueError("Automatyczny raport PCB wymaga ukończonego przebiegu.")
+    if automatic and not data.get("is_pcb") and data["manifest"].get("status") != "running":
         raise ValueError("Raport automatyczny wolno zapisać tylko przed zamknięciem nowego przebiegu.")
     html = render_html(data, plots_path=root / "plots" if automatic else None,
                        phase_step=phase_step, field_components=field_components)
