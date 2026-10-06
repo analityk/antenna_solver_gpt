@@ -689,6 +689,42 @@ z projektowej .venv i ustawionym CSXCAD_INSTALL_PATH. Opcjonalnie te same
 --center-mhz/--cutoff-mhz/--frequencies-mhz/--loss-reference-mhz co control.
 Nie uruchamiać automatycznie kilku macierzy ani wariantów równolegle.
 
+
+## 2026-10-06 — PCB-009C: zrównoważona drabina przestrzenna PCB
+
+Wyniki PCB-009B przekazane przez użytkownika wskazały dominującą wrażliwość
+na port (~8,03% zespolonego Z) i podział Z laminatu (~4,71%) przy 1,42 GHz.
+Wpływ domeny/PML/czasu był dużo mniejszy. Nie uznano rozwiązania za zbieżne.
+
+Dodano osobną komendę `python -m antenna_lab.pcb.spatial_convergence`.
+L0/L1/L2/L3 równocześnie zmieniają cells_per_wavelength 20/30/40/50,
+podział szczeliny i szerokości portu 2/4/6/8 oraz laminatu Z 4/8/12/16.
+Powietrze 0,25 długości fali, PML 8, EndCriteria 1e-5, limit 100000 kroków
+i grading 1,4/1,5 pozostają stałe. Geometria i model materiału nie zmieniają się.
+Pasmo i walidacja są współdzielone z control. PCB-009B pozostaje bez zmian.
+
+Przed każdym solverem powstaje siatka preflight z istniejącym max_cells;
+jej rozmiary, kroki i grading są drukowane i zapisywane. Istniejący runner
+odtwarza ją deterministycznie; metadane muszą się zgadzać. Błąd limitu
+zatrzymuje poziom przed natywnym API i zachowuje wcześniejsze wyniki.
+Katalogi poziomów są niezależne; brak wznowienia i dodatkowych poziomów.
+
+spatial_convergence.json/CSV zawierają Z, S11, SWR, pojemność diagnostyczną,
+porównania kolejnych poziomów i względem L3, metadane siatki oraz trend |delta Z|.
+Progi inżynierskie dla L3–L2: względne Z/X ≤1% i R ≤5% na każdej częstotliwości.
+Status diagnostic_candidate_converged lub diagnostic_not_converged nie oznacza
+walidacji fizycznej. R/X używają progu mianownika 1 ohm, Z — Zref. Porównanie
+pojemności wymaga obu X<0; jawny próg mianownika 1e-18 F dotyczy wyłącznie
+tej diagnostyki i nie wpływa na bramkę inżynierską. Trend nie jest wymuszany.
+
+Sprawdzenie: 8 nowych testów z atrapami, dotychczasowe control/convergence
+i adapter bez błędów; 151 testów PCB (1 pominięty), pełny zestaw 218
+(3 pominięte), OK. Sprawdzono granice progów, matematykę porównań, trzy pasma,
+kolejność preflight/solve, brak mutacji i zachowanie wyników po błędzie
+L2/L3 lub przerwaniu. Natywnego FDTD nie uruchamiano; XML smoke pominięty
+z braku openEMS. Drabina wymaga lokalnego wykonania na Windowsie.
+Bez Gerbera, korekcji 1/3–2/3, pól, NF2FF i diagnostyki mocy.
+
 ## Wzór kolejnego wpisu
 
 - Data i krótka nazwa zmiany.
