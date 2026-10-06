@@ -28,7 +28,7 @@ class PcbLumpedPortSpec:
 
 
 def resolve_pcb_lumped_port(
-    geometry: PcbGeometry, domain_mesh: PcbDomainMesh, settings: PcbSimulationSettings,
+    geometry: PcbGeometry, domain_mesh: PcbDomainMesh, settings: PcbSimulationSettings, *, port_edge_mode='aligned',
 ) -> PcbLumpedPortSpec:
     """Resolve an exact planar +X port without touching geometry, mesh or CSXCAD.
 
@@ -37,6 +37,8 @@ def resolve_pcb_lumped_port(
     XY-cell centres. This does not prove the absence of subcell copper slivers.
     Requires validated experiment settings; no native source is created.
     """
+    if port_edge_mode != 'aligned':
+        return _resolve_thirds_port(geometry, domain_mesh, settings, port_edge_mode)
     plan = make_pcb_mesh_anchor_plan(geometry)
     n, p = geometry.port.negative_xy_m, geometry.port.positive_xy_m
     mx = (n[0]+p[0])/2
@@ -96,3 +98,54 @@ def resolve_pcb_lumped_port(
     return PcbLumpedPortSpec(1, geometry.port.id, start, stop, 'x',
         settings.reference_impedance_ohm, 1.0, 5, geometry.copper[negative].id,
         geometry.copper[positive].id, nx, ny, nx*(ny+1))
+
+
+
+def _resolve_thirds_port(geometry, mesh, settings, mode):
+    """Physical contact and discrete intersecting-cell audit; no coordinate snapping.
+
+    Counts describe intersecting XY intervals. Active Ex edges use X-cell centres
+    inside the gap and Y mesh rows inside the physical width, not (ny+1).
+    They are a project grid audit, not inspection of native resistor internals.
+    """
+    from antenna_lab.solvers.pcb_mesh import make_pcb_solver_anchor_plan, audit_pcb_port_edge_mesh
+    plan=make_pcb_solver_anchor_plan(geometry,settings,mode)
+    audit_pcb_port_edge_mesh(geometry,settings,mesh,mode)
+    axes=(mesh.x_lines_m,mesh.y_lines_m,mesh.z_lines_m)
+    if mesh.pml_cells!=settings.pml_cells:
+        raise ConfigurationError('PCB thirds: niezgodne pml_cells.')
+    for lines,required in zip(axes,(plan.x_required_m,plan.y_required_m,plan.z_required_m)):
+        if (not set(required).issubset(lines) or any(not isfinite(v) for v in lines)
+                or any(a>=b for a,b in zip(lines,lines[1:]))):
+            raise ConfigurationError('PCB thirds: niezgodna geometria/siatka lub brak krytycznych linii.')
+    n,p=geometry.port.negative_xy_m,geometry.port.positive_xy_m
+    my=(n[1]+p[1])/2;half=geometry.port.width_m/2
+    yl,yu=my-half,my+half
+    x,y,_=axes
+    intervals=lambda lines,lo,hi: [(a,b) for a,b in zip(lines,lines[1:]) if a<hi and b>lo]
+    xi,yi=intervals(x,n[0],p[0]),intervals(y,yl,yu)
+    if len(xi)<settings.min_port_gap_cells or len(yi)<settings.min_port_width_cells:
+        raise ConfigurationError('PCB thirds: niewystarczająca liczba komórek przecinających port.')
+    polygons=[]
+    for copper in geometry.copper:
+        vertices=list(copper.vertices_xy_m)
+        if vertices[-1]==vertices[0]: vertices.pop()
+        polygons.append(vertices)
+    members=lambda pt: [i for i,v in enumerate(polygons) if _contains(pt,v)]
+    ni,pi=members(n)[0],members(p)[0]
+    rows=[v for v in y if yl<v<yu]
+    centres_y=[max(a,yl)+(min(b,yu)-max(a,yl))/2 for a,b in yi]
+    for side,xx,owner in (('negative',n[0],ni),('positive',p[0],pi)):
+        for yy in (yl,yu,my,*rows,*centres_y):
+            if members((xx,yy))!=[owner]:
+                raise ConfigurationError(f'PCB thirds {side}: niepełny/niejednoznaczny kontakt przy {(xx,yy)}.')
+    centres_x=[a+(b-a)/2 for a,b in xi]
+    if not rows or any(not n[0]<v<p[0] for v in centres_x):
+        raise ConfigurationError('PCB thirds: środki aktywnych komórek Ex muszą leżeć w szczelinie.')
+    for xx in centres_x:
+        for yy in (yl,yu,*rows,*centres_y):
+            if members((xx,yy)):
+                raise ConfigurationError(f'PCB thirds: miedź w szczelinie przy {(xx,yy)}.')
+    return PcbLumpedPortSpec(1,geometry.port.id,(n[0],yl,0.0),(p[0],yu,0.0),'x',
+        settings.reference_impedance_ohm,1.,5,geometry.copper[ni].id,geometry.copper[pi].id,
+        len(xi),len(yi),len(centres_x)*len(rows))

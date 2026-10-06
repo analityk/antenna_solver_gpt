@@ -342,7 +342,7 @@ def _add_domain_pml(lines, count):
 
 
 def make_pcb_domain_mesh(
-    geometry: PcbGeometry, settings: PcbSimulationSettings,
+    geometry: PcbGeometry, settings: PcbSimulationSettings, *, port_edge_mode='aligned',
 ) -> PcbDomainMesh:
     """Refine local PCB/air intervals, audit, then attach uniform PML cells.
 
@@ -350,7 +350,7 @@ def make_pcb_domain_mesh(
     Cartesian cell array. Intermediate count estimates are lower bounds;
     all refinements only increase counts. No native solver is instantiated.
     """
-    plan = make_pcb_mesh_anchor_plan(geometry)
+    plan = make_pcb_solver_anchor_plan(geometry, settings, port_edge_mode)
     policy = derive_pcb_physical_mesh_policy(geometry, settings)
     pml = policy.pml_cells
     if isinstance(pml, bool) or not isinstance(pml, int) or not 6 <= pml <= 20:
@@ -382,7 +382,13 @@ def make_pcb_domain_mesh(
             ratio = (b-a) / maximum
             if not isfinite(ratio) or ratio > policy.max_cells:
                 raise ConfigurationError("PCB domain: wymagany podział osi przekracza max_cells.")
-            divisions.append(ceil(ratio))
+            count = ceil(ratio)
+            if port_edge_mode == 'thirds' and axis < 2:
+                edge = pcb_port_edge_policy(geometry, settings, port_edge_mode)
+                hints = edge['x_hints' if axis == 0 else 'y_hints']
+                if (a,b) in (hints[:2],hints[2:]) and ratio <= 1 + _DOMAIN_REL_TOL:
+                    count = 1  # preserve edge cell despite subtraction residue
+            divisions.append(count)
         boundaries.append(edges)
         limits.append(axis_limits)
         counts.append(divisions)
@@ -409,9 +415,109 @@ def make_pcb_domain_mesh(
     for axis, core in zip(axes, anchors):
         if not axis[0] < axis[pml] < core[0] < core[-1] < axis[-pml-1] < axis[-1]:
             raise ConfigurationError("PCB domain: nieprawidłowy porządek granic struktury, powietrza i PML.")
-    return PcbDomainMesh(
+    mesh = PcbDomainMesh(
         *axes, shape, cell_count,
         tuple(a[0] for a in ordinary), tuple(a[-1] for a in ordinary),
         tuple(a[0] for a in axes), tuple(a[-1] for a in axes), pml,
         min(min(s) for s in all_steps), max(max(s) for s in all_steps), worst,
     )
+
+    audit_pcb_port_edge_mesh(geometry, settings, mesh, port_edge_mode)
+    return mesh
+
+
+def pcb_port_edge_policy(geometry, settings, port_edge_mode='aligned'):
+    """Four synthetic feed edges only; no vertex-to-grid or automatic net policy."""
+    if port_edge_mode not in ('aligned', 'thirds'):
+        raise ConfigurationError('PCB port_edge_mode: wymagane aligned albo thirds.')
+    policy = derive_pcb_physical_mesh_policy(geometry,settings)
+    n,p = geometry.port.negative_xy_m,geometry.port.positive_xy_m
+    my = (n[1]+p[1])/2
+    yl,yu = my-geometry.port.width_m/2,my+geometry.port.width_m/2
+    hx = min(policy.max_port_gap_step_m,policy.max_substrate_xy_step_m)
+    hy = min(policy.max_port_width_step_m,policy.max_substrate_xy_step_m)
+    return dict(mode=port_edge_mode,edge_resolution_x=hx,edge_resolution_y=hy,
+        physical_x_edges=(n[0],p[0]),physical_y_edges=(yl,yu),
+        x_hints=(n[0]-hx/3,n[0]+2*hx/3,p[0]-2*hx/3,p[0]+hx/3),
+        y_hints=(yl-2*hy/3,yl+hy/3,yu-hy/3,yu+2*hy/3))
+
+
+def _audit_thirds_pads(geometry, edge):
+    """Conservative geometric proof for two rectangular synthetic terminals.
+
+    Supports only axis-aligned rectangular pads (rotation residue tolerated).
+    Full transverse contacts and the occupied X side are checked geometrically,
+    not inferred from IDs. General polygon/edge recognition is deliberately absent.
+    """
+    from antenna_lab.pcb.validation import _contains, TOLERANCE_M
+    if len(geometry.copper) != 2:
+        raise ConfigurationError('PCB thirds: wymagane dokładnie dwa prostokątne pady syntetyczne.')
+    n,p = geometry.port.negative_xy_m,geometry.port.positive_xy_m
+    yl,yu = edge['physical_y_edges']
+    owners=[]
+    for endpoint,side in ((n,'negative'),(p,'positive')):
+        found=[c for c in geometry.copper if _contains(endpoint,list(c.vertices_xy_m))]
+        if len(found)!=1:
+            raise ConfigurationError(f'PCB thirds {side}: niejednoznaczny kontakt.')
+        copper=found[0];vertices=list(copper.vertices_xy_m)
+        if vertices[-1]==vertices[0]: vertices.pop()
+        xmin,xmax=min(v[0] for v in vertices),max(v[0] for v in vertices)
+        ymin,ymax=min(v[1] for v in vertices),max(v[1] for v in vertices)
+        corners={(min((0,1),key=lambda i:abs(v[0]-(xmin,xmax)[i])),
+                  min((0,1),key=lambda i:abs(v[1]-(ymin,ymax)[i]))) for v in vertices}
+        rectangular=(len(vertices)==4 and len(corners)==4 and all(
+            min(abs(x-xmin),abs(x-xmax))<=TOLERANCE_M and
+            min(abs(y-ymin),abs(y-ymax))<=TOLERANCE_M for x,y in vertices))
+        inner=xmax if side=='negative' else xmin
+        inside=edge['x_hints'][0] if side=='negative' else edge['x_hints'][-1]
+        if (not rectangular or abs(inner-endpoint[0])>TOLERANCE_M or
+            abs(ymin-yl)>TOLERANCE_M or abs(ymax-yu)>TOLERANCE_M or
+            not xmin < inside < xmax):
+            raise ConfigurationError(f'PCB thirds {side}: błędna strona metalu lub niepełny prostokątny kontakt; '
+                                     'ujemny pad musi zajmować -X, dodatni +X, z krawędziami Y na szerokości portu.')
+        owners.append(copper.id)
+    if owners[0]==owners[1]:
+        raise ConfigurationError('PCB thirds: wspólny przewodnik zwiera port.')
+
+
+def make_pcb_solver_anchor_plan(geometry, settings, port_edge_mode='aligned'):
+    """Aligned plan is unchanged; thirds replaces only four identified feed edges."""
+    from dataclasses import replace
+    plan=make_pcb_mesh_anchor_plan(geometry)
+    if port_edge_mode=='aligned': return plan
+    edge=pcb_port_edge_policy(geometry,settings,port_edge_mode)
+    _audit_thirds_pads(geometry,edge)
+    n,p=geometry.port.negative_xy_m,geometry.port.positive_xy_m
+    mids=((n[0]+p[0])/2,(n[1]+p[1])/2)
+    modified=[]
+    for axis,required in enumerate((plan.x_required_m,plan.y_required_m)):
+        forbidden=edge['physical_x_edges' if axis==0 else 'physical_y_edges']
+        hints=edge['x_hints' if axis==0 else 'y_hints']
+        # Board extremes and copper centres/outer edges are independent anchors.
+        board=[v[axis] for v in geometry.outline.vertices_xy_m]
+        independent=[min(board),max(board),mids[axis]]
+        for copper in geometry.copper:
+            vals=[v[axis] for v in copper.vertices_xy_m];lo,hi=min(vals),max(vals)
+            independent.append((lo+hi)/2)
+            independent.extend(v for v in (lo,hi) if all(abs(v-f)>ANCHOR_MERGE_TOLERANCE_M for f in forbidden))
+        if any(abs(v-f)<=ANCHOR_MERGE_TOLERANCE_M for v in independent for f in forbidden):
+            raise ConfigurationError('PCB thirds: niezależna kotwica koliduje z fizyczną krawędzią portu.')
+        remaining=[v for v in required if all(abs(v-f)>ANCHOR_MERGE_TOLERANCE_M for f in forbidden)]
+        modified.append(_merge(remaining,(*hints,mids[axis])))
+    return replace(plan,x_required_m=modified[0],y_required_m=modified[1])
+
+
+def audit_pcb_port_edge_mesh(geometry, settings, mesh, port_edge_mode='aligned'):
+    """Audit exact hints, forbidden edge lines, and unsplit edge cells in thirds."""
+    if port_edge_mode=='aligned': return
+    edge=pcb_port_edge_policy(geometry,settings,port_edge_mode)
+    for axis,lines in (('x',mesh.x_lines_m),('y',mesh.y_lines_m)):
+        hints=edge[axis+'_hints']
+        if not set(hints).issubset(lines) or any(v in lines for v in edge['physical_'+axis+'_edges']):
+            raise ConfigurationError(f'PCB thirds {axis}: brak dokładnych hints lub ponownie dodana fizyczna krawędź.')
+        for a,b in (hints[:2],hints[2:]):
+            if any(a<v<b for v in lines):
+                raise ConfigurationError(f'PCB thirds {axis}: grading/podział rozbił komórkę krawędziową 1/3–2/3; '
+                                         'zmień jawne ustawienia, nie osłabiaj gradingu.')
+    if 0.0 not in mesh.z_lines_m:
+        raise ConfigurationError('PCB thirds: brak dokładnej płaszczyzny z=0.')

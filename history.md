@@ -725,6 +725,20 @@ L2/L3 lub przerwaniu. Natywnego FDTD nie uruchamiano; XML smoke pominięty
 z braku openEMS. Drabina wymaga lokalnego wykonania na Windowsie.
 Bez Gerbera, korekcji 1/3–2/3, pól, NF2FF i diagnostyki mocy.
 
+## 2026-10-06 — PCB-009D: eksperyment krawędzi portu
+
+Dodano jawny tryb thirds dla dwóch prostokątnych padów syntetycznych; aligned
+pozostaje domyślny. Geometria miedzi, fizyczny port i Z=0 są zachowane.
+Audyt odrzuca konflikty kotwic oraz podział komórki krawędziowej przez grading.
+Runner porównuje aligned/thirds na istniejących L2/L3; wymaga statystyk natywnych
+i zakończenia przed limitem kroków. Zapisuje ścisły JSON/CSV także po błędzie.
+Dokumentacja: docs/pcb-port-edge-experiment.md.
+
+Sprawdzenie: 11 nowych testów, cały zestaw 229 testów OK (3 pominięte).
+Siatki aligned L2/L3 porównano dokładnie z kodem sprzed zmiany: identyczne.
+Brak rzeczywistego FDTD w środowisku agenta; A/B wymaga lokalnego Windows.
+Wynik jest diagnostyczny, nie stanowi walidacji fizycznej ani zmiany domyślnej.
+
 ## Wzór kolejnego wpisu
 
 - Data i krótka nazwa zmiany.

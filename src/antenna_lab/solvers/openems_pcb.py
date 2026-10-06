@@ -9,7 +9,7 @@ from antenna_lab.core.config import ConfigurationError
 from antenna_lab.pcb.model import PcbGeometry
 from antenna_lab.pcb.port import resolve_pcb_lumped_port
 from antenna_lab.pcb.simulation import PcbSimulationSettings
-from .pcb_mesh import PcbDomainMesh, make_pcb_domain_mesh, make_pcb_mesh_anchor_plan
+from .pcb_mesh import PcbDomainMesh, make_pcb_domain_mesh, make_pcb_mesh_anchor_plan, make_pcb_solver_anchor_plan, audit_pcb_port_edge_mesh
 
 EPS0 = 8.8541878128e-12
 
@@ -34,7 +34,7 @@ def _require_lines(axes, plan, domain_mesh):
 
 
 def install_pcb_geometry(
-    csx, geometry: PcbGeometry, domain_mesh: PcbDomainMesh, settings: PcbSimulationSettings,
+    csx, geometry: PcbGeometry, domain_mesh: PcbDomainMesh, settings: PcbSimulationSettings, *, port_edge_mode='aligned',
 ) -> dict:
     """Install a validated geometry/mesh pair in a fresh CSXCAD structure.
 
@@ -43,7 +43,7 @@ def install_pcb_geometry(
     Preflight failures do not touch CSXCAD. Readback failures stop before
     material/metal creation (the grid has necessarily already been written).
     """
-    plan = make_pcb_mesh_anchor_plan(geometry)
+    plan = make_pcb_solver_anchor_plan(geometry, settings, port_edge_mode)
     axes = (domain_mesh.x_lines_m, domain_mesh.y_lines_m, domain_mesh.z_lines_m)
     if domain_mesh.pml_cells != settings.pml_cells:
         raise ConfigurationError("PCB grid: pml_cells domeny nie zgadza się z ustawieniami eksperymentu.")
@@ -52,6 +52,7 @@ def install_pcb_geometry(
                 a >= b for a, b in zip(lines, lines[1:])):
             raise ConfigurationError(f"PCB grid {axis}: wymagane skończone, ściśle rosnące linie.")
     _require_lines(axes, plan, domain_mesh)
+    audit_pcb_port_edge_mesh(geometry, settings, domain_mesh, port_edge_mode)
     substrate = geometry.substrate
     frequency = settings.loss_reference_frequency_hz
     if not isfinite(frequency) or frequency <= 0:
@@ -69,7 +70,7 @@ def install_pcb_geometry(
         raise ConfigurationError("PCB grid: CSXCAD zmienił delta unit; wymagane dokładnie 1.0 m.")
     readback = tuple(tuple(grid.GetLines(axis)) for axis in 'xyz')
     # Recheck the solver-facing geometry contract after native grid installation.
-    plan = make_pcb_mesh_anchor_plan(geometry)
+    plan = make_pcb_solver_anchor_plan(geometry, settings, port_edge_mode)
     # Diagnose critical missing coordinates independently of whole-axis equality.
     _require_lines(readback, plan, domain_mesh)
     for axis, expected, actual in zip('xyz', axes, readback):
@@ -101,13 +102,13 @@ def install_pcb_geometry(
     }
 
 
-def prepare_pcb_csx(geometry: PcbGeometry, settings: PcbSimulationSettings):
+def prepare_pcb_csx(geometry: PcbGeometry, settings: PcbSimulationSettings, *, port_edge_mode='aligned'):
     """Build the domain before loading native modules; return CSX, mesh, metadata."""
-    domain_mesh = make_pcb_domain_mesh(geometry, settings)
+    domain_mesh = make_pcb_domain_mesh(geometry, settings, port_edge_mode=port_edge_mode)
     from .openems import native_modules
     _, csx_module = native_modules()
     csx = csx_module.ContinuousStructure()
-    metadata = install_pcb_geometry(csx, geometry, domain_mesh, settings)
+    metadata = install_pcb_geometry(csx, geometry, domain_mesh, settings, port_edge_mode=port_edge_mode)
     return csx, domain_mesh, metadata
 
 
@@ -127,13 +128,13 @@ def _audit_port_grid(csx, domain_mesh, after=False, context=None):
 
 
 def install_pcb_lumped_port(engine, csx, geometry: PcbGeometry,
-                            domain_mesh: PcbDomainMesh, settings: PcbSimulationSettings):
+                            domain_mesh: PcbDomainMesh, settings: PcbSimulationSettings, *, port_edge_mode='aligned'):
     """Install on an engine already associated with csx; never modify the grid.
 
     Spec resolution and preflight complete before any engine method is called.
     Metadata describes the resolved contract, not audited native edge internals.
     """
-    spec = resolve_pcb_lumped_port(geometry, domain_mesh, settings)
+    spec = resolve_pcb_lumped_port(geometry, domain_mesh, settings, port_edge_mode=port_edge_mode)
     _audit_port_grid(csx, domain_mesh)
     port = engine.AddLumpedPort(spec.port_nr, spec.reference_impedance_ohm,
                                list(spec.start_m), list(spec.stop_m), spec.exc_dir,
@@ -146,16 +147,16 @@ def install_pcb_lumped_port(engine, csx, geometry: PcbGeometry,
     return port, spec, metadata
 
 
-def prepare_pcb_native_model(geometry: PcbGeometry, settings: PcbSimulationSettings):
+def prepare_pcb_native_model(geometry: PcbGeometry, settings: PcbSimulationSettings, *, port_edge_mode='aligned'):
     """Return engine, CSX, port, mesh, spec, metadata; no waveform, BC, XML or run."""
-    domain_mesh = make_pcb_domain_mesh(geometry, settings)
+    domain_mesh = make_pcb_domain_mesh(geometry, settings, port_edge_mode=port_edge_mode)
     from .openems import native_modules
     ems_module, csx_module = native_modules()
     csx = csx_module.ContinuousStructure()
     engine = ems_module.openEMS(NrTS=settings.max_timesteps, EndCriteria=settings.end_criteria)
     engine.SetCSX(csx)
-    geometry_metadata = install_pcb_geometry(csx, geometry, domain_mesh, settings)
-    port, spec, port_metadata = install_pcb_lumped_port(engine, csx, geometry, domain_mesh, settings)
+    geometry_metadata = install_pcb_geometry(csx, geometry, domain_mesh, settings, port_edge_mode=port_edge_mode)
+    port, spec, port_metadata = install_pcb_lumped_port(engine, csx, geometry, domain_mesh, settings, port_edge_mode=port_edge_mode)
     metadata = {'geometry': geometry_metadata, 'port': port_metadata,
                 'engine': {'max_timesteps': settings.max_timesteps, 'end_criteria': settings.end_criteria}}
     return engine, csx, port, domain_mesh, spec, metadata
@@ -200,16 +201,16 @@ def write_pcb_xml(engine, csx, domain_mesh: PcbDomainMesh, xml_path) -> dict:
     return {'path': str(xml_path), 'size_bytes': size, 'parse_status': 'passed'}
 
 
-def prepare_pcb_xml_model(geometry: PcbGeometry, settings: PcbSimulationSettings, xml_path):
+def prepare_pcb_xml_model(geometry: PcbGeometry, settings: PcbSimulationSettings, xml_path, *, port_edge_mode='aligned'):
     """Prepare reusable XML; no Run, result processing or additional files."""
-    engine, csx, port, mesh, spec, metadata = prepare_pcb_native_model(geometry, settings)
+    engine, csx, port, mesh, spec, metadata = prepare_pcb_native_model(geometry, settings, port_edge_mode=port_edge_mode)
     metadata = {**metadata, **configure_pcb_fdtd(engine, csx, mesh, settings),
                 'xml': write_pcb_xml(engine, csx, mesh, xml_path)}
     return engine, csx, port, mesh, spec, metadata
 
 
 def run_pcb_fdtd(engine, csx, port, domain_mesh: PcbDomainMesh,
-                 settings: PcbSimulationSettings, native_dir) -> dict:
+                 settings: PcbSimulationSettings, native_dir, *, exact_endcriteria=False, dump_statistics=False) -> dict:
     """Execute an already prepared control model; port ratios remain unverified."""
     import os
     import numpy as np
@@ -219,13 +220,26 @@ def run_pcb_fdtd(engine, csx, port, domain_mesh: PcbDomainMesh,
     xml = native_dir / 'model.xml'
     if not native_dir.is_dir() or not xml.is_file() or xml.stat().st_size == 0:
         raise ConfigurationError(f'PCB Run: wymagany istniejący, niepusty {xml}; przygotuj XML najpierw.')
+    if not isinstance(exact_endcriteria, bool) or not isinstance(dump_statistics, bool):
+        raise ConfigurationError('PCB Run: exact_endcriteria/dump_statistics muszą być bool.')
+    options = {}
+    if exact_endcriteria: options['exact_endcriteria'] = True
+    if dump_statistics:
+        options['dump_statistics'] = True
+        if (native_dir/'openEMS_stats.txt').exists():
+            raise ConfigurationError('PCB Run: istnieją stare openEMS_stats.txt; użyj nowego katalogu.')
     cwd = Path.cwd()
     try:
-        status = engine.Run(str(native_dir), cleanup=False, numThreads=settings.threads)
+        status = engine.Run(str(native_dir), cleanup=False, numThreads=settings.threads, **options)
     finally:
         os.chdir(cwd)
     if status not in (None, 0):
         raise RuntimeError(f'PCB Run: openEMS zwrócił kod {status!r}; sprawdź pliki natywne w {native_dir}.')
+    statistics = None
+    if dump_statistics:
+        statistics = read_pcb_native_statistics(native_dir/'openEMS_stats.txt')
+        if statistics['number_of_iterations'] >= settings.max_timesteps:
+            raise ConfigurationError('PCB: temporal termination not established; iterations >= max_timesteps.')
     frequencies = np.asarray(settings.result_frequency_hz, dtype=float)
     port.CalcPort(str(native_dir), frequencies, ref_impedance=settings.reference_impedance_ohm)
 
@@ -259,7 +273,7 @@ def run_pcb_fdtd(engine, csx, port, domain_mesh: PcbDomainMesh,
         db = [None if r == 0 else float(20*np.log10(r)) for r in rho]
     if not np.isfinite(swr).all():
         raise ConfigurationError('PCB port: nieskończone SWR.')
-    return {
+    result = {
         'validation_status': 'unverified',
         'note': 'First synthetic PCB FDTD control result. Port, mesh, PML and material convergence have not yet been established. Exact zero reflection is stored as s11_db=null (minus infinity dB).',
         'frequency_hz': frequencies.tolist(), 'reference_impedance_ohm': reference,
@@ -269,6 +283,11 @@ def run_pcb_fdtd(engine, csx, port, domain_mesh: PcbDomainMesh,
         'mesh': {'shape_cells': list(domain_mesh.shape_cells), 'cell_count': domain_mesh.cell_count,
                  'pml_cells': domain_mesh.pml_cells},
     }
+
+    if statistics is not None:
+        result['native_statistics'] = statistics
+        result['run_options'] = dict(exact_endcriteria=exact_endcriteria, dump_statistics=dump_statistics)
+    return result
 
 
 def write_pcb_port_results(result: dict, output_dir) -> dict:
@@ -293,3 +312,30 @@ def write_pcb_port_results(result: dict, output_dir) -> dict:
                              *[detached[k][i] for k in keys[3:]]))
     (directory/'summary.json').write_text(serialized+'\n', encoding='utf-8')
     return detached
+
+
+
+def read_pcb_native_statistics(path):
+    """openEMS DumpStatistics numeric-tab-%label format (openems.cpp)."""
+    import math
+    names={'number of iterations':'number_of_iterations','timestep (s)':'fdtd_timestep_s',
+           'total numerical time (s)':'total_numerical_time_s'}
+    values={}
+    try:
+        for line in Path(path).read_text(encoding='utf-8-sig').splitlines():
+            number,sep,label=line.partition('%')
+            key=names.get(label.strip())
+            if not sep or key is None: continue
+            if key in values: raise ValueError(f'duplicate {key}')
+            value=float(number.strip())
+            if not math.isfinite(value) or value<=0: raise ValueError(f'invalid {key}')
+            values[key]=value
+        if set(values)!=set(names.values()): raise ValueError('missing required statistics')
+        iterations=values['number_of_iterations']
+        if not iterations.is_integer(): raise ValueError('non-integer iterations')
+        values['number_of_iterations']=int(iterations)
+        if not math.isclose(values['total_numerical_time_s'],iterations*values['fdtd_timestep_s'],rel_tol=1e-12):
+            raise ValueError('numerical time does not match iterations * timestep')
+    except (OSError,ValueError) as exc:
+        raise ConfigurationError(f'PCB: invalid/missing openEMS_stats.txt; temporal termination not established: {exc}') from exc
+    return values

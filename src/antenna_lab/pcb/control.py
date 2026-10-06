@@ -65,7 +65,8 @@ def run_synthetic_control(output_dir, *,
     return run_control_model(geometry, settings, output_dir)
 
 
-def run_control_model(geometry: PcbGeometry, settings: PcbSimulationSettings, output_dir) -> dict:
+def run_control_model(geometry: PcbGeometry, settings: PcbSimulationSettings, output_dir, *,
+                      port_edge_mode='aligned', exact_endcriteria=False, dump_statistics=False) -> dict:
     """Run a supplied control geometry/settings pair in an isolated directory."""
     validate_pcb_simulation_settings(settings)
     output = Path(output_dir).resolve()
@@ -74,8 +75,12 @@ def run_control_model(geometry: PcbGeometry, settings: PcbSimulationSettings, ou
     output.mkdir(parents=True, exist_ok=True)
     native = output/'native'
     native.mkdir()  # also prevents concurrent runs from claiming the same directory
-    engine, csx, port, mesh, spec, metadata = prepare_pcb_xml_model(geometry, settings, native/'model.xml')
-    result = run_pcb_fdtd(engine, csx, port, mesh, settings, native)
+    mode_options = {} if port_edge_mode == 'aligned' else {'port_edge_mode': port_edge_mode}
+    engine, csx, port, mesh, spec, metadata = prepare_pcb_xml_model(geometry, settings, native/'model.xml', **mode_options)
+    run_options = {}
+    if exact_endcriteria: run_options['exact_endcriteria'] = True
+    if dump_statistics: run_options['dump_statistics'] = True
+    result = run_pcb_fdtd(engine, csx, port, mesh, settings, native, **run_options)
     result['mesh'].update(min_step_m=mesh.min_step_m, max_step_m=mesh.max_step_m,
                           worst_growth_ratio=mesh.worst_growth_ratio)
     result['preparation'] = metadata
