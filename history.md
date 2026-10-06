@@ -653,6 +653,42 @@ meshera i portu brak wymogu 1,42 GHz. Natywny XML pominięto z braku openEMS.
 Użytkownik potwierdził wcześniejszy pierwszy FDTD na Windowsie; tej zmiany
 nie uruchamiano natywnie. Badanie zbieżności pozostaje odrębnym etapem.
 
+
+## 2026-10-06 — PCB-009B: macierz zbieżności syntetycznej PCB
+
+Dodano sekwencyjną komendę `python -m antenna_lab.pcb.convergence`: osiem
+jawnie nazwanych wariantów, od baseline przez pojedyncze zmiany do
+reference_fine. Wspólna funkcja run_control_model obsługuje również stary
+control; opcje pasma i walidacja są współdzielone. Każdy wariant zachowuje
+tę samą geometrię i osobne native/model.xml, dane natywne, CSV i summary.
+Domyślne wartości i kontrakty fizyczne pozostają bez zmian.
+
+convergence.json i convergence.csv porównują R, X i zespolone Z względem
+baseline oraz refined numerical reference. Względne różnice to ułamki,
+z progami mianowników 1 ohm dla R/X i Zref dla modułu Z. Pojemność zastępcza
+jest tylko diagnostyką dla X<0. Raport obejmuje ustawienia i rozmiary siatki,
+jej min/max krok oraz najgorszy stosunek sąsiednich kroków. Identyfikator
+geometrii SHA256 i jej pełna znormalizowana kopia umożliwiają kontrolę
+niezmienności. Status powodzenia: diagnostic_pending_review, nigdy validated.
+
+Nowe/niepuste katalogi są chronione przed nadpisaniem; domyślne katalogi UTC
+są unikalne. Błąd lub KeyboardInterrupt zapisuje failed, zachowuje wcześniejsze
+wyniki i nie uruchamia kolejnych wariantów. Brak wznowienia w v0.
+Zakończenie Run nie dowodzi osiągnięcia EndCriteria przed limitem kroków.
+
+Sprawdzenie: convergence 5, control 15, simulation 12, adapter 15, mesh 34
+— OK; 143 testy PCB (1 pominięty), pełny zestaw 210 (3 pominięte), bez błędów.
+Testy używają atrap i znanych widm; rzeczywisty mesher sprawdzono dla ośmiu
+wariantów w pasmach 0,9/1,42/2,45 GHz. Natywnego FDTD nie uruchamiano.
+Smoke XML pominięty z braku openEMS. Użytkownik wcześniej potwierdził
+pojedyncze natywne przebiegi w tych trzech pasmach; macierz pozostaje
+do ręcznego uruchomienia i oceny. Bez Gerbera, pól, NF2FF i diagnostyki mocy.
+
+Pierwsza lokalna próba: `python -m antenna_lab.pcb.convergence`
+z projektowej .venv i ustawionym CSXCAD_INSTALL_PATH. Opcjonalnie te same
+--center-mhz/--cutoff-mhz/--frequencies-mhz/--loss-reference-mhz co control.
+Nie uruchamiać automatycznie kilku macierzy ani wariantów równolegle.
+
 ## Wzór kolejnego wpisu
 
 - Data i krótka nazwa zmiany.

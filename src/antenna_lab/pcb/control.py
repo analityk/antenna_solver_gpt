@@ -62,6 +62,12 @@ def run_synthetic_control(output_dir, *,
     geometry, settings = make_synthetic_control_case(
         excitation_center_hz=excitation_center_hz, excitation_cutoff_hz=excitation_cutoff_hz,
         result_frequency_hz=result_frequency_hz, loss_reference_frequency_hz=loss_reference_frequency_hz)
+    return run_control_model(geometry, settings, output_dir)
+
+
+def run_control_model(geometry: PcbGeometry, settings: PcbSimulationSettings, output_dir) -> dict:
+    """Run a supplied control geometry/settings pair in an isolated directory."""
+    validate_pcb_simulation_settings(settings)
     output = Path(output_dir).resolve()
     if output.exists() and (not output.is_dir() or any(output.iterdir())):
         raise ConfigurationError(f'PCB control: katalog musi być pusty lub nowy: {output}')
@@ -70,25 +76,35 @@ def run_synthetic_control(output_dir, *,
     native.mkdir()  # also prevents concurrent runs from claiming the same directory
     engine, csx, port, mesh, spec, metadata = prepare_pcb_xml_model(geometry, settings, native/'model.xml')
     result = run_pcb_fdtd(engine, csx, port, mesh, settings, native)
+    result['mesh'].update(min_step_m=mesh.min_step_m, max_step_m=mesh.max_step_m,
+                          worst_growth_ratio=mesh.worst_growth_ratio)
     result['preparation'] = metadata
     result['simulation_settings'] = asdict(settings)
     return write_pcb_port_results(result, output)
 
 
-def main(argv=None) -> int:
-    parser = argparse.ArgumentParser(description='Synthetic PCB FDTD control (UNVERIFIED)')
-    parser.add_argument('--output', type=Path)
+def add_frequency_arguments(parser):
     parser.add_argument('--center-mhz', type=float, default=1420.)
     parser.add_argument('--cutoff-mhz', type=float, default=200.)
     parser.add_argument('--frequencies-mhz', type=float, nargs='+', default=[1300., 1420., 1500.])
     parser.add_argument('--loss-reference-mhz', type=float)
-    args = parser.parse_args(argv)
+
+
+def frequency_arguments_hz(args):
     # MHz exists only at this command-line boundary; all downstream values are Hz.
-    band = dict(excitation_center_hz=args.center_mhz*1e6,
+    return dict(excitation_center_hz=args.center_mhz*1e6,
                 excitation_cutoff_hz=args.cutoff_mhz*1e6,
                 result_frequency_hz=tuple(f*1e6 for f in args.frequencies_mhz),
                 loss_reference_frequency_hz=(args.center_mhz if args.loss_reference_mhz is None
                                              else args.loss_reference_mhz)*1e6)
+
+
+def main(argv=None) -> int:
+    parser = argparse.ArgumentParser(description='Synthetic PCB FDTD control (UNVERIFIED)')
+    parser.add_argument('--output', type=Path)
+    add_frequency_arguments(parser)
+    args = parser.parse_args(argv)
+    band = frequency_arguments_hz(args)
     try:
         output = args.output
         if output is None:
