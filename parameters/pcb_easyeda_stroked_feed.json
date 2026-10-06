@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "model": "pcb",
+  "files": {
+    "copper_top": "../gerbs/emstest/Gerber_TopLayer.GTL",
+    "board_outline": "../gerbs/emstest/Gerber_BoardOutlineLayer.GKO"
+  },
+  "copper": {
+    "thickness_um": 35,
+    "conductivity_s_m": 58000000,
+    "model": "pec"
+  },
+  "substrate": {
+    "thickness_mm": 1.6,
+    "epsilon_r": 4.3,
+    "loss_tangent": 0.018
+  },
+  "port": {
+    "negative_mm": [
+      12.22288,
+      12.573
+    ],
+    "positive_mm": [
+      12.867,
+      12.573
+    ],
+    "width_mm": 0.86401
+  }
+}

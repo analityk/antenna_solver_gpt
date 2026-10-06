@@ -771,6 +771,44 @@ Nowych natywnych symulacji nie uruchamiano. Wynik badania wymaga lokalnego
 Windows; status diagnostic_pending_review nie jest walidacją fizyczną.
 Bez Gerbera, pól, NF2FF, diagnostyki mocy i przeprojektowania portu.
 
+
+## 2026-10-06 — PCB-010A: rzeczywiste Gerbery EasyEDA
+
+Dodano gerbonara==1.6.3 i shapely>=2.1,<2.2 oraz importer dodatnich regionów,
+flashy i kołowych linii/łuków. Gerbonara parsuje RS-274X, Shapely łączy miedź;
+wynik zawiera po jednym poligonie na rozłączny przewodnik. GKO określa
+środek linii obrysu, więc pisak nie powiększa płytki. Konwersja do SI jest
+na granicy importu, normalizacja portu wykonywana raz. Otwory, polaryzacja
+clear, kontakt wyłącznie punktowy i niejednoznaczne obrysy są odrzucane.
+
+Komenda pcb.gerber_control używa zwykłej polityki control i istniejącego
+adaptera FDTD/CalcPort; --prepare-only kończy się na XML. Wydzielono wspólny
+konstruktor ustawień bez zmiany wartości ani zachowania dotychczasowych
+komend. Źródłowa/znormalizowana geometria, transformacja, skróty Gerberów,
+wersje bibliotek i założenia trafiają do wyników. Miedź PEC zerowej grubości,
+bez maski/pasty/sitodruku, B.Cu i vias; laminat z konfiguracji. Status unverified.
+Nie dodano sweepów, pól, NF2FF ani nowej fizyki.
+
+Zbadano GTL/GKO dodane wcześniej przez użytkownika w commicie b9bc0c6
+(potomek wskazanego 21feddd). PCB-010A nie dodaje ani nie zmienia tych plików.
+Rzeczywisty GTL oprócz regionów zawiera obrysy pisakiem 0,2032 mm. Prawa
+krawędź szczeliny leży na X=12,86700 mm, a podany koniec X=12,92312 mm
+jest wewnątrz miedzi. Audyt portu poprawnie odrzuca pierwotny port.
+parameters/pcb_easyeda_requested.json zachowuje pierwotne dane; osobny
+pcb_easyeda_stroked_feed.json jawnie zmienia tylko dodatni koniec na
+12,86700 mm. Szczelina ma wtedy 0,64412 mm, szerokość nadal 0,86401 mm.
+Nie usunięto linii miedzi ani nie zmieniono sformułowania portu. Parametry
+laminatu 1,6 mm / 4,3 / 0,018 są jawnymi wartościami startowymi do potwierdzenia.
+
+Sprawdzenie: rzeczywiste pliki dają płytkę 25x25 mm i dwie wyspy; import,
+normalizacja i audyt ekonomicznej siatki/portu przechodzą dla jawnego wariantu.
+11 testów na autorskich minimalnych Gerberach i atrapach natywnych obejmuje
+łączenie regionów/padów, linie/łuki, jednostki, szczelinę 0,70024 mm reprezentatywnego
+wzorca bez obrysowego pisaka, odrzucenie konfliktu pisaka i przygotowanie XML
+bez Run. Wszystkie 183 testy PCB OK (1 pominięty), cały zestaw 250 OK
+(3 pominięte). Wersje testowane: Gerbonara 1.6.3, Shapely 2.1.2.
+Natywne FDTD wymaga Windows. Instrukcje i ograniczenia: docs/pcb-gerber.md.
+
 ## Wzór kolejnego wpisu
 
 - Data i krótka nazwa zmiany.

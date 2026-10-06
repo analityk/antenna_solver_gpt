@@ -1,0 +1,12 @@
+G04 Minimal authored regression: 25mm board centreline, not stroke extents*
+%FSLAX45Y45*%
+%MOMM*%
+%ADD10C,0.254*%
+D10*
+G01*
+X0Y0D02*
+X2500000Y0D01*
+X2500000Y2500000D01*
+X0Y2500000D01*
+X0Y0D01*
+M02*

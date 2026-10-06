@@ -39,6 +39,16 @@ def make_synthetic_control_case(
                         Substrate(outline,-.0016,0.,4.3,.018),
                         PcbPort('native_smoke',point(-.0005,0.),point(.0005,0.),.002))
     geometry, _ = normalize_port_orientation(source)
+    settings = make_control_settings(
+        excitation_center_hz=excitation_center_hz, excitation_cutoff_hz=excitation_cutoff_hz,
+        result_frequency_hz=result_frequency_hz, loss_reference_frequency_hz=loss_reference_frequency_hz)
+    return geometry, settings
+
+
+def make_control_settings(*, excitation_center_hz=1.42e9, excitation_cutoff_hz=.20e9,
+                          result_frequency_hz=(1.30e9, 1.42e9, 1.50e9),
+                          loss_reference_frequency_hz=None):
+    """Shared economical single-run policy; independent of physical geometry."""
     settings = PcbSimulationSettings(
         schema_version=1, result_frequency_hz=tuple(result_frequency_hz),
         excitation_center_hz=excitation_center_hz, excitation_cutoff_hz=excitation_cutoff_hz,
@@ -49,7 +59,7 @@ def make_synthetic_control_case(
                                      else loss_reference_frequency_hz), max_timesteps=100000,
         end_criteria=1e-5, threads=0, air_padding_wavelengths=.25, pml_cells=8)
     validate_pcb_simulation_settings(settings)
-    return geometry, settings
+    return settings
 
 
 def run_synthetic_control(output_dir, *,
