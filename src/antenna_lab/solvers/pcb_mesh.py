@@ -237,8 +237,8 @@ _DOMAIN_REL_TOL = 1e-10
 class PcbDomainMesh:
     """Complete coordinate domain; no solver objects or convergence claim.
 
-    PML starts exclude absorber thickness. Exact metal-edge anchors are kept;
-    the deferred 1/3–2/3 edge correction is not applied.
+    PML starts exclude absorber thickness. Selected required anchors are exact;
+    optional Gerber policy can omit noncritical numerical copper anchors.
     """
 
     x_lines_m: tuple[float, ...]
@@ -342,7 +342,7 @@ def _add_domain_pml(lines, count):
 
 
 def make_pcb_domain_mesh(
-    geometry: PcbGeometry, settings: PcbSimulationSettings, *, port_edge_mode='aligned',
+    geometry: PcbGeometry, settings: PcbSimulationSettings, *, port_edge_mode='aligned', gerber_quality=None,
 ) -> PcbDomainMesh:
     """Refine local PCB/air intervals, audit, then attach uniform PML cells.
 
@@ -350,7 +350,7 @@ def make_pcb_domain_mesh(
     Cartesian cell array. Intermediate count estimates are lower bounds;
     all refinements only increase counts. No native solver is instantiated.
     """
-    plan = make_pcb_solver_anchor_plan(geometry, settings, port_edge_mode)
+    plan = make_pcb_solver_anchor_plan(geometry, settings, port_edge_mode, gerber_quality=gerber_quality)
     policy = derive_pcb_physical_mesh_policy(geometry, settings)
     pml = policy.pml_cells
     if isinstance(pml, bool) or not isinstance(pml, int) or not 6 <= pml <= 20:
@@ -480,9 +480,13 @@ def _audit_thirds_pads(geometry, edge):
         raise ConfigurationError('PCB thirds: wspólny przewodnik zwiera port.')
 
 
-def make_pcb_solver_anchor_plan(geometry, settings, port_edge_mode='aligned'):
-    """Aligned plan is unchanged; thirds replaces only four identified feed edges."""
+def make_pcb_solver_anchor_plan(geometry, settings, port_edge_mode='aligned', *, gerber_quality=None):
+    """Default aligned plan is unchanged; Gerber filtering is explicitly opt-in."""
     from dataclasses import replace
+    if gerber_quality is not None:
+        if port_edge_mode != 'aligned':
+            raise ConfigurationError('Gerber economical anchors require aligned port edges.')
+        return make_gerber_mesh_anchor_plan(geometry, settings, gerber_quality)[0]
     plan=make_pcb_mesh_anchor_plan(geometry)
     if port_edge_mode=='aligned': return plan
     edge=pcb_port_edge_policy(geometry,settings,port_edge_mode)
@@ -521,3 +525,57 @@ def audit_pcb_port_edge_mesh(geometry, settings, mesh, port_edge_mode='aligned')
                                          'zmień jawne ustawienia, nie osłabiaj gradingu.')
     if 0.0 not in mesh.z_lines_m:
         raise ConfigurationError('PCB thirds: brak dokładnej płaszczyzny z=0.')
+
+
+def make_gerber_mesh_anchor_plan(geometry, settings, quality):
+    """Filter only numerical copper anchors; never change physical polygons.
+
+    Board/material outer bounds and the complete feed anchor set take precedence.
+    Sorted candidate edges (then verify-only bounding-box midpoints) are accepted
+    only at distances >= half the smaller local resolution of the two anchors.
+    Local resolution is substrate XY outside the feed interval and the smaller
+    substrate/port step inside it. Critical-critical separations are never repaired.
+    """
+    from dataclasses import replace
+    if quality not in ('preview', 'design', 'verify'):
+        raise ConfigurationError('Unknown Gerber anchor quality.')
+    base = make_pcb_mesh_anchor_plan(geometry)
+    policy = derive_pcb_physical_mesh_policy(geometry, settings)
+    n,p = geometry.port.negative_xy_m, geometry.port.positive_xy_m
+    mx,my = (n[0]+p[0])/2, (n[1]+p[1])/2
+    half = geometry.port.width_m/2
+    feed = ((n[0],mx,p[0]), (my-half,my,my+half))
+    port_steps = (policy.max_port_gap_step_m, policy.max_port_width_step_m)
+    bounds = geometry.bounds
+    axes, suppressed = [], []
+    for axis in range(2):
+        board = [v[axis] for v in geometry.outline.vertices_xy_m]
+        critical = sorted(set((*feed[axis], min(board), max(board), bounds[0][axis], bounds[1][axis])))
+        retained = list(_merge((), critical))
+        def resolution(v):
+            return min(policy.max_substrate_xy_step_m, port_steps[axis]) if feed[axis][0] <= v <= feed[axis][-1] else policy.max_substrate_xy_step_m
+        candidates = []
+        for copper in geometry.copper:
+            values = [v[axis] for v in copper.vertices_xy_m]
+            low,high = min(values),max(values)
+            candidates.extend((0,v,copper.id,kind) for v,kind in ((low,'edge_min'),(high,'edge_max')))
+            candidates.append((1,(low+high)/2,copper.id,'bbox_midpoint'))
+        for _,value,identifier,kind in sorted(candidates):
+            record = dict(axis='xy'[axis], coordinate_m=value, copper_id=identifier, kind=kind)
+            if value in retained:
+                continue  # Exact coordinate is already represented, not suppressed.
+            if kind == 'bbox_midpoint' and quality != 'verify':
+                suppressed.append(dict(record, reason='nonphysical_midpoint_omitted'))
+                continue
+            conflicts = [(other, .5*min(resolution(value),resolution(other))) for other in sorted(retained)
+                         if abs(value-other) < .5*min(resolution(value),resolution(other))]
+            if conflicts:
+                other,minimum = min(conflicts, key=lambda pair:(abs(pair[0]-value),pair[0]))
+                suppressed.append(dict(record, reason='below_half_local_resolution',
+                    retained_neighbor_m=other, minimum_separation_m=minimum, separation_m=abs(value-other)))
+            else:
+                retained.append(value)
+        axes.append(tuple(sorted(retained)))
+    return replace(base,x_required_m=axes[0],y_required_m=axes[1]), dict(
+        name='gerber_economical_v1', quality=quality, minimum_interval_fraction=.5,
+        copper_midpoints=quality=='verify', suppressed_noncritical_anchors=suppressed)

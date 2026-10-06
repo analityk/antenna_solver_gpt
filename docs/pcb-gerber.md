@@ -23,11 +23,67 @@ Opcjonalny `--output` wymaga pustego/nowego katalogu. Dostępne są te same
 opcje częstotliwości co w pcb.control: `--center-mhz`, `--cutoff-mhz`,
 `--frequencies-mhz`, `--loss-reference-mhz`.
 
-Ustawienia pierwszego przebiegu są zwykłymi ustawieniami control: siatka
-aligned, 20 komórek/długość fali, minima portu 2/2, laminat Z 4, PML 8,
-padding 0,25, EndCriteria 1e-5, limit 100000 kroków. Nie włączamy
-exact_endcriteria ani macierzy zbieżności. Zasilanie i odczyt impedancji
-pozostają w istniejącym adapterze; nie zmieniamy fizyki FDTD.
+## Profile jakości (PCB-010B)
+
+`--quality preview|design|verify` dotyczy wyłącznie gerber_control.
+Domyślny profil to `design`; komendy syntetyczne i diagnostyczne nie zmieniają się.
+
+| Profil | Komórki/falę | Laminat Z | Port gap/width | Padding | PML | EndCriteria | Limit kroków | exact_endcriteria |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| preview | 10 | 2 | 2/2 | 0,10 | 6 | 1e-3 | 50000 | false |
+| design | 15 | 3 | 2/2 | 0,15 | 6 | 1e-4 | 75000 | false |
+| verify | 20 | 4 | 4/4 | 0,25 | 8 | 1e-5 | 120000 | true |
+
+To profile numeryczne, nie certyfikaty dokładności. Miedź CSXCAD, wymiary
+portu, laminat i żądane częstotliwości pozostają identyczne.
+Wybór profilu nie uruchamia macierzy ani dodatkowych przebiegów.
+
+### Kotwice ekonomicznej siatki
+
+Polityka `gerber_economical_v1` zachowuje dokładnie granice płytki i zewnętrzne
+granice materiałów, końce i środek portu X, krawędzie i środek portu Y oraz
+oba interfejsy laminatu, w tym literalne z=0. Nie przesuwa żadnego poligonu.
+
+Najpierw zachowuje krytyczne współrzędne. Następnie rozpatruje minimum i
+maksimum bounding box każdej wyspy miedzi w kolejności współrzędnych/ID.
+W `verify` na końcu rozpatruje także środki bounding box; preview/design
+je pomijają. Kandydat zostaje usunięty, jeżeli odległość od dowolnej już
+zachowanej kotwicy jest mniejsza niż 0,5 razy mniejsza z rozdzielczości
+lokalnych obu kotwic. Lokalna rozdzielczość to krok XY laminatu poza zakresem
+portu, a wewnątrz zakresu portu — minimum tego kroku i kroku portu danej osi.
+Równość z progiem jest dopuszczalna. Takie same reguły ochrony obowiązują
+wszystkie profile; krytycznych kotwic nigdy nie usuwa się dla oszczędności.
+
+`summary.json` zapisuje `mesh_anchor_policy` i listę
+`suppressed_noncritical_anchors`: oś, współrzędną SI, ID miedzi, rodzaj,
+powód, a dla konfliktu także sąsiada, odległość i próg. Współrzędne
+identyczne z zachowanymi liniami nie są raportowane jako usunięte.
+Usunięcie kotwicy nie oznacza usunięcia krawędzi fizycznej. Dodatkowy audyt
+poligonów nie pozwala, aby rzadka siatka ukryła miedź wewnątrz szczeliny
+portu (z dotychczasową tolerancją geometryczną 1e-10 m).
+
+### Kontrola kosztu i zakończenia
+
+Z ukończonej siatki, przed załadowaniem natywnego API, liczone są min_dx,
+min_dy, min_dz i górna granica CFL:
+`dt = 1 / (C0 * sqrt(1/min_dx² + 1/min_dy² + 1/min_dz²))`.
+Czas impulsu Gaussa wynosi `9 / (pi * cutoff_hz)`. Minimalna liczba kroków
+to zaokrąglony w górę iloraz czasu impulsu i granicy CFL; iloczyn tej liczby
+oraz liczby komórek jest wskaźnikiem minimalnego kosztu. To optymistyczna
+dolna granica samego wymuszenia: natywny krok może być mniejszy, a wygasanie
+pól wymaga dodatkowych kroków. Nie jest to prognoza czasu pracy komputera.
+
+Jeżeli nawet ta dolna granica osiąga limit kroków, przebieg jest blokowany
+przed natywnym API, także przy --prepare-only. Błąd wskazuje potrzebę
+przeglądu rozdzielczości/krytycznych kotwic lub jawnego budżetu kroków.
+Nie ma automatycznego podnoszenia limitów ani zmiany częstotliwości.
+
+Wszystkie profile używają dump_statistics=True. Osiągnięcie max_timesteps
+kończy się statusem failed / max_timesteps_reached przed CalcPort;
+nie powstaje ukończony wynik impedancji. Sukces ma termination_status
+completed_before_limit i rzeczywistą actual_iterations. Przy samym XML
+termination_status to not_run, a actual_iterations to null. Brak prawidłowych
+statystyk nie może dać statusu completed. Wynik pozostaje unverified.
 
 ## Istotna różnica między podanymi wymiarami a rzeczywistym GTL
 

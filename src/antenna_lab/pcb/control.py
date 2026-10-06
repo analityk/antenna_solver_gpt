@@ -76,7 +76,7 @@ def run_synthetic_control(output_dir, *,
 
 
 def run_control_model(geometry: PcbGeometry, settings: PcbSimulationSettings, output_dir, *,
-                      port_edge_mode='aligned', exact_endcriteria=False, dump_statistics=False) -> dict:
+                      port_edge_mode='aligned', exact_endcriteria=False, dump_statistics=False, gerber_quality=None) -> dict:
     """Run a supplied control geometry/settings pair in an isolated directory."""
     validate_pcb_simulation_settings(settings)
     output = Path(output_dir).resolve()
@@ -86,6 +86,8 @@ def run_control_model(geometry: PcbGeometry, settings: PcbSimulationSettings, ou
     native = output/'native'
     native.mkdir()  # also prevents concurrent runs from claiming the same directory
     mode_options = {} if port_edge_mode == 'aligned' else {'port_edge_mode': port_edge_mode}
+    if gerber_quality is not None:
+        mode_options['gerber_quality'] = gerber_quality
     engine, csx, port, mesh, spec, metadata = prepare_pcb_xml_model(geometry, settings, native/'model.xml', **mode_options)
     run_options = {}
     if exact_endcriteria: run_options['exact_endcriteria'] = True

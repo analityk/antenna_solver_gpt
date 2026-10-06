@@ -7,7 +7,7 @@ from antenna_lab.core.config import ConfigurationError
 from antenna_lab.pcb.model import PcbGeometry
 from antenna_lab.pcb.simulation import PcbSimulationSettings
 from antenna_lab.pcb.validation import _contains
-from antenna_lab.solvers.pcb_mesh import PcbDomainMesh, make_pcb_mesh_anchor_plan
+from antenna_lab.solvers.pcb_mesh import PcbDomainMesh, make_pcb_mesh_anchor_plan, make_pcb_solver_anchor_plan
 
 
 @dataclass(frozen=True)
@@ -28,7 +28,7 @@ class PcbLumpedPortSpec:
 
 
 def resolve_pcb_lumped_port(
-    geometry: PcbGeometry, domain_mesh: PcbDomainMesh, settings: PcbSimulationSettings, *, port_edge_mode='aligned',
+    geometry: PcbGeometry, domain_mesh: PcbDomainMesh, settings: PcbSimulationSettings, *, port_edge_mode='aligned', gerber_quality=None,
 ) -> PcbLumpedPortSpec:
     """Resolve an exact planar +X port without touching geometry, mesh or CSXCAD.
 
@@ -37,13 +37,29 @@ def resolve_pcb_lumped_port(
     XY-cell centres. This does not prove the absence of subcell copper slivers.
     Requires validated experiment settings; no native source is created.
     """
+    if gerber_quality is not None and port_edge_mode != 'aligned':
+        raise ConfigurationError('Gerber anchors require aligned port.')
     if port_edge_mode != 'aligned':
         return _resolve_thirds_port(geometry, domain_mesh, settings, port_edge_mode)
-    plan = make_pcb_mesh_anchor_plan(geometry)
+    plan = (make_pcb_mesh_anchor_plan(geometry) if gerber_quality is None else
+            make_pcb_solver_anchor_plan(geometry, settings, gerber_quality=gerber_quality))
     n, p = geometry.port.negative_xy_m, geometry.port.positive_xy_m
     mx = (n[0]+p[0])/2
     ym, half = (n[1]+p[1])/2, geometry.port.width_m/2
     start, stop = (n[0], ym-half, 0.0), (p[0], ym+half, 0.0)
+    if gerber_quality is not None:
+        # Filtering noncritical edges must not hide a PEC sliver from the
+        # existing discrete gap audit. Use physical polygons, not mesh anchors.
+        from shapely.geometry import Polygon, box
+        from antenna_lab.pcb.validation import TOLERANCE_M
+        tol = TOLERANCE_M
+        if stop[0]-start[0] <= 2*tol or stop[1]-start[1] <= 2*tol:
+            raise ConfigurationError('Gerber port surface is unresolved at geometry tolerance.')
+        interior = box(start[0]+tol, start[1]+tol, stop[0]-tol, stop[1]-tol)
+        for copper in geometry.copper:
+            if interior.intersects(Polygon(copper.vertices_xy_m)):
+                raise ConfigurationError(f'Gerber port: miedź {copper.id!r} wewnątrz szczeliny; '
+                                         'economical anchors cannot remove physical copper.')
     axes = (domain_mesh.x_lines_m, domain_mesh.y_lines_m, domain_mesh.z_lines_m)
     if domain_mesh.pml_cells != settings.pml_cells:
         raise ConfigurationError("PCB port: niezgodne pml_cells geometrii domeny i eksperymentu.")

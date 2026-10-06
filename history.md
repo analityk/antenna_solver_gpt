@@ -809,6 +809,42 @@ bez Run. Wszystkie 183 testy PCB OK (1 pominięty), cały zestaw 250 OK
 (3 pominięte). Wersje testowane: Gerbonara 1.6.3, Shapely 2.1.2.
 Natywne FDTD wymaga Windows. Instrukcje i ograniczenia: docs/pcb-gerber.md.
 
+
+## 2026-10-06 — PCB-010B: ekonomiczne profile jakości Gerber
+
+Dodano --quality preview/design/verify (domyślnie design) wyłącznie do
+gerber_control. Jawne profile ustawiają minima siatki, padding/PML i budżet
+czasowy według PCB-010B; wszystkie używają dump_statistics, tylko verify
+włącza exact_endcriteria. Nie zmieniono syntetycznych komend diagnostycznych
+ani fizycznych poligonów, portu, laminatu lub częstotliwości wyników.
+
+Polityka gerber_economical_v1 zachowuje dokładnie krytyczne kotwice płytki,
+granic materiałów, portu i Z=0. Pomija środki bounding box miedzi w preview/design.
+Pozostałe niekrytyczne kotwice są deterministycznie odrzucane poniżej połowy
+mniejszej lokalnej rozdzielczości dwóch kotwic; verify używa tej samej ochrony.
+Metadane raportują każdą pominiętą kotwicę i przyczynę. Wspólne API siatki,
+portu i adaptera otrzymują opcjonalną politykę; brak opcji zachowuje stare
+zachowanie. Rzadsza siatka ujawniła ryzyko przeoczenia fragmentu PEC w błędnym
+porcie: dodatkowy Gerber-only audyt fizycznych poligonów z istniejącą tolerancją
+geometrii nadal odrzuca pierwotną kolidującą konfigurację, bez zmiany źródła.
+
+Preflight liczy min_dx/dy/dz, CFL, czas impulsu 9/(pi*cutoff), dolną granicę
+liczby kroków i aktualizacji komórek. Nie jest prognozą czasu działania.
+Jeśli samo wymuszenie osiągnęłoby limit, natywne API nie jest ładowane.
+Statystyki natywne muszą potwierdzić iterations < max_timesteps; dojście
+do limitu zapisuje failed / max_timesteps_reached i blokuje CalcPort.
+summary zawiera profil, politykę/kotwice, koszty, actual_iterations i termination_status.
+Przy prepare-only actual_iterations=null i termination_status=not_run.
+
+Sprawdzenie: 7 nowych testów plus zaktualizowane oczekiwania domyślnego
+Gerber control; 190 testów PCB OK (1 pominięty), całość 257 OK (3 pominięte).
+Pokryto profile, koszt CFL/impulsu, krytyczne współrzędne, stagger 25 um,
+niezmienność miedzi CSXCAD/materiału/portu między profilami, blokadę przed
+natywnym API oraz limit kroków bez odczytu impedancji. Wszystkie Run to atrapy.
+Na rzeczywistej geometrii sprawdzono wyłącznie siatkę: preview 76440,
+design 131760, verify 620490 komórek. Nie uruchamiano natywnego FDTD.
+Dokumentacja zasad i ograniczeń: docs/pcb-gerber.md. Wyniki nadal unverified.
+
 ## Wzór kolejnego wpisu
 
 - Data i krótka nazwa zmiany.

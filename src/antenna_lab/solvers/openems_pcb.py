@@ -34,7 +34,7 @@ def _require_lines(axes, plan, domain_mesh):
 
 
 def install_pcb_geometry(
-    csx, geometry: PcbGeometry, domain_mesh: PcbDomainMesh, settings: PcbSimulationSettings, *, port_edge_mode='aligned',
+    csx, geometry: PcbGeometry, domain_mesh: PcbDomainMesh, settings: PcbSimulationSettings, *, port_edge_mode='aligned', gerber_quality=None,
 ) -> dict:
     """Install a validated geometry/mesh pair in a fresh CSXCAD structure.
 
@@ -43,7 +43,7 @@ def install_pcb_geometry(
     Preflight failures do not touch CSXCAD. Readback failures stop before
     material/metal creation (the grid has necessarily already been written).
     """
-    plan = make_pcb_solver_anchor_plan(geometry, settings, port_edge_mode)
+    plan = make_pcb_solver_anchor_plan(geometry, settings, port_edge_mode, gerber_quality=gerber_quality)
     axes = (domain_mesh.x_lines_m, domain_mesh.y_lines_m, domain_mesh.z_lines_m)
     if domain_mesh.pml_cells != settings.pml_cells:
         raise ConfigurationError("PCB grid: pml_cells domeny nie zgadza się z ustawieniami eksperymentu.")
@@ -70,7 +70,7 @@ def install_pcb_geometry(
         raise ConfigurationError("PCB grid: CSXCAD zmienił delta unit; wymagane dokładnie 1.0 m.")
     readback = tuple(tuple(grid.GetLines(axis)) for axis in 'xyz')
     # Recheck the solver-facing geometry contract after native grid installation.
-    plan = make_pcb_solver_anchor_plan(geometry, settings, port_edge_mode)
+    plan = make_pcb_solver_anchor_plan(geometry, settings, port_edge_mode, gerber_quality=gerber_quality)
     # Diagnose critical missing coordinates independently of whole-axis equality.
     _require_lines(readback, plan, domain_mesh)
     for axis, expected, actual in zip('xyz', axes, readback):
@@ -102,13 +102,13 @@ def install_pcb_geometry(
     }
 
 
-def prepare_pcb_csx(geometry: PcbGeometry, settings: PcbSimulationSettings, *, port_edge_mode='aligned'):
+def prepare_pcb_csx(geometry: PcbGeometry, settings: PcbSimulationSettings, *, port_edge_mode='aligned', gerber_quality=None):
     """Build the domain before loading native modules; return CSX, mesh, metadata."""
-    domain_mesh = make_pcb_domain_mesh(geometry, settings, port_edge_mode=port_edge_mode)
+    domain_mesh = make_pcb_domain_mesh(geometry, settings, port_edge_mode=port_edge_mode, **({'gerber_quality': gerber_quality} if gerber_quality is not None else {}))
     from .openems import native_modules
     _, csx_module = native_modules()
     csx = csx_module.ContinuousStructure()
-    metadata = install_pcb_geometry(csx, geometry, domain_mesh, settings, port_edge_mode=port_edge_mode)
+    metadata = install_pcb_geometry(csx, geometry, domain_mesh, settings, port_edge_mode=port_edge_mode, **({'gerber_quality': gerber_quality} if gerber_quality is not None else {}))
     return csx, domain_mesh, metadata
 
 
@@ -128,13 +128,13 @@ def _audit_port_grid(csx, domain_mesh, after=False, context=None):
 
 
 def install_pcb_lumped_port(engine, csx, geometry: PcbGeometry,
-                            domain_mesh: PcbDomainMesh, settings: PcbSimulationSettings, *, port_edge_mode='aligned'):
+                            domain_mesh: PcbDomainMesh, settings: PcbSimulationSettings, *, port_edge_mode='aligned', gerber_quality=None):
     """Install on an engine already associated with csx; never modify the grid.
 
     Spec resolution and preflight complete before any engine method is called.
     Metadata describes the resolved contract, not audited native edge internals.
     """
-    spec = resolve_pcb_lumped_port(geometry, domain_mesh, settings, port_edge_mode=port_edge_mode)
+    spec = resolve_pcb_lumped_port(geometry, domain_mesh, settings, port_edge_mode=port_edge_mode, **({'gerber_quality': gerber_quality} if gerber_quality is not None else {}))
     _audit_port_grid(csx, domain_mesh)
     port = engine.AddLumpedPort(spec.port_nr, spec.reference_impedance_ohm,
                                list(spec.start_m), list(spec.stop_m), spec.exc_dir,
@@ -147,16 +147,16 @@ def install_pcb_lumped_port(engine, csx, geometry: PcbGeometry,
     return port, spec, metadata
 
 
-def prepare_pcb_native_model(geometry: PcbGeometry, settings: PcbSimulationSettings, *, port_edge_mode='aligned'):
+def prepare_pcb_native_model(geometry: PcbGeometry, settings: PcbSimulationSettings, *, port_edge_mode='aligned', gerber_quality=None):
     """Return engine, CSX, port, mesh, spec, metadata; no waveform, BC, XML or run."""
-    domain_mesh = make_pcb_domain_mesh(geometry, settings, port_edge_mode=port_edge_mode)
+    domain_mesh = make_pcb_domain_mesh(geometry, settings, port_edge_mode=port_edge_mode, **({'gerber_quality': gerber_quality} if gerber_quality is not None else {}))
     from .openems import native_modules
     ems_module, csx_module = native_modules()
     csx = csx_module.ContinuousStructure()
     engine = ems_module.openEMS(NrTS=settings.max_timesteps, EndCriteria=settings.end_criteria)
     engine.SetCSX(csx)
-    geometry_metadata = install_pcb_geometry(csx, geometry, domain_mesh, settings, port_edge_mode=port_edge_mode)
-    port, spec, port_metadata = install_pcb_lumped_port(engine, csx, geometry, domain_mesh, settings, port_edge_mode=port_edge_mode)
+    geometry_metadata = install_pcb_geometry(csx, geometry, domain_mesh, settings, port_edge_mode=port_edge_mode, **({'gerber_quality': gerber_quality} if gerber_quality is not None else {}))
+    port, spec, port_metadata = install_pcb_lumped_port(engine, csx, geometry, domain_mesh, settings, port_edge_mode=port_edge_mode, **({'gerber_quality': gerber_quality} if gerber_quality is not None else {}))
     metadata = {'geometry': geometry_metadata, 'port': port_metadata,
                 'engine': {'max_timesteps': settings.max_timesteps, 'end_criteria': settings.end_criteria}}
     return engine, csx, port, domain_mesh, spec, metadata
@@ -201,9 +201,9 @@ def write_pcb_xml(engine, csx, domain_mesh: PcbDomainMesh, xml_path) -> dict:
     return {'path': str(xml_path), 'size_bytes': size, 'parse_status': 'passed'}
 
 
-def prepare_pcb_xml_model(geometry: PcbGeometry, settings: PcbSimulationSettings, xml_path, *, port_edge_mode='aligned'):
+def prepare_pcb_xml_model(geometry: PcbGeometry, settings: PcbSimulationSettings, xml_path, *, port_edge_mode='aligned', gerber_quality=None):
     """Prepare reusable XML; no Run, result processing or additional files."""
-    engine, csx, port, mesh, spec, metadata = prepare_pcb_native_model(geometry, settings, port_edge_mode=port_edge_mode)
+    engine, csx, port, mesh, spec, metadata = prepare_pcb_native_model(geometry, settings, port_edge_mode=port_edge_mode, **({'gerber_quality': gerber_quality} if gerber_quality is not None else {}))
     metadata = {**metadata, **configure_pcb_fdtd(engine, csx, mesh, settings),
                 'xml': write_pcb_xml(engine, csx, mesh, xml_path)}
     return engine, csx, port, mesh, spec, metadata
