@@ -899,3 +899,38 @@ wyłącznie atrapą; istniejące testy raportu antenowego bez zmian. Sprawdzono
 wizualnie rysunek pętli z realnej geometrii; widmo kontrolne pochodziło z atrapy.
 Ograniczenia: auto tylko poziome/pionowe zgodne prostokątne pady; pozostałe
 układy wymagają jawnego portu. Natywne wykonanie pozostaje lokalnie na Windows.
+
+## 2026-10-07 — PCB-010E: pola PCB i odtwarzanie okresu RF
+
+Dodano --fields-mhz (1–3 unikalne częstotliwości w paśmie wymuszenia).
+Pasywne FD E/H korzystają z istniejącego wspólnego instalatora dumpów
+i czytnika HDF5. PCB adapter wybiera xy_air (pierwsze dodatnie Z), xz_feed
+i yz_feed (środek portu), wyłącznie na istniejących liniach poza PML.
+Wspólny limit 4 mln punktów × częstotliwości i koszt DFT są jawne przed Run.
+Siatka, geometria, port, wymuszenie, PML i profile nie zostały zmienione.
+
+Jedno Run oraz jedno CalcPort dla sumy częstotliwości impedancji/pól.
+Impedance.csv zachowuje tylko sweep. Pamiętane uf_tot normalizuje E/H
+do 1∠0 V portu, nie do mocy przyjętej. Zero/nieskończone odniesienia
+i niezgodne natywne siatki są błędem. Pełne zespolone komponenty XYZ
+trafiają do fields/*.npz, a fazory/czynniki, jednostki i konwencja do
+metadata.json. Maski miedzi z=0, źródła i halo jednej lokalnej przekątnej
+komórki są konserwatywne, nie opisują natywnej zajętości Yee. Laminat nie
+jest maskowany; surowe HDF5 pozostają nietknięte, NPZ używa NaN dla maski.
+
+Raport współdzieli loader, konwencję fazy i generator HTML/PNG z antenami.
+PCB adapter rysuje chwilowe wektory E oraz podpisane Hz/Hy/Hx, interfejsy
+laminatu, miedź i port. Suwak/Play/Pause pokazuje 0–330° i czas w ns;
+stałe symetryczne skale zależą od pełnej obwiedni fazora, nie klatki.
+Rozrzedzenie dotyczy tylko wyświetlania (mapy do 80×80 i rzadsze strzałki).
+PNG zawiera 0/90/180/270°. Ręczna regeneracja z NPZ działa offline bez
+openEMS/Gerberów. Dotychczasowe raporty bez pól i raporty antenowe zachowane.
+
+Testy: 13 field tests, 213 PCB OK (1 skip), pełny zestaw 280 OK (3 skip).
+Atrapy potwierdzają jeden Run/CalcPort, niezależne częstotliwości, dokładną
+siatkę, format HDF5/NPZ, maski i normowanie, raw SHA256, fazy i raport.
+JS wykonano z atrapą canvas/DOM: suwak, Play/Pause, 330→0 i czas przy 2 GHz.
+Obejrzano kontaktowy PNG na rzeczywistej geometrii emstest2 z syntetycznymi
+polami testowymi. Nie uruchomiono natywnego FDTD; zapis realnych dumpów
+openEMS 0.37.0rc3 pozostaje do sprawdzenia lokalnie na Windows. Wyniki
+nadal unverified. Nie dodano NF2FF, prądów, bilansu ani nowej fizyki.

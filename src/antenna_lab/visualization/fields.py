@@ -8,6 +8,8 @@ from matplotlib.figure import Figure
 from matplotlib.patches import Rectangle
 import numpy as np
 
+PCB_VIEWS = {"xy_air": (2, 0, 1, 0, 2), "xz_feed": (1, 0, 2, 0, 1), "yz_feed": (0, 1, 2, 1, 0)}
+
 VIEWS = {"xy_front": (2, 1, 0, 0, 2), "xz": (1, 0, 2, 0, 1), "yz": (0, 1, 2, 0, 1)}
 
 
@@ -16,14 +18,16 @@ def phase_values(phasor, degrees):
 
 
 def load_plane(path, plane, expected_frequency):
+    pcb = plane["name"] in PCB_VIEWS
+    normalization_keys = (("port_voltage_phasor", "reference_voltage_v", "array_order") if pcb else ("reference_power_w",))
     with np.load(path, allow_pickle=False) as data:
         result = {key: data[key] for key in ("frequency_hz", "x_m", "y_m", "z_m", "E_v_per_m", "H_a_per_m",
-                                            "mask", "normalization_factor", "reference_power_w", "phasor_convention")}
+                                            "mask", "normalization_factor", "phasor_convention", *normalization_keys)}
     lines = [result[a + "_m"] for a in "xyz"]
     shape = tuple(len(a) for a in lines)
     if any(not np.isfinite(a).all() or np.any(np.diff(a) <= 0) for a in lines):
         raise ValueError("Niepoprawne współrzędne przekroju pola.")
-    normal = VIEWS[plane["name"]][0]
+    normal = (PCB_VIEWS if pcb else VIEWS)[plane["name"]][0]
     if (shape[normal] != 1 or shape != tuple(plane["shape_xyz"])
             or not np.isclose(lines[normal][0], plane["actual_position_m"], rtol=1e-6, atol=1e-10)):
         raise ValueError("Położenie lub kształt przekroju pola różni się od metadanych.")
@@ -32,10 +36,18 @@ def load_plane(path, plane, expected_frequency):
             or str(result["phasor_convention"]) != "real(F * exp(+j * phase)); phase zero = positive port voltage"
             or result["normalization_factor"].shape != frequency.shape
             or not np.isfinite(result["normalization_factor"]).all()
-            or not np.isfinite(result["reference_power_w"]).all() or float(result["reference_power_w"]) <= 0):
+            or (not pcb and (not np.isfinite(result["reference_power_w"]).all() or float(result["reference_power_w"]) <= 0))):
         raise ValueError("Nieprawidłowa normalizacja lub konwencja pól.")
     if frequency.shape != np.shape(expected_frequency) or not np.allclose(frequency, expected_frequency, rtol=1e-12, atol=0):
         raise ValueError("Częstotliwości E/H nie zgadzają się z metadanymi.")
+    if pcb:
+        voltage = result['port_voltage_phasor']
+        if (float(result['reference_voltage_v']) != 1. or voltage.shape != frequency.shape
+                or not np.isfinite(voltage).all() or np.any(voltage == 0)
+                or not np.allclose(voltage*result['normalization_factor'], 1., rtol=1e-12, atol=0)
+                or str(result['array_order']) != 'frequency,component_xyz,x,y,z'
+                or frequency.ndim != 1 or not 1 <= len(frequency) <= 3 or np.any(np.diff(frequency)<=0)):
+            raise ValueError('Nieprawidłowe odniesienie PCB 1 V lub układ tablic.')
     mask = result["mask"]
     if mask.shape != shape or not np.issubdtype(mask.dtype, np.integer) or np.any(mask > 7) or np.any(mask < 0):
         raise ValueError("Niepoprawna maska próbek E/H.")
@@ -138,6 +150,9 @@ def field_section(data, figure_image, plots_path=None, phase_step=None, componen
     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
     if metadata.get("schema_version") != 1:
         raise ValueError("Nieobsługiwana wersja metadanych E/H.")
+    if metadata.get('model') == 'pcb':
+        from .pcb_fields import pcb_field_section
+        return pcb_field_section(data, metadata, figure_image, plots_path, phase_step)
     geometry = json.loads((root / "geometry.json").read_text(encoding="utf-8"))
     phases = (list(range(0, 181, phase_step)) if phase_step else
               data["config"].get("requested_outputs", {}).get("phase_degrees", list(range(0, 181, 30))))

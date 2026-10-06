@@ -27,7 +27,7 @@ def _write_json(path, value):
     path.write_text(json.dumps(value, indent=2, allow_nan=False)+'\n', encoding='utf-8')
 
 
-def run_gerber_control(config_path, output_dir, *, prepare_only=False, quality='design', sweep_request=None, pcb_config=None, **frequency_settings):
+def run_gerber_control(config_path, output_dir, *, prepare_only=False, quality='design', sweep_request=None, pcb_config=None, field_frequency_hz=(), **frequency_settings):
     """Import, normalize once, preflight, then XML or one solve for all frequencies."""
     bundle_metadata = {}
     if Path(config_path).is_dir():
@@ -42,6 +42,9 @@ def run_gerber_control(config_path, output_dir, *, prepare_only=False, quality='
         audit_physical_feed(source)
     geometry, transform = normalize_port_orientation(source)
     settings, exact = gerber_quality_settings(quality, **frequency_settings)
+    from antenna_lab.solvers.pcb_fields import validate_field_frequencies, pcb_field_layout
+    field_frequency_hz = validate_field_frequencies(field_frequency_hz, settings)
+    field_options = {"field_frequency_hz": field_frequency_hz} if field_frequency_hz else {}
     frequencies = settings.result_frequency_hz
     sweep = dict(mode='explicit', start_hz=frequencies[0], stop_hz=frequencies[-1], point_count=len(frequencies))
     if sweep_request is not None:
@@ -87,16 +90,24 @@ def run_gerber_control(config_path, output_dir, *, prepare_only=False, quality='
               f"Estimated excitation: {cost['estimated_excitation_steps']} timesteps (optimistic minimum)\n"
               f"Cost indicator: {cost['estimated_cell_updates']} cell updates (excitation only)", flush=True)
         require_excitation_fits(cost, settings)
+        if field_frequency_hz:
+            layout = pcb_field_layout(geometry, mesh, settings, field_frequency_hz)
+            from math import prod
+            samples = sum(prod(p['shape_xyz']) for p in layout)*len(field_frequency_hz)
+            print('Field frequencies: '+', '.join(f'{f/1e6:g} MHz' for f in field_frequency_hz)+
+                  '\nField planes: xy_air, xz_feed, yz_feed'+
+                  f'\nField DFT samples: {samples*6} complex components ({samples} spatial points × frequencies)'+
+                  '\nMesh changed by fields: no\nAdditional FDTD runs: 0', flush=True)
         if prepare_only:
             output.mkdir(parents=True, exist_ok=True)
             native = output/'native'
             native.mkdir()
-            _, _, _, _, _, preparation = prepare_pcb_xml_model(geometry, settings, native/'model.xml', gerber_quality=quality)
+            _, _, _, _, _, preparation = prepare_pcb_xml_model(geometry, settings, native/'model.xml', gerber_quality=quality, **field_options)
             result = dict(status='prepared', validation_status='unverified', preparation=preparation,
                 simulation_settings=asdict(settings), mesh={'shape_cells': mesh.shape_cells, 'cell_count': mesh.cell_count})
         else:
             result = run_control_model(geometry, settings, output, gerber_quality=quality,
-                                       exact_endcriteria=exact, dump_statistics=True)
+                                       exact_endcriteria=exact, dump_statistics=True, **field_options)
             diagnostics['actual_iterations'] = result['native_statistics']['number_of_iterations']
             if not 0 < diagnostics['actual_iterations'] < settings.max_timesteps:
                 raise ConfigurationError('Gerber native termination not established: timestep limit reached.')
@@ -158,6 +169,7 @@ def main(argv=None):
     parser.add_argument('--pcb-config', type=Path, help='Physical assumptions only; default FR4 1.6 mm, auto port')
     parser.add_argument('--output', type=Path)
     parser.add_argument('--quality', choices=('preview','design','verify'), default='design')
+    parser.add_argument('--fields-mhz', type=float, nargs='+', help='1–3 passive E/H frequencies; same single Run')
     parser.add_argument('--prepare-only', action='store_true', help='Write native XML without running FDTD')
     add_frequency_arguments(parser)
     parser.set_defaults(frequencies_mhz=None)
@@ -182,13 +194,16 @@ def main(argv=None):
                 args.frequencies_mhz = [1300., 1420., 1500.]
             band = frequency_arguments_hz(args)
         # Validate the unchanged excitation-band rule before creating output/native objects.
-        gerber_quality_settings(args.quality, **band)
+        settings, _ = gerber_quality_settings(args.quality, **band)
+        from antenna_lab.solvers.pcb_fields import validate_field_frequencies
+        fields = validate_field_frequencies(tuple(f*1e6 for f in args.fields_mhz or ()), settings)
+        field_options = {"field_frequency_hz": fields} if fields else {}
         output = args.output
         if output is None:
             root = Path('outcomes/pcb_gerber')
             root.mkdir(parents=True, exist_ok=True)
             output = Path(mkdtemp(prefix=datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ_'), dir=root))
-        result = run_gerber_control(args.config, output, prepare_only=args.prepare_only, quality=args.quality, **sweep_options, pcb_config=args.pcb_config, **band)
+        result = run_gerber_control(args.config, output, prepare_only=args.prepare_only, quality=args.quality, **sweep_options, pcb_config=args.pcb_config, **field_options, **band)
         print(f"Status: {result['status']}; validation_status: unverified\n{output.resolve()/'summary.json'}")
         if not args.prepare_only:
             print(output.resolve()/'impedance.csv')

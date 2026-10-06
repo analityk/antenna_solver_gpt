@@ -109,8 +109,8 @@ Jak w istniejących raportach antenowych, ręczna regeneracja zapisuje nowy
 HTML w outcomes/reports, nie nadpisuje ukończonego przebiegu. Raport pokazuje
 próbkowane minima, przedziały zmiany znaku X, ostrzeżenie o minimum na granicy,
 założenia, SHA256, profil i stan wykonania. Zmiana Zref w części interaktywnej
-nie zmienia statycznych wykresów/minimów dla zapisanego Zref. Nie ma E/H,
-NF2FF ani bilansu mocy; nie są zastępowane fikcyjnymi danymi.
+nie zmienia statycznych wykresów/minimów dla zapisanego Zref. E/H pojawiają się po jawnym --fields-mhz. NF2FF i bilans mocy nie są zapisywane;
+braków nie zastępują fikcyjne dane.
 
 ## Profile jakości (PCB-010B)
 
@@ -245,3 +245,91 @@ przedziały o przeciwnych znakach X lub dokładnym zerze na którymś końcu.
 Dokładne zero wewnątrz szeregu może wystąpić w dwóch przedziałach; także
 przedział o obu końcach równych zero jest zapisany. Nie interpolujemy rezonansu.
 Dla dokładnego S11=0 pole s11_db jest null (−∞ dB), zachowując ścisły JSON.
+
+
+## Pola E/H i odtwarzanie fazy (PCB-010E)
+
+```bat
+.\.venv\Scripts\python.exe -m antenna_lab.pcb.gerber_control gerbs\emstest2 ^
+  --quality preview ^
+  --center-mhz 2000 --cutoff-mhz 625 ^
+  --sweep-start-mhz 1500 --sweep-stop-mhz 2500 --sweep-step-mhz 10 ^
+  --fields-mhz 2000
+```
+
+`--fields-mhz` wybiera 1–3 unikalne, dodatnie, skończone częstotliwości
+wewnątrz zadeklarowanego pasma center ± cutoff. Nie muszą występować w sweepie
+impedancji. Obowiązuje nadal **jeden Run**. Jeden CalcPort oblicza sumę zbiorów
+częstotliwości sweepu i pól; impedance.csv zawiera wyłącznie żądany sweep.
+Pominięcie --fields-mhz zachowuje dotychczasowy przebieg i raport.
+
+Przed XML/Run instalowane są pasywne zrzuty FD E (10) i H (11), dump_mode=1
+(interpolacja do węzłów), HDF5. Zrzuty otrzymują tylko częstotliwości pól,
+nie cały sweep. Nie ma filmu kroków czasowych ani objętości 3D.
+
+Trzy przekroje korzystają wyłącznie z istniejących linii, ściśle poza PML:
+
+- xy_air: pierwsza dodatnia linia Z powyżej miedzi, bez próbkowania na PEC;
+- xz_feed: najbliższa istniejąca linia Y do fizycznego środka portu;
+- yz_feed: najbliższa istniejąca linia X do fizycznego środka portu.
+
+Wszystkie osie styczne kończą się przed początkiem PML. Metadane zapisują
+politykę, żądaną i rzeczywistą pozycję, rozmiar przekroju i pliki natywne.
+Nie dodaje się ani nie przesuwa linii siatki. Geometria, port, wymuszenie,
+PML oraz profil jakości pozostają bez zmian; koszt rośnie jedynie o DFT/I/O.
+Przed solverem konsola podaje częstotliwości, płaszczyzny i liczbę zespolonych
+próbek składowych. Wspólny limit infrastruktury wynosi 4 mln punktów
+przestrzennych × częstotliwości (po 6 składowych E/H), sumowanych po przekrojach.
+
+Po udanym zakończeniu powstają:
+
+- fields/metadata.json;
+- fields/xy_air.npz, fields/xz_feed.npz, fields/yz_feed.npz;
+- plots/fields_xy_air_0.png, fields_xz_feed_0.png, fields_yz_feed_0.png
+  (indeks _1/_2 dla następnych częstotliwości).
+
+NPZ: frequency_hz, x_m/y_m/z_m, pełne zespolone E_v_per_m i H_a_per_m,
+mask, normalization_factor, port_voltage_phasor, reference_voltage_v,
+phasor_convention i array_order. Kolejność tablic pól:
+`frequency, component_xyz, x, y, z`, z pojedynczą próbką osi normalnej.
+Surowe native/fields_<plane>_E.h5 i _H.h5 pozostają nietknięte.
+
+Odniesieniem jest natywne całkowite napięcie portu uf_tot dla każdej
+częstotliwości pola. E/H mnożymy przez `1 / uf_tot`, otrzymując port
+**1∠0 V**, bez normalizacji do mocy przyjętej. Zapisywane są oryginalne
+zespolone napięcia i czynniki. Zero/nieskończone napięcie powoduje błąd.
+Jednostki: **E: V/m per 1 V port; H: A/m per 1 V port**. Konwencja:
+`real(F * exp(+j * phase))`; faza zero to dodatnie maksimum napięcia portu.
+
+Siatki E i H oraz wszystkich częstotliwości muszą być identyczne; nie są
+interpolowane przy eksporcie. Porównanie natywnych współrzędnych z planem
+uwzględnia zapis float32 (rtol 1e-6, atol 1e-10 m), ale zapisane współrzędne
+pozostają natywne, bez snapowania. Pełna maska jest konserwatywną oceną
+geometrii: bit 1 miedź z=0, bit 2 otoczenie o jednej lokalnej przekątnej komórki,
+bit 4 prostokąt źródła z takim halo. Odległość jest liczona do rzeczywistych
+poligonów i powierzchni portu. To nie natywna zajętość komórek Yee. Laminat
+nie jest maskowany. Próbki objęte maską mają NaN w oderwanych NPZ; JSON
+pozostaje ścisły, bez NaN/Inf. Pierwszy przekrój nad metalem może mieć znaczny
+obszar maski — nie należy go odczytywać jako brak pola fizycznego.
+
+Raport dodaje „Pola E/H — przebieg jednego okresu”: suwak i Play/Pause,
+fazy 0°, 30°, …, 330° z pętlą do 0° oraz czas `phase / 360 / f` w ns.
+Ruch na ekranie jest celowo spowolniony. Nie uruchamia solvera. Każda
+płaszczyzna/częstotliwość ma własny odtwarzacz:
+
+- xy_air: Ex/Ey jako wektor, tło podpisane Ex; obok podpisane Hz;
+- xz_feed: Ex/Ez jako wektor, tło Ex; obok Hy;
+- yz_feed: Ey/Ez jako wektor, tło Ey; obok Hx.
+
+Skale symetryczne symlog są stałe dla wszystkich faz jednej składowej
+i częstotliwości, wyznaczone z pełnej niezamaskowanej obwiedni fazora.
+W XY nakładany jest rzut miedzi, płytki i portu; pionowe cięcia pokazują
+przecięcia miedzi/portu i interfejsy laminatu. Strzałki są deterministycznie
+rozrzedzane w przestrzeni. Przeglądarka dostaje najwyżej 80×80 próbek mapy;
+pełne NPZ nie są zmieniane. Kontaktowe PNG pokazują 0°, 90°, 180°, 270°.
+
+Ręczne `python -m antenna_lab report outcomes\pcb_gerber\RUN --open`
+odtwarza wszystko z geometry.json i fields/*.npz/metadata.json, bez Gerberów
+ani openEMS. `--phase-step 15` zmienia wyłącznie prezentację do 24 faz.
+Brak dumpów w starym przebiegu wymaga nowego obliczenia z --fields-mhz;
+raport nie może odzyskać pól, których solver nie zapisał. Wyniki nadal unverified.

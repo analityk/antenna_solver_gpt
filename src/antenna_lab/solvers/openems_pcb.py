@@ -201,20 +201,25 @@ def write_pcb_xml(engine, csx, domain_mesh: PcbDomainMesh, xml_path) -> dict:
     return {'path': str(xml_path), 'size_bytes': size, 'parse_status': 'passed'}
 
 
-def prepare_pcb_xml_model(geometry: PcbGeometry, settings: PcbSimulationSettings, xml_path, *, port_edge_mode='aligned', gerber_quality=None):
+def prepare_pcb_xml_model(geometry: PcbGeometry, settings: PcbSimulationSettings, xml_path, *, port_edge_mode='aligned', gerber_quality=None, field_frequency_hz=()):
     """Prepare reusable XML; no Run, result processing or additional files."""
     engine, csx, port, mesh, spec, metadata = prepare_pcb_native_model(geometry, settings, port_edge_mode=port_edge_mode, **({'gerber_quality': gerber_quality} if gerber_quality is not None else {}))
-    metadata = {**metadata, **configure_pcb_fdtd(engine, csx, mesh, settings),
-                'xml': write_pcb_xml(engine, csx, mesh, xml_path)}
+    metadata = {**metadata, **configure_pcb_fdtd(engine, csx, mesh, settings)}
+    if field_frequency_hz:
+        from .pcb_fields import install_pcb_fields
+        metadata['fields'] = install_pcb_fields(csx, geometry, mesh, settings, field_frequency_hz)
+    metadata['xml'] = write_pcb_xml(engine, csx, mesh, xml_path)
     return engine, csx, port, mesh, spec, metadata
 
 
 def run_pcb_fdtd(engine, csx, port, domain_mesh: PcbDomainMesh,
-                 settings: PcbSimulationSettings, native_dir, *, exact_endcriteria=False, dump_statistics=False) -> dict:
+                 settings: PcbSimulationSettings, native_dir, *, exact_endcriteria=False, dump_statistics=False, field_frequency_hz=()) -> dict:
     """Execute an already prepared control model; port ratios remain unverified."""
     import os
     import numpy as np
 
+    from .pcb_fields import validate_field_frequencies
+    field_frequency_hz = validate_field_frequencies(field_frequency_hz, settings)
     _audit_port_grid(csx, domain_mesh, context='before Run')
     native_dir = Path(native_dir).resolve()
     xml = native_dir / 'model.xml'
@@ -241,7 +246,8 @@ def run_pcb_fdtd(engine, csx, port, domain_mesh: PcbDomainMesh,
         if statistics['number_of_iterations'] >= settings.max_timesteps:
             raise ConfigurationError('PCB: temporal termination not established; iterations >= max_timesteps.')
     frequencies = np.asarray(settings.result_frequency_hz, dtype=float)
-    port.CalcPort(str(native_dir), frequencies, ref_impedance=settings.reference_impedance_ohm)
+    calc_frequencies = np.asarray(sorted(set((*frequencies, *field_frequency_hz)))) if field_frequency_hz else frequencies
+    port.CalcPort(str(native_dir), calc_frequencies, ref_impedance=settings.reference_impedance_ohm)
 
     def spectrum(name):
         try:
@@ -250,11 +256,20 @@ def run_pcb_fdtd(engine, csx, port, domain_mesh: PcbDomainMesh,
             raise ConfigurationError(f'PCB port: brak lub niepoprawne widmo {name}: {exc}') from exc
         # Only singleton dimensions can be removed; never flatten a true matrix.
         values = np.atleast_1d(values.squeeze())
-        if values.ndim != 1 or values.size != frequencies.size or not np.isfinite(values).all():
-            raise ConfigurationError(f'PCB port: {name} musi zawierać {frequencies.size} skończonych próbek widma 1D.')
+        if values.ndim != 1 or values.size != calc_frequencies.size or not np.isfinite(values).all():
+            raise ConfigurationError(f'PCB port: {name} musi zawierać {calc_frequencies.size} skończonych próbek widma 1D.')
         return values
 
     voltage, current = spectrum('uf_tot'), spectrum('if_tot')
+    field_reference = None
+    if field_frequency_hz:
+        from .pcb_fields import voltage_scale
+        field_voltage = voltage[np.searchsorted(calc_frequencies,field_frequency_hz)]
+        voltage_scale(field_voltage)  # Reject unusable references before field export.
+        field_reference = dict(frequency_hz=list(field_frequency_hz),
+            voltage_real=field_voltage.real.tolist(), voltage_imag=field_voltage.imag.tolist())
+        selected = np.searchsorted(calc_frequencies, frequencies)
+        voltage, current = voltage[selected], current[selected]
     if np.any(current == 0):
         raise ConfigurationError('PCB port: zerowy prąd w widmie; nie można obliczyć Z.')
     reference = settings.reference_impedance_ohm
@@ -284,6 +299,8 @@ def run_pcb_fdtd(engine, csx, port, domain_mesh: PcbDomainMesh,
                  'pml_cells': domain_mesh.pml_cells},
     }
 
+    if field_reference is not None:
+        result['field_port_reference'] = field_reference
     if statistics is not None:
         result['native_statistics'] = statistics
         result['run_options'] = dict(exact_endcriteria=exact_endcriteria, dump_statistics=dump_statistics)

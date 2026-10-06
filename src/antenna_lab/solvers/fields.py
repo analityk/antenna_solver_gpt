@@ -9,6 +9,8 @@ from antenna_lab.core.config import ConfigurationError, write_json
 from .feed import resolve_feed
 from .power import _read_surface
 
+MAX_FIELD_POINTS = 4_000_000
+
 PLANES = {"xy_front": 2, "xz": 1, "yz": 0}
 CONVENTION = "real(F * exp(+j * phase)); phase zero = positive port voltage"
 
@@ -51,17 +53,22 @@ def field_layout(geometry, axes, mesh, config):
                        "start_m": [float(axes[a][pair[0]]) for a, pair in zip("xyz", bounds)],
                        "stop_m": [float(axes[a][pair[1]]) for a, pair in zip("xyz", bounds)],
                        "native_files": {kind: f"fields_{name}_{kind}.h5" for kind in "EH"}})
-    if total > 4_000_000:
+    if total > MAX_FIELD_POINTS:
         raise ConfigurationError("Zapis E/H przekracza 4 mln punktów × częstotliwości. Ogranicz field_planes lub frequency_hz.")
     return result
 
 
-def install_fields(csx, layout, config, run):
+def install_frequency_planes(csx, layout, frequencies):
+    """Shared passive complex FD node dumps; never requests grid modification."""
     for plane in layout:
         for kind, dump_type in (("E", 10), ("H", 11)):
             dump = csx.AddDump(f"fields_{plane['name']}_{kind}", dump_type=dump_type,
-                               dump_mode=1, file_type=1, frequency=config["simulation"]["frequency_hz"])
+                               dump_mode=1, file_type=1, frequency=list(frequencies))
             dump.AddBox(start=plane["start_m"], stop=plane["stop_m"])
+
+
+def install_fields(csx, layout, config, run):
+    install_frequency_planes(csx, layout, config["simulation"]["frequency_hz"])
     if layout:
         write_json(run.path / "field_layout.json", {"planes": layout, "dump_mode": 1,
                    "interpolation": "node", "units": "m", "mesh_changed": False})

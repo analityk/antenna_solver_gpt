@@ -314,6 +314,8 @@ def _pcb_metadata(data):
     assumptions=imported.get('assumptions',data['geometry'].get('assumptions',[]))
     body+='<h3>Założenia i pominięta fizyka</h3><ul>'+''.join('<li>'+escape(str(a))+'</li>' for a in assumptions)+'</ul>'
     body+='<p>Model PEC: bez skończonej grubości i chropowatości miedzi. Soldermask, paste i silkscreen pominięto. Dolna/wewnętrzna miedź oraz otwory/vias nie są obsługiwane. E/H, NF2FF i bilans mocy: not recorded.</p>'
+    if (data['root']/'fields/metadata.json').exists():
+        body = body.replace('E/H, NF2FF i bilans mocy: not recorded.', 'E/H: zapisane przekroje poniżej. NF2FF i bilans mocy: not recorded.')
     body+=''.join('<p class="status">'+escape(str(w))+'</p>' for w in data['warnings'])
     return '<section class="panel"><h2>Przebieg PCB i założenia</h2>'+body+'</section>'
 
@@ -336,6 +338,8 @@ def render_html(data, *, plots_path=None, phase_step=None, field_components=None
     if pcb:
         geometry = _pcb_geometry(data, plots_path)
         extra_sections = geometry + _pcb_metadata(data)
+        if (data["root"] / "fields" / "metadata.json").exists():
+            extra_sections += field_section(data, figure_image, plots_path, phase_step, field_components)
         zeros = _pcb_diagnostics(data)
     else:
         extra_sections = (_power_section(data) + _far_field(data, plots_path / 'pattern_cuts.png' if plots_path else None)
