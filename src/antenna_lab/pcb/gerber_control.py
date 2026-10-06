@@ -18,6 +18,7 @@ from .control import (run_control_model, add_frequency_arguments,
                       frequency_arguments_hz)
 from .gerber import load_pcb_geometry
 from .gerber_quality import gerber_quality_settings, gerber_cost_preflight, require_excitation_fits
+from .gerber_sweep import sweep_frequencies_hz, sampled_diagnostics, print_sweep_summary
 from .port import resolve_pcb_lumped_port
 from .transform import normalize_port_orientation
 
@@ -26,12 +27,21 @@ def _write_json(path, value):
     path.write_text(json.dumps(value, indent=2, allow_nan=False)+'\n', encoding='utf-8')
 
 
-def run_gerber_control(config_path, output_dir, *, prepare_only=False, quality='design', **frequency_settings):
-    """Import, normalize once, preflight, then XML or one normal solve. No sweep."""
+def run_gerber_control(config_path, output_dir, *, prepare_only=False, quality='design', sweep_request=None, **frequency_settings):
+    """Import, normalize once, preflight, then XML or one solve for all frequencies."""
     config = load_pcb_config(config_path)
     source = load_pcb_geometry(config)
     geometry, transform = normalize_port_orientation(source)
     settings, exact = gerber_quality_settings(quality, **frequency_settings)
+    frequencies = settings.result_frequency_hz
+    sweep = dict(mode='explicit', start_hz=frequencies[0], stop_hz=frequencies[-1], point_count=len(frequencies))
+    if sweep_request is not None:
+        expected = sweep_frequencies_hz(*sweep_request)
+        if expected != tuple(frequencies):
+            raise ConfigurationError('Sweep metadata does not match result frequencies.')
+        sweep.update(mode='regular', requested_start_hz=sweep_request[0]*1e6,
+                     requested_stop_hz=sweep_request[1]*1e6, requested_step_hz=sweep_request[2]*1e6,
+                     stop_policy='include_if_on_regular_grid')
     output = Path(output_dir).resolve()
     if output.exists() and (not output.is_dir() or any(output.iterdir())):
         raise ConfigurationError(f'PCB Gerber: wymagany pusty/nowy katalog {output}.')
@@ -49,7 +59,7 @@ def run_gerber_control(config_path, output_dir, *, prepare_only=False, quality='
     for assumption in geometry.assumptions:
         print('  '+assumption, flush=True)
     output.mkdir(parents=True, exist_ok=True)
-    diagnostics = dict(quality_profile=quality, actual_iterations=None, termination_status='not_started')
+    diagnostics = dict(sweep=sweep, quality_profile=quality, actual_iterations=None, termination_status='not_started')
     try:
         _, anchor_metadata = make_gerber_mesh_anchor_plan(geometry, settings, quality)
         diagnostics['suppressed_noncritical_anchors'] = anchor_metadata.pop('suppressed_noncritical_anchors')
@@ -78,11 +88,15 @@ def run_gerber_control(config_path, output_dir, *, prepare_only=False, quality='
                 raise ConfigurationError('Gerber native termination not established: timestep limit reached.')
             diagnostics['termination_status'] = 'completed_before_limit'
             result['status'] = 'completed'
+            result['note'] = result['note'].replace('First synthetic PCB FDTD control result.', 'PCB FDTD result imported from Gerber geometry.')
+            result.update(sampled_diagnostics(result))
         if prepare_only:
             diagnostics['termination_status'] = 'not_run'
         result.update(diagnostics)
         result['import'] = metadata
         _write_json(output/'summary.json', result)
+        if not prepare_only:
+            print_sweep_summary(result)
     except (Exception, KeyboardInterrupt) as exc:
         if output.is_dir():
             stats_path = output/'native/openEMS_stats.txt'
@@ -117,14 +131,35 @@ def main(argv=None):
     parser.add_argument('--quality', choices=('preview','design','verify'), default='design')
     parser.add_argument('--prepare-only', action='store_true', help='Write native XML without running FDTD')
     add_frequency_arguments(parser)
+    parser.set_defaults(frequencies_mhz=None)
+    for name in ('start', 'stop', 'step'):
+        parser.add_argument(f'--sweep-{name}-mhz', type=float)
     args = parser.parse_args(argv)
     try:
+        request = (args.sweep_start_mhz, args.sweep_stop_mhz, args.sweep_step_mhz)
+        sweep_options = {}
+        if any(v is not None for v in request):
+            if not all(v is not None for v in request):
+                raise ConfigurationError('Provide all three sweep start/stop/step arguments.')
+            if args.frequencies_mhz is not None:
+                raise ConfigurationError('--frequencies-mhz cannot be combined with sweep arguments.')
+            frequencies = sweep_frequencies_hz(*request)
+            sweep_options['sweep_request'] = request
+            args.frequencies_mhz = [1300., 1420., 1500.]
+            band = frequency_arguments_hz(args)
+            band['result_frequency_hz'] = frequencies
+        else:
+            if args.frequencies_mhz is None:
+                args.frequencies_mhz = [1300., 1420., 1500.]
+            band = frequency_arguments_hz(args)
+        # Validate the unchanged excitation-band rule before creating output/native objects.
+        gerber_quality_settings(args.quality, **band)
         output = args.output
         if output is None:
             root = Path('outcomes/pcb_gerber')
             root.mkdir(parents=True, exist_ok=True)
             output = Path(mkdtemp(prefix=datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ_'), dir=root))
-        result = run_gerber_control(args.config, output, prepare_only=args.prepare_only, quality=args.quality, **frequency_arguments_hz(args))
+        result = run_gerber_control(args.config, output, prepare_only=args.prepare_only, quality=args.quality, **sweep_options, **band)
         print(f"Status: {result['status']}; validation_status: unverified\n{output.resolve()/'summary.json'}")
         if not args.prepare_only:
             print(output.resolve()/'impedance.csv')

@@ -134,3 +134,25 @@ API graficzne: [Gerbonara 1.6.3](https://gerbolyze.gitlab.io/gerbonara/object-ap
 Testy używają własnych minimalnych Gerberów i atrap natywnego solvera.
 Rzeczywiste GTL/GKO sprawdzono przez import, normalizację i audyt siatki/portu;
 natywne FDTD tej płytki wymaga uruchomienia lokalnego na Windowsie.
+
+## Gęsty sweep z jednego przebiegu (PCB-010C)
+
+`--sweep-start-mhz 1260 --sweep-stop-mhz 1580 --sweep-step-mhz 5`
+wybiera 65 częstotliwości dla jednego Run i jednego CalcPort. Wszystkie trzy
+argumenty są wymagane razem; nie można łączyć ich z `--frequencies-mhz`.
+Domyślne częstotliwości i profile jakości pozostają bez zmian. Obowiązuje
+istniejący zakres jakości impulsu; sweep nie zmienia centrum ani cutoff.
+
+Punkty powstają na regularnej siatce start + i × step. Koniec jest włączony,
+jeśli trafia w krok; inaczej ostatni punkt jest poniżej stop (bez dodatkowego
+krótszego kroku). W summary.json `sweep` zapisuje żądany i rzeczywisty zakres,
+krok, liczbę punktów oraz tę zasadę. Sama liczba próbek nie zmienia siatki;
+zmiana najniższej częstotliwości nadal wpływa na padding zgodnie z istniejącą
+polityką. Impedance.csv pozostaje jedyną tabelą per częstotliwość.
+
+`minimum_s11`, `minimum_swr`, `minimum_abs_reactance` opisują wyłącznie
+próbki (przy remisie pierwsza). `reactance_crossings` zawiera sąsiednie
+przedziały o przeciwnych znakach X lub dokładnym zerze na którymś końcu.
+Dokładne zero wewnątrz szeregu może wystąpić w dwóch przedziałach; także
+przedział o obu końcach równych zero jest zapisany. Nie interpolujemy rezonansu.
+Dla dokładnego S11=0 pole s11_db jest null (−∞ dB), zachowując ścisły JSON.

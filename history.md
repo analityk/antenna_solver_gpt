@@ -854,3 +854,16 @@ Dokumentacja zasad i ograniczeń: docs/pcb-gerber.md. Wyniki nadal unverified.
 - Wpływ na architekturę, formaty i odtwarzalność.
 - Wykonane sprawdzenia i ich rezultat.
 - Ograniczenia, migracje lub konieczność ponownego przeliczenia wyników.
+
+## 2026-10-06 — PCB-010C: gęsty sweep Gerberów
+
+Dodano opcjonalną regularną siatkę częstotliwości do gerber_control; jeden Run
+oraz jeden CalcPort obsługują wszystkie próbki. Niepodzielny przez krok koniec
+zakresu nie jest dopisywany. summary.json zawiera metadane sweepu, minima
+próbkowane i sąsiednie przedziały przejścia X przez zero, bez interpolacji.
+Usunięto mylące określenie wyniku Gerber jako syntetycznego. impedance.csv
+pozostaje jedyną tabelą widma. Bez zmian geometrii, siatki, portu i profili.
+Liczba próbek nie zmienia siatki przy niezmienionym zakresie częstotliwości;
+padding nadal zależy od minimum częstotliwości. Wyniki nie uzyskują nowej
+kwalifikacji walidacyjnej. Testy fake: Gerber 23, pełny zestaw 262 OK
+(3 pominięte); bez natywnego FDTD i bez modyfikacji historycznych wyników.
