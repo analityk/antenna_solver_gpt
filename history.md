@@ -739,6 +739,38 @@ Siatki aligned L2/L3 porównano dokładnie z kodem sprzed zmiany: identyczne.
 Brak rzeczywistego FDTD w środowisku agenta; A/B wymaga lokalnego Windows.
 Wynik jest diagnostyczny, nie stanowi walidacji fizycznej ani zmiany domyślnej.
 
+## 2026-10-06 — PCB-009E: dekompozycja wrażliwości wokół thirds L2
+
+Użytkownik przekazał wyniki natywnego PCB-009D: zmiany Z dla thirds L2–L3
+wyniosły 1,89965/1,91197/1,90776% przy 1,30/1,42/1,50 GHz; aligned około
+2,33–2,36%. Wszystkie cztery przebiegi zakończyły się przed limitem 100000
+kroków z exact_endcriteria i dump_statistics. Poprawa nie zalicza progu 1%.
+
+Dodano osobną komendę pcb.refined_sensitivity: pięć sekwencyjnych wariantów
+thirds_L2_reference, thirds_wave50, thirds_port8, thirds_substrate16 oraz
+thirds_L3_combined. Jedna geometria, wspólne pasmo i model portu 50 ohm;
+zmieniają się tylko zadane minima dyskretyzacji. Solver, domyślny aligned
+i istniejące komendy pozostają bez zmian. Kontrola preflight zapisuje
+siatkę, port oraz wskazówki thirds; przed porównaniem wymaga prawidłowych
+statystyk natywnych i zakończenia poniżej limitu. Błąd zachowuje pliki
+oraz wcześniejsze poprawne wyniki.
+
+Ścisły JSON/CSV zapisuje przyrosty zespolone względem własnego L2,
+sumę wkładów, resztę interakcji, udziały modułów i diagnostyczną klasyfikację.
+Udziałów nie normalizuje się do 100%. Pojemność pozostaje pomocnicza dla X<0.
+Liczba krawędzi Ex nie jest interpretowana jako zmiana rezystancji źródła;
+uwzględniono wskazane przez użytkownika skalowanie natywnego elementu RLC.
+Dokumentacja: docs/pcb-refined-sensitivity.md.
+
+Sprawdzenie: 10 nowych testów na atrapach natywnych z rzeczywistym kodem
+siatki/portu i zapisu wyników; pasmo domyślne i 2,45 GHz. Sprawdzono
+arytmetykę wektorową, granice klasyfikacji, bezpieczne mianowniki, brak
+mutacji, limity, niepoprawne statystyki, formaty i zachowanie wyników po błędzie.
+172 testy PCB OK (1 pominięty), cały zestaw 239 OK (3 pominięte).
+Nowych natywnych symulacji nie uruchamiano. Wynik badania wymaga lokalnego
+Windows; status diagnostic_pending_review nie jest walidacją fizyczną.
+Bez Gerbera, pól, NF2FF, diagnostyki mocy i przeprojektowania portu.
+
 ## Wzór kolejnego wpisu
 
 - Data i krótka nazwa zmiany.
