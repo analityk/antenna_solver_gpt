@@ -1,0 +1,21 @@
+{
+"lengthUnit": "mil",
+"remark": [],
+"components": {
+	"fields": ["COMPONENT_NO", "COMPONENT_NAME", "LAYER", "X_COORDINATE", "Y_COORDINATE", "ANGLE"],
+	"rows": [
+		[1, "C1", "T", 190, 490, 90],
+		[2, "PAD1", "T", 190, 519.66, 0],
+		[3, "PAD2", "T", 190, 460.34, 0]
+	]
+},
+"pins": {
+	"fields": ["PIN_NO", "PIN_NAME", "PIN_X", "PIN_Y", "LAYER", "PIN_TYPE", "NET_NAME", "NET_TYPE", "PAD_SHAPE", "PAD_SIZEX", "PAD_SIZEY", "HOLE_SIZE", "HOLE_LEN", "PAD_ANGLE"],
+	"rows": [
+		[1, "C1_1", 190, 460.34, "T", "SMD", "A", "", "R", 31.751, 34.016, 0, 0, 90],
+		[2, "C1_2", 190, 519.66, "T", "SMD", "B", "", "R", 31.751, 34.016, 0, 0, 90],
+		[3, "PAD1_2", 190, 519.66, "T", "SMD", "B", "", "R", 31.751, 34.016, 0, 0, 90],
+		[4, "PAD2_1", 190, 460.34, "T", "SMD", "A", "", "R", 31.751, 34.016, 0, 0, 90]
+	]
+}
+}
