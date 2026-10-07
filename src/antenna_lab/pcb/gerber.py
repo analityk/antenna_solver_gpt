@@ -22,6 +22,7 @@ from shapely.ops import polygonize_full
 from antenna_lab.core.config import ConfigurationError
 from .config import ResolvedPcbConfig
 from .model import BoardOutline, CopperPolygon, PcbGeometry, PcbPort, Substrate, CopperImageStats
+from .sources import member, read_gerber
 from .validation import validate_pcb_geometry
 
 CURVE_ERROR_M = 1e-7
@@ -38,7 +39,7 @@ ASSUMPTIONS = (
 
 
 def _read(path, role):
-    path = Path(path)
+    path = member(path)
     if role == 'top copper' and path.suffix.lower() in {
             '.gtp', '.gto', '.gts', '.gbl', '.gbp', '.gbo', '.gbs', '.drl', '.gko'}:
         raise ConfigurationError(f'{path}: expected top copper, not mask/paste/silk/bottom/drill/outline.')
@@ -46,7 +47,7 @@ def _read(path, role):
         with warnings.catch_warnings():
             # Gerbonara can otherwise ignore unknown commands or missing EOF.
             warnings.simplefilter('error')
-            gerber = GerberFile.open(path, enable_includes=False)
+            gerber = read_gerber(path)
     except (OSError, ValueError, SyntaxError, Warning) as exc:
         raise ConfigurationError(f'{role}: cannot parse {path}: {exc}') from exc
     if not gerber.objects:

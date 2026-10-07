@@ -799,3 +799,87 @@ nadal wymaga sprawdzenia statystyk). Profile i zabezpieczenia nie zmieniły się
 Dla powyższego preview: 288 120 komórek, minimum 34 507 kroków impulsu;
 bez kotwic elementów przy identycznym eksperymencie: 181 790 komórek.
 Oś Z jest identyczna. To preflight, nie benchmark ani dowód zbieżności.
+
+## Eksperyment ZIP i dziedziczenie wejść (PCB-012D)
+
+Wejście `*.zip` (bez znaczenia wielkości liter) oznacza eksperyment z zewnętrzną
+netlistą. Katalog oraz legacy JSON zachowują dotychczasowe zasady i **nie**
+zaczynają szukać plików w rodzicach.
+
+Dla ZIP wybieramy niezależnie netlistę i stackup: dokładnie jeden kandydat
+lokalny wygrywa; przy braku szukamy tylko w jednym katalogu nadrzędnym.
+Wielu kandydatów na rozpatrywanym poziomie oznacza błąd; nie szukamy dalej.
+Brak na obu poziomach też oznacza błąd. Nie łączymy konfiguracji.
+`--pcb-config` zastępuje automatyczny wybór stackupu (`explicit_cli`),
+ale netlista nadal wymaga lokalnego lub nadrzędnego `.enet`.
+
+Netlistą jest regularny plik `.enet`, bez wymaganego związku nazwy z ZIP.
+Stackup rozpoznajemy po kontrakcie physical PCB lub strukturze EasyEDA Pro
+`layerManagement` + `physicalStacking`; przypadkowe JSON i FlyingProbe nie są
+kandydatami. ENET wewnątrz ZIP jest odrzucany. FlyingProbeTesting.json pochodzi
+z ZIP. Zachowujemy oryginalną ścieżkę i katalog ENET, żeby przyszłe odnośniki
+do modeli komponentów mogły być względem tego katalogu. Nie dodano modeli
+pomiarowych komponentów.
+
+Przykładowy układ: `family/common.enet`, `family/stackup.json`,
+`family/variant/board.zip`. Lokalny `.enet` lub stackup w `variant` zastępuje
+wyłącznie odpowiadające mu wejście rodzica.
+
+ZIP pozostaje źródłem: `ZipMember` czyta pojedyncze wpisy przez ZipFile,
+Gerbonara parsuje tekst przez `from_string`. Nie używamy extract/extractall,
+nie powstają rozpakowane Gerbery w outcomes ani obok ZIP. Zwykłe katalogi
+nadal korzystają z Path i dotychczasowego otwierania Gerbonara. Obsługiwany
+jest korzeń archiwum albo jeden katalog opakowujący, nie łączenie drzew.
+
+Limity: 4096 wpisów, 32 MiB na plik, 256 MiB sumy rozpakowanych danych,
+512 MiB pliku ZIP. Odrzucamy traversal, ścieżki absolutne/Windows/UNC,
+duplikaty po normalizacji separatorów i wielkości liter, symlinki/specjalne
+wpisy, szyfrowanie i uszkodzenia. ZIP jest hashowany strumieniowo; każdy wpis
+ma SHA256 swoich dokładnych nieskompresowanych bajtów. Metadane używają
+`archive.zip::member`, bez ścieżek tymczasowych.
+
+EasyEDA: Thickness oznacza mm; dla miedzi jest przeliczana na µm w kontrakcie
+physical. Miedź/dielektryk muszą występować naprzemiennie od top do bottom.
+Wewnętrzne aktywne warstwy otrzymują role inner1, inner2 itd. Maska, pasta i
+sitodruk pozostają pominięte. Permittivity musi wynosić co najmniej 1;
+nie zgadujemy epsilon z nazwy FR4. Loss Tangent=0 pozostaje zerem.
+Conducting sheet, 58 MS/m oraz PTH 25 µm solid_pec_equivalent są jawnymi
+założeniami projektu. Grubość miedzi nie tworzy komórek Z.
+
+### Rzeczywisty test1 — wynik diagnostyczny
+
+Lokalne `stacup.json` i `test1.enet` oraz ich warianty w jednym rodzicu dają
+identyczną geometrię źródłową, normalizowaną, modelowaną i siatkę. Import ZIP
+jest również identyczny z dawnym rozpakowanym katalogiem. Po tej kontroli
+usunięto tylko kopię `gerbs/realpcb_microstrip/test1/`.
+
+Stack: 35 µm Cu / 0,2 mm dielektryka, epsilon=4,5, tanδ=0 / 35 µm Cu.
+Jeden CSRC, R1=49,9 Ω, dwa zdeduplikowane PTH top–bottom; topologia przy
+10 µm PASS. Dla preview, center 2000 MHz, cutoff 1000 MHz, sweep
+1500–2500 MHz co 10 MHz: siatka (92,86,45)=356040, minima XYZ
+10/30/100 µm, impuls minimum 90937 kroków, 32377209480 aktualizacji komórek.
+
+**Ten rzeczywisty wariant nie przechodzi obecnego prepare-only preview.**
+Dotychczasowy resolver R1 nie znajduje istniejącej komórki poprzecznej
+mieszczącej się w jego oknie kontaktu. Ponadto impuls przekracza limit
+preview 50000 kroków. Obie blokady występują także przy imporcie katalogowym.
+Nie zmieniono meshera, reguł styków ani profilu, żeby je ukryć. Wymagają
+osobnej decyzji dotyczącej polityki obliczeń. Natywne XML/FDTD nie zostało
+uruchomione dla tego wariantu.
+
+Polecenie diagnostyczne Windows (aktualnie kończy się opisanym błędem R1):
+
+```bat
+set "PY=.\.venv\Scripts\python.exe"
+set "CSXCAD_INSTALL_PATH=C:\dev\openems\openEMS"
+%PY% -m antenna_lab.pcb.gerber_control ^
+  gerbs\realpcb_microstrip\test1.zip ^
+  --geometry-resolution-um 10 ^
+  --quality preview ^
+  --center-mhz 2000 ^
+  --cutoff-mhz 1000 ^
+  --sweep-start-mhz 1500 ^
+  --sweep-stop-mhz 2500 ^
+  --sweep-step-mhz 10 ^
+  --prepare-only
+```

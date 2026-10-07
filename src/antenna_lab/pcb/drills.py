@@ -22,16 +22,18 @@ from shapely.geometry import Point, Polygon
 from antenna_lab.core.config import ConfigurationError
 from .model import PcbDrill, QuantizedPcbDrill
 from .regions import copper_shape
+from .sources import member, ZipMember
 
 PTH_MODEL_NOTE = 'PTH barrel model: solid PEC equivalent cylinder; plating losses and hollow barrel geometry are not modeled.'
 
 
 def read_drill_source(path, layer_count):
-    path = Path(path)
+    path = member(path)
     try:
         with warnings.catch_warnings(record=True) as parser_warnings:
             warnings.simplefilter('always')
-            parsed = ExcellonFile.open(path)
+            parsed = (ExcellonFile.from_string(path.read_text('utf-8-sig'),filename=str(path))
+                      if isinstance(path,ZipMember) else ExcellonFile.open(path))
             parser = ExcellonParser(settings=parsed.import_settings)
             parser.do_parse(path.read_text(encoding='utf-8-sig'), filename=str(path))
     except (ValueError, SyntaxError, OSError, Warning) as exc:
@@ -99,7 +101,7 @@ def read_drill_source(path, layer_count):
             raise ConfigurationError(f'{path.name}: cannot preserve source tool identity.')
         diameters[identifier]=diameter
         holes.append((x,y,diameter,identifier))
-    info=dict(path=str(path.resolve()),sha256=sha256(path.read_bytes()).hexdigest(),
+    info=dict(path=str(path if isinstance(path,ZipMember) else path.resolve()),sha256=sha256(path.read_bytes()).hexdigest(),
         classification=role,tool_diameters_m=diameters,hole_count=len(holes),span='through',
         compatibility_warnings=compatibility_warnings,
         classification_policy='Gerbonara plating metadata + X2 comments + conventional filename; conflicts rejected')
@@ -112,16 +114,19 @@ def connected_layers(geometry, x, y, radius):
         point.distance(copper_shape(c)) <= radius for c in geometry.copper if c.layer_role==layer.role))
 
 
-def load_drills(geometry, records, settings):
+def load_drills(geometry, records, settings, *, sources_by_path=None):
     from .validation import TOLERANCE_M
     drills=[];sources=[];parsed=[];owners=[]
+    def source_name(record):
+        source=(sources_by_path or {}).get(record['path'])
+        return source.name if source is not None else Path(record['path']).name
     # Parse every source, including auxiliary exports, before deduplicating.
     # Lexical order puts Through.DRL before Through_Via.DRL, independent of
     # discovery/input order. Coordinates are retained from the owner, not averaged.
     records=sorted((r for r in records if r['role'] in ('PTH','NPTH')),
-        key=lambda r:(Path(r['path']).name.casefold(),Path(r['path']).name,str(r['path'])))
+        key=lambda r:(source_name(r).casefold(),source_name(r),str(r['path'])))
     for record in records:
-        holes,info=read_drill_source(record['path'],len(geometry.copper_layers))
+        holes,info=read_drill_source((sources_by_path or {}).get(record['path'],record['path']),len(geometry.copper_layers))
         info.update(suppressed_duplicate_holes=[],modeled_hole_count=0)
         sources.append(info);parsed.append((record,holes,info))
     for record,holes,info in parsed:
@@ -130,7 +135,7 @@ def load_drills(geometry, records, settings):
             raise ConfigurationError('PTH requires explicit v2 drills.pth_plating_um and pth_model=solid_pec_equivalent.')
         thickness=settings['pth_plating_um']*1e-6 if plated else None
         for index,(x,y,diameter,tool) in enumerate(holes,1):
-            identifier=f'{Path(record["path"]).name}:{index}'
+            identifier=f'{source_name(record)}:{index}'
             canonical=next((d for d,source in owners
                 if plated and d.plated and info['span']=='through' and source['span']=='through'
                 and source['path']!=info['path']
@@ -138,7 +143,7 @@ def load_drills(geometry, records, settings):
                 and abs(diameter-d.drill_diameter_m)<=TOLERANCE_M),None)
             if canonical is not None:
                 info['suppressed_duplicate_holes'].append(dict(
-                    source_filename=Path(record['path']).name,tool=tool,x_m=x,y_m=y,
+                    source_filename=source_name(record),tool=tool,x_m=x,y_m=y,
                     drill_diameter_m=diameter,disposition='duplicate_pth_suppressed',
                     canonical_source=next(source['path'] for d,source in owners if d is canonical),
                     canonical_drill_id=canonical.id))

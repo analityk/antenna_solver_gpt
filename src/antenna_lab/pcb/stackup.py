@@ -5,6 +5,7 @@ Copper thickness is a surface-material input only. No geometry is extruded.
 from dataclasses import dataclass, asdict
 from math import isfinite, pi
 from pathlib import Path
+from .sources import ZipMember
 
 from antenna_lab.core.config import ConfigurationError
 from .model import CopperLayer, DielectricLayer
@@ -16,8 +17,8 @@ EPS0 = 8.8541878128e-12
 class ResolvedPcbStackupConfig:
     schema_version: int
     model: str
-    copper_top_path: Path
-    board_outline_path: Path
+    copper_top_path: Path | ZipMember
+    board_outline_path: Path | ZipMember
     copper_layers: tuple[CopperLayer, ...]
     dielectric_layers: tuple[DielectricLayer, ...]
     port_negative_xy_m: tuple[float, float]

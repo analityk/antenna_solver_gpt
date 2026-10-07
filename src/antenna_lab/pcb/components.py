@@ -15,6 +15,7 @@ from shapely import union_all
 from antenna_lab.core.config import ConfigurationError
 from .model import PcbLumpedComponent, PcbPort, PcbSourceProvenance
 from .regions import copper_shape
+from .sources import member
 from .validation import TOLERANCE_M
 
 IDEAL_NOTE = ('Components are ideal lumped elements. Package parasitics, tolerance, '
@@ -43,9 +44,9 @@ def _json(path):
             result[key] = value
         return result
     try:
-        return json.loads(Path(path).read_text(encoding='utf-8-sig'), object_pairs_hook=unique)
+        return json.loads(member(path).read_text(encoding='utf-8-sig'), object_pairs_hook=unique)
     except (OSError, ValueError) as exc:
-        raise ConfigurationError(f'{Path(path).name}: invalid component JSON: {exc}') from exc
+        raise ConfigurationError(f'{member(path).name}: invalid component JSON: {exc}') from exc
 
 
 def discover_component_sources(directory):
@@ -153,7 +154,7 @@ def terminal_gap(ref, pins, copper):
 
 def load_components(enet, probe, copper):
     entries=read_netlist(enet);placements=read_placements(probe,entries)
-    eh,fh=(sha256(Path(p).read_bytes()).hexdigest() for p in (enet,probe))
+    eh,fh=(sha256(member(p).read_bytes()).hexdigest() for p in (enet,probe))
     components=[];source=None;port=None
     for ref,(kind,number,text,nets) in sorted(entries.items()):
         axis,start,stop,window,width=terminal_gap(ref,placements[ref],copper)

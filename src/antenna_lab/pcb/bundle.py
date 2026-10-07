@@ -18,6 +18,7 @@ from shapely import union_all
 
 from antenna_lab.core.config import ConfigurationError, validate_schema
 from .config import ResolvedPcbConfig
+from .sources import read_gerber
 from .gerber import _read, _copper, _outline, ASSUMPTIONS
 from .model import PcbGeometry, PcbPort, Substrate, CopperImageStats
 from .regions import copper_shape
@@ -57,7 +58,7 @@ def _role(path):
     if not gerber_like:
         return 'unclassified'
     try:
-        parsed = GerberFile.open(path, enable_includes=False)
+        parsed = read_gerber(path)
     except (ValueError, SyntaxError, OSError) as exc:
         raise ConfigurationError(f'Cannot identify Gerber {path.name}: {exc}') from exc
     function = ','.join(parsed.file_attrs.get('.FileFunction',())).lower()
@@ -84,12 +85,14 @@ def _role(path):
     return 'unclassified_gerber'
 
 
-def discover_bundle(directory):
+def discover_bundle(directory, *, members=None):
     directory = Path(directory).resolve()
-    if not directory.is_dir():
+    if members is None and not directory.is_dir():
         raise ConfigurationError(f'Gerber directory not found: {directory}')
     records = []
-    for path in sorted((p for p in directory.iterdir() if p.is_file()), key=lambda p:p.name):
+    sources = {}
+    for path in sorted(members if members is not None else (p for p in directory.iterdir() if p.is_file()), key=lambda p:p.name):
+        sources[str(path)] = path
         role = _role(path)
         records.append(dict(name=path.name, path=str(path), role=role,
             sha256=sha256(path.read_bytes()).hexdigest(),
@@ -100,7 +103,7 @@ def discover_bundle(directory):
         if len(candidates)!=1:
             raise ConfigurationError(f'Require exactly one {role}; candidates: '+
                 (', '.join(Path(p).name for p in candidates) or '(none)'))
-        selected[role] = Path(candidates[0])
+        selected[role] = sources[candidates[0]]
     unsupported = [r['name'] for r in records if r['role'] in ('bottom_copper','inner_copper','drill','unclassified_gerber')]
     if unsupported:
         raise ConfigurationError('Unsupported PCB-v0 layers/features (not modeled): '+', '.join(unsupported))
@@ -171,16 +174,21 @@ def audit_physical_feed(geometry):
             raise ConfigurationError(f'Physical feed {side}: incomplete or ambiguous full-width contact; use explicit port.')
 
 
-def load_bundle_geometry(directory, physical_path=None):
-    value=load_physical_config(physical_path)
+def load_bundle_geometry(directory, physical_path=None, *, physical_value=None, members=None, component_sources=None):
+    value=load_physical_config(physical_path) if physical_value is None else physical_value
     if value['schema_version'] == 2:
         from .bundle_multilayer import load_multilayer_bundle
-        return load_multilayer_bundle(directory, value)
-    selected,records=discover_bundle(directory)
+        return load_multilayer_bundle(directory, value, members=members, component_sources=component_sources)
+    selected,records=discover_bundle(directory, members=members)
     top=_read(selected['top_copper'],'top copper')
     counts={}
     copper=_copper(top,counts);outline=_outline(_read(selected['outline'],'board outline'))
-    if value['port']['mode']=='auto': port,feed=detect_feed(top,copper)
+    components, source_port = (), None
+    if component_sources is not None:
+        from .components import load_components
+        port,components,source_port=load_components(*component_sources,copper)
+        feed=dict(mode='enet_CSRC',source_refdes='CSRC',source_pin_nets=source_port.source_pin_nets)
+    elif value['port']['mode']=='auto': port,feed=detect_feed(top,copper)
     else:
         v=value['port']
         port=PcbPort('gerber_feed',tuple(x*1e-3 for x in v['negative_mm']),
@@ -201,6 +209,7 @@ def load_bundle_geometry(directory, physical_path=None):
     geometry=PcbGeometry('pcb',outline,copper,Substrate(outline,-config.substrate_thickness_m,0.,
         config.substrate_epsilon_r,config.substrate_loss_tangent),port,assumptions,
         copper_composition=(CopperImageStats('top',**counts),))
+    geometry.components,geometry.source_port=components,source_port
     validate_pcb_geometry(geometry);audit_physical_feed(geometry)
     return config,geometry,dict(source_directory=str(Path(directory).resolve()),discovered_files=records,
         physical_config=value,physical_config_source=origin,feed_detection=feed)

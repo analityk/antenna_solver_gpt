@@ -1413,3 +1413,40 @@ Windows UCRT i GUI Tk). Testy kierunkowe PCB/pól/stackupu: 24, OK.
 **Ograniczenia:** kontener nie ma openEMS/CSXCAD; testy produkcyjne używają
 atrap native. Nowy publiczny prepare-only pozostaje do potwierdzenia na
 Windows. To akceptacja architektury, nie badanie zbieżności ani walidacja EM.
+
+## 2026-10-08 — PCB-012D: hierarchiczne wejścia ZIP (akceptacja real preview zablokowana)
+
+**Powód:** warianty PCB mają współdzielić stackup/ENET bez kopiowania ich do
+rozpakowanych katalogów. ZIP jest źródłem, nie etapem ekstrakcji.
+
+**Zmiany robocze:** bezpośredni ZipMember + Path, niezależne dziedziczenie
+local → jeden parent, jawny config nadrzędny wobec stackupu automatycznego,
+strict adapter EasyEDA fizycznego stackupu. Oryginalne bajty i ścieżki ENET,
+katalog modeli przyszłych komponentów, hashe ZIP/wpisów i pochodzenie
+materiałów są oddzielną deterministyczną informacją. Parsery używają
+Gerbonara from_string dla ZIP; nie napisano parsera Gerber/NC. ENET wewnątrz
+archiwum jest błędem. Folder/legacy JSON zachowują zachowanie i nie dziedziczą.
+
+**Fizyka:** bez zmian. Epsilon nie jest zgadywane; real stackup to 35 µm Cu /
+0,2 mm epsilon=4,5 tanδ=0 / 35 µm Cu. Maska pominięta, model miedzi/przelotek
+pozostaje dotychczasowy. Rozdzielczość geometrii 10 µm i siatka float nietknięte.
+
+**Sprawdzenie danych:** dokładne bajty 13 wpisów ZIP zgodne z dawną kopią
+katalogową. Geometria/normalizacja/model/siatka/koszt zgodne dla ZIP lokalnego,
+dziedziczonego i importu katalogowego. Po tej kontroli usunięto tylko
+`gerbs/realpcb_microstrip/test1/`, zachowując oryginalny ZIP/ENET/stackup.
+
+**Blokada akceptacji:** test1 topology PASS, dwa PTH top–bottom, jedno CSRC,
+R1=49,9 Ω; preview daje 356040 komórek (92,86,45), minimum impulsu 90937
+kroków / 32377209480 aktualizacji. Dotychczasowy resolver R1 odrzuca brak
+legalnej komórki poprzecznej; dodatkowo 90937 > 50000. Zjawiska są identyczne
+dla dawnego importu katalogowego. Nie naprawiano ich niedozwoloną zmianą
+meshera/profilu ani ukrytym refinement. Nie wykonano natywnego FDTD.
+
+**Testy:** testy hierarchii, formatów, jednostek, ochrony ZIP, źródeł/provenance,
+bezpośredniego parsowania, fake-native przygotowania poprawnego syntetycznego
+ZIP oraz rzeczywistej równoważności i jawnego odrzucenia kosztu/styków.
+Pełny zestaw: 368 testów, OK, 3 pominięte (openEMS/CSXCAD, Windows UCRT, Tk).
+Końcowy zestaw wejść ZIP i konfiguracji: 22 testy, OK. Warunek pełnej
+akceptacji rzeczywistego prepare-only nie jest spełniony, więc nie utworzono
+commitu; przygotowano łatkę do przeglądu bez zmian polityki solvera.

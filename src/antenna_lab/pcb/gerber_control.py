@@ -43,6 +43,13 @@ def run_gerber_control(config_path, output_dir, *, prepare_only=False, quality='
     if Path(config_path).is_dir():
         from .bundle import load_bundle_geometry
         config, source, bundle_metadata = load_bundle_geometry(config_path, pcb_config)
+    elif Path(config_path).suffix.lower() == '.zip':
+        from .experiment import resolve_experiment, load_experiment_geometry
+        experiment = resolve_experiment(config_path, pcb_config)
+        print(f'Gerber archive: {experiment.archive_path}\n'
+              f'Stackup: {experiment.stackup.source_path} [{experiment.stackup.scope}]\n'
+              f'Netlist: {experiment.netlist.source_path} [{experiment.netlist.scope}]',flush=True)
+        config, source, bundle_metadata = load_experiment_geometry(experiment)
     else:
         if pcb_config is not None:
             raise ConfigurationError('--pcb-config is for directory input; legacy JSON already specifies physical parameters.')
@@ -71,8 +78,8 @@ def run_gerber_control(config_path, output_dir, *, prepare_only=False, quality='
         raise ConfigurationError(f'PCB Gerber: wymagany pusty/nowy katalog {output}.')
     metadata = {
         'config_path': str(Path(pcb_config or config_path).resolve()) if pcb_config or not Path(config_path).is_dir() else None,
-        'resolved_config': {key: str(value) if isinstance(value, Path) else value
-                            for key,value in asdict(config).items()},
+        'resolved_config': {**asdict(config), 'copper_top_path': str(config.copper_top_path),
+                            'board_outline_path': str(config.board_outline_path)},
         'files': {role: {'path': str(path), 'sha256': sha256(path.read_bytes()).hexdigest()}
                   for role,path in (('top_copper',config.copper_top_path),('outline',config.board_outline_path))},
         'dependencies': {name: version(name) for name in ('gerbonara','shapely')},
@@ -85,7 +92,10 @@ def run_gerber_control(config_path, output_dir, *, prepare_only=False, quality='
         'composition_method': 'ordered primitive union/difference; later dark restores copper',
     }
     metadata.update(bundle_metadata)
-    metadata.setdefault('source_directory', str(config.copper_top_path.parent))
+    if 'experiment_input' in metadata:
+        metadata['config_path'] = metadata['experiment_input']['stackup']['source_path']
+    if 'source_directory' not in metadata:
+        metadata['source_directory'] = str(config.copper_top_path.parent)
     print('PCB Gerber: '+str(output), flush=True)
     if geometry.copper_layers:
         from .stackup import resolved_stackup_metadata
@@ -233,8 +243,8 @@ def run_gerber_control(config_path, output_dir, *, prepare_only=False, quality='
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description='Import top-copper/outline Gerbers and run one unverified PCB model')
-    parser.add_argument('config', type=Path, help='Gerber directory (or legacy PCB JSON)')
-    parser.add_argument('--pcb-config', type=Path, help='Physical assumptions only; default FR4 1.6 mm, auto port')
+    parser.add_argument('config', type=Path, help='Gerber ZIP experiment, directory, or legacy PCB JSON')
+    parser.add_argument('--pcb-config', type=Path, help='Physical config override; ZIP otherwise resolves stackup locally or in one parent')
     parser.add_argument('--output', type=Path)
     parser.add_argument('--geometry-resolution-um', type=float, choices=(100,10,1,.1), default=10,
                         help='CAD geometry resolution in um (default 10); independent of FDTD mesh resolution')

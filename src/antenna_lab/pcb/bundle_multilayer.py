@@ -11,6 +11,7 @@ from .gerber import _read, _outline, _copper, ASSUMPTIONS
 from .model import PcbGeometry, PcbPort, Substrate, CopperImageStats
 from .stackup import ResolvedPcbStackupConfig, resolve_stackup
 from .validation import validate_pcb_geometry
+from .sources import read_gerber
 
 
 def _layer_number(path, role):
@@ -19,7 +20,7 @@ def _layer_number(path, role):
     X2 L2 means inner1. In1_Cu, InnerLayer1 and .G1/.GP1 mean inner1.
     Ambiguous/non-contiguous orders are errors, never lexicographic guesses.
     """
-    parsed = GerberFile.open(path, enable_includes=False)
+    parsed = read_gerber(path)
     function = parsed.file_attrs.get('.FileFunction', ())
     numbers = [int(v[1:]) for v in function if re.fullmatch(r'L[1-9][0-9]*', v, re.I)]
     if len(numbers) > 1:
@@ -38,16 +39,18 @@ def _layer_number(path, role):
     return None, physical
 
 
-def discover_stackup_bundle(directory, expected_roles):
+def discover_stackup_bundle(directory, expected_roles, *, members=None, component_sources=None):
     from .bundle import _role
     directory = Path(directory).resolve()
-    if not directory.is_dir():
+    if members is None and not directory.is_dir():
         raise ConfigurationError(f'Gerber directory not found: {directory}')
     from .components import discover_component_sources
-    component_files = discover_component_sources(directory)
+    component_files = component_sources if component_sources is not None else discover_component_sources(directory)
     component_roles = dict(zip(component_files or (), ('enet','flying_probe')))
     records, physical_numbers = [], {}
-    for path in sorted((p for p in directory.iterdir() if p.is_file()), key=lambda p:p.name):
+    sources = {}
+    for path in sorted(members if members is not None else (p for p in directory.iterdir() if p.is_file()), key=lambda p:p.name):
+        sources[str(path)] = path
         role = component_roles.get(path) or _role(path)
         if role == 'drill':
             from .drills import read_drill_source
@@ -73,17 +76,17 @@ def discover_stackup_bundle(directory, expected_roles):
         if len(candidates) != 1:
             raise ConfigurationError(f'Require exactly one {role}; candidates: '+
                 (', '.join(r['name'] for r in candidates) or '(none)')+'; available: '+available)
-        selected[role] = Path(candidates[0]['path'])
+        selected[role] = sources[candidates[0]['path']]
     for name, (role, physical) in physical_numbers.items():
         if physical != expected_roles.index(role)+1:
             raise ConfigurationError(f'{name}: X2 L{physical} inconsistent with stackup role {role}; candidates: {available}')
     return selected, records
 
 
-def load_multilayer_bundle(directory, value):
+def load_multilayer_bundle(directory, value, *, members=None, component_sources=None):
     from .bundle import detect_feed, audit_physical_feed
     roles = [v['role'] for v in value['stackup'] if v['type'] == 'copper']
-    selected, records = discover_stackup_bundle(directory, roles)
+    selected, records = discover_stackup_bundle(directory, roles, members=members, component_sources=component_sources)
     outline = _outline(_read(selected['outline'], 'board outline'))
     hashes = {r['role']:r['sha256'] for r in records if r['role'] in roles}
     layers, dielectrics = resolve_stackup(value, outline, hashes)
@@ -96,7 +99,8 @@ def load_multilayer_bundle(directory, value):
         copper.extend(replace(p, id=layer.role+':'+p.id, z_m=layer.z_m, layer_role=layer.role) for p in polygons)
         if layer.role == 'top': top_file = parsed
     from .components import load_components, IDEAL_NOTE
-    netfiles = {r['role']:Path(r['path']) for r in records if r['role'] in ('enet','flying_probe')}
+    netfiles = (dict(zip(('enet','flying_probe'),component_sources)) if component_sources is not None else
+                {r['role']:Path(r['path']) for r in records if r['role'] in ('enet','flying_probe')})
     components, source_port = (), None
     if netfiles:
         port, components, source_port = load_components(netfiles['enet'], netfiles['flying_probe'], copper)
@@ -121,7 +125,8 @@ def load_multilayer_bundle(directory, value):
     geometry.components, geometry.source_port = components, source_port
     if source_port: geometry.assumptions.append(IDEAL_NOTE)
     from .drills import load_drills
-    geometry, drill_sources = load_drills(geometry, records, value.get('drills'))
+    geometry, drill_sources = load_drills(geometry, records, value.get('drills'),
+        sources_by_path={str(m):m for m in members} if members is not None else None)
     validate_pcb_geometry(geometry); audit_physical_feed(geometry)
     config = ResolvedPcbStackupConfig(2, 'pcb', selected['top'], selected['outline'], layers, dielectrics,
         port.negative_xy_m, port.positive_xy_m, port.width_m)

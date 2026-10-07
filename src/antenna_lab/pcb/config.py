@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 import json
 from pathlib import Path
+from .sources import ZipMember
 
 from antenna_lab.core.config import ConfigurationError, validate_schema
 
@@ -11,8 +12,8 @@ from antenna_lab.core.config import ConfigurationError, validate_schema
 class ResolvedPcbConfig:
     schema_version: int
     model: str
-    copper_top_path: Path
-    board_outline_path: Path
+    copper_top_path: Path | ZipMember
+    board_outline_path: Path | ZipMember
     copper_thickness_m: float
     copper_conductivity_s_m: float
     copper_model: str
