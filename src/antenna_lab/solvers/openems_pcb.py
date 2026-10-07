@@ -43,8 +43,13 @@ def install_pcb_geometry(
     Preflight failures do not touch CSXCAD. Readback failures stop before
     material/metal creation (the grid has necessarily already been written).
     """
-    copper_info = copper_metadata(copper_config)
     plan = make_pcb_solver_anchor_plan(geometry, settings, port_edge_mode, gerber_quality=gerber_quality)
+    if geometry.copper_layers:
+        from antenna_lab.pcb.stackup import resolved_stackup_metadata
+        copper_info = dict(copper_model='stackup', resolved_stackup=resolved_stackup_metadata(
+            geometry, settings.loss_reference_frequency_hz))
+    else:
+        copper_info = copper_metadata(copper_config)
     axes = (domain_mesh.x_lines_m, domain_mesh.y_lines_m, domain_mesh.z_lines_m)
     if domain_mesh.pml_cells != settings.pml_cells:
         raise ConfigurationError("PCB grid: pml_cells domeny nie zgadza się z ustawieniami eksperymentu.")
@@ -79,19 +84,35 @@ def install_pcb_geometry(
             raise ConfigurationError(f"PCB grid {axis}: odczyt CSXCAD różni się od finalnej osi domeny; "
                                      "nie wolno wygładzać, zaokrąglać ani usuwać linii.")
 
-    material = csx.AddMaterial('pcb_substrate', epsilon=substrate.epsilon_r, kappa=kappa)
-    material.AddLinPoly(points=_xy_polygon_points(substrate.outline.vertices_xy_m),
-                        norm_dir='z', elevation=substrate.z_min_m,
-                        length=substrate.z_max_m-substrate.z_min_m, priority=0)
-    if copper_info['copper_model'] == 'conducting_sheet':
-        metal = csx.AddConductingSheet('pcb_top_copper_sheet',
-            conductivity=copper_info['copper_conductivity_s_m'],
-            thickness=copper_info['copper_thickness_m'])
+    if geometry.copper_layers:
+        stack = copper_info['resolved_stackup']
+        dielectric_info = [v for v in stack['layers'] if v['type'] == 'dielectric']
+        for index, (layer, info) in enumerate(zip(geometry.dielectrics, dielectric_info)):
+            material = csx.AddMaterial(f'pcb_dielectric_{index}', epsilon=layer.epsilon_r,
+                                       kappa=info['kappa_s_per_m'])
+            material.AddLinPoly(points=_xy_polygon_points(layer.outline.vertices_xy_m),
+                norm_dir='z', elevation=layer.z_min_m, length=layer.z_max_m-layer.z_min_m, priority=0)
+        for layer in geometry.copper_layers:
+            name = 'pcb_copper_'+layer.role
+            material = (csx.AddMetal(name) if layer.model == 'pec' else
+                csx.AddConductingSheet(name, conductivity=layer.conductivity_s_m, thickness=layer.thickness_m))
+            for copper in geometry.copper:
+                if copper.layer_role == layer.role:
+                    material.AddPolygon(points=_xy_polygon_points(copper.vertices_xy_m),
+                        norm_dir='z', elevation=copper.z_m, priority=10)
     else:
-        metal = csx.AddMetal('pcb_top_copper_PEC')
-    for copper in geometry.copper:
-        metal.AddPolygon(points=_xy_polygon_points(copper.vertices_xy_m),
-                         norm_dir='z', elevation=0.0, priority=10)
+        material = csx.AddMaterial('pcb_substrate', epsilon=substrate.epsilon_r, kappa=kappa)
+        material.AddLinPoly(points=_xy_polygon_points(substrate.outline.vertices_xy_m),
+                            norm_dir='z', elevation=substrate.z_min_m,
+                            length=substrate.z_max_m-substrate.z_min_m, priority=0)
+        metal = (csx.AddMetal('pcb_top_copper_PEC') if copper_info['copper_model'] == 'pec' else
+                 csx.AddConductingSheet('pcb_top_copper_sheet',
+                    conductivity=copper_info['copper_conductivity_s_m'],
+                    thickness=copper_info['copper_thickness_m']))
+        for copper in geometry.copper:
+            metal.AddPolygon(points=_xy_polygon_points(copper.vertices_xy_m),
+                             norm_dir='z', elevation=0.0, priority=10)
+    _audit_port_grid(csx, domain_mesh, context='after dielectric/copper installation')
     return {
         **copper_info,
         'delta_unit_m': 1.0,
@@ -104,7 +125,7 @@ def install_pcb_geometry(
             'loss_model': 'constant_kappa',
             'z_min_m': substrate.z_min_m, 'z_max_m': substrate.z_max_m,
         },
-        'copper': {'model': 'PEC' if copper_info['copper_model'] == 'pec' else 'conducting_sheet', 'polygon_count': len(geometry.copper),
+        'copper': {'model': 'PEC' if copper_info['copper_model'] == 'pec' else copper_info['copper_model'], 'polygon_count': len(geometry.copper),
                    'ids': [copper.id for copper in geometry.copper]},
     }
 

@@ -51,6 +51,16 @@ def _z_interfaces(geometry):
 
     Geometry validation tolerates residue; solver-facing export does not.
     """
+    if geometry.copper_layers:
+        required = sorted({v for d in geometry.dielectrics for v in (d.z_min_m,d.z_max_m)})
+        if any(b-a <= ANCHOR_MERGE_TOLERANCE_M for a,b in zip(required, required[1:])):
+            raise ConfigurationError('PCB Z: unresolved dielectric interfaces; do not merge thin physical layers.')
+        planes = {c.role:c.z_m for c in geometry.copper_layers}
+        if required[-1] != 0.0 or any(c.z_m != planes[c.layer_role] for c in geometry.copper):
+            raise ConfigurationError('PCB stackup: exact shared copper/interface Z lines required, top z=0.')
+        if not set(planes.values()).issubset(required):
+            raise ConfigurationError('PCB stackup: copper plane missing dielectric interface.')
+        return tuple(required)
     bottom, top = geometry.substrate.z_min_m, geometry.substrate.z_max_m
     if top - bottom <= ANCHOR_MERGE_TOLERANCE_M:
         raise ConfigurationError(
@@ -92,7 +102,7 @@ def make_pcb_mesh_anchor_plan(geometry: PcbGeometry) -> PcbMeshAnchorPlan:
         _merge(x, (n[0], mx, p[0])),
         _merge(y, (my - half, my, my + half)),
         z, hypot(p[0] - n[0], p[1] - n[1]), geometry.port.width_m,
-        geometry.substrate.z_max_m - geometry.substrate.z_min_m,
+        max(d.z_max_m for d in geometry.dielectrics) - min(d.z_min_m for d in geometry.dielectrics),
     )
 
 
@@ -169,7 +179,7 @@ def make_pcb_placeholder_mesh(
 class PcbPhysicalMeshPolicy:
     """Independent local step limits, not mesh axes or a complete FDTD domain.
 
-    Assumes a homogeneous isotropic substrate with relative permeability 1.
+    Uses the shortest dielectric wavelength for shared Cartesian XY planes; mu_r=1.
     Growth values are carried forward only; grading is not performed here.
     air_padding_m is the clearance from structure to START of PML, excluding
     PML thickness. pml_cells is metadata only; no PML geometry is constructed.
@@ -208,7 +218,7 @@ def derive_pcb_physical_mesh_policy(
     padding_frequency = min(settings.result_frequency_hz)
     padding_wavelength = C0 / padding_frequency
     air = C0 / f_mesh
-    substrate = air / sqrt(geometry.substrate.epsilon_r)
+    substrate = air / sqrt(max(d.epsilon_r for d in geometry.dielectrics))
     substrate_step = substrate / settings.cells_per_wavelength
     return PcbPhysicalMeshPolicy(
         padding_frequency_hz=padding_frequency,
@@ -371,6 +381,13 @@ def make_pcb_domain_mesh(
         core_limits = []
         for a, b in zip(required, required[1:]):
             maximum = policy.max_substrate_z_step_m if axis == 2 else policy.max_substrate_xy_step_m
+            if axis == 2 and geometry.dielectric_layers:
+                layer = next(d for d in geometry.dielectrics if d.z_min_m <= a and b <= d.z_max_m)
+                # Wavelength follows the actual material. The existing minimum
+                # substrate count applies to total dielectric depth, NOT N cells
+                # per layer: interfaces alone may already exceed that minimum.
+                maximum = min(policy.air_wavelength_m / sqrt(layer.epsilon_r) / settings.cells_per_wavelength,
+                              plan.substrate_thickness_m / settings.min_substrate_cells_z)
             if axis < 2 and local_ranges[axis][0] <= a and b <= local_ranges[axis][1]:
                 maximum = min(maximum, local_steps[axis])
             core_limits.append(maximum)

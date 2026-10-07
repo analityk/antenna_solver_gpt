@@ -94,10 +94,11 @@ def pcb_sample_mask(lines, full_axes, geometry):
         widths.append(np.maximum(full[indices]-full[indices-1],full[indices+1]-full[indices]))
     halo=np.sqrt(sum(w*w for w in np.meshgrid(*widths,indexing='ij'))).ravel()
     xy=points(xyz[:,:2]);z=xyz[:,2]
-    metal=union_all([Polygon(c.vertices_xy_m) for c in geometry.copper])
-    d=np.hypot(distance(xy,metal),z)
     mask=np.zeros(len(xyz),dtype=np.uint8)
-    mask[d<=1e-12]|=1;mask[d<=halo]|=2
+    for plane_z in sorted({c.z_m for c in geometry.copper}):
+        metal=union_all([Polygon(c.vertices_xy_m) for c in geometry.copper if c.z_m == plane_z])
+        d=np.hypot(distance(xy,metal),z-plane_z)
+        mask[d<=1e-12]|=1;mask[d<=halo]|=2
     n,p=geometry.port.negative_xy_m,geometry.port.positive_xy_m
     ym=(n[1]+p[1])/2;half=geometry.port.width_m/2
     source=box(n[0],ym-half,p[0],ym+half)

@@ -56,7 +56,7 @@ def resolve_pcb_lumped_port(
         if stop[0]-start[0] <= 2*tol or stop[1]-start[1] <= 2*tol:
             raise ConfigurationError('Gerber port surface is unresolved at geometry tolerance.')
         interior = box(start[0]+tol, start[1]+tol, stop[0]-tol, stop[1]-tol)
-        for copper in geometry.copper:
+        for copper in geometry.top_copper:
             if interior.intersects(Polygon(copper.vertices_xy_m)):
                 raise ConfigurationError(f'Gerber port: miedź {copper.id!r} wewnątrz szczeliny; '
                                          'economical anchors cannot remove physical copper.')
@@ -82,7 +82,7 @@ def resolve_pcb_lumped_port(
     if ny < settings.min_port_width_cells:
         raise ConfigurationError(f"PCB port: szerokość ma {ny} komórek, wymagane {settings.min_port_width_cells}.")
     polygons = []
-    for copper in geometry.copper:
+    for copper in geometry.top_copper:
         vertices = list(copper.vertices_xy_m)
         if vertices[-1] == vertices[0]:
             vertices.pop()
@@ -101,7 +101,7 @@ def resolve_pcb_lumped_port(
             if found != [owner]:
                 reason = 'niejednoznaczny kontakt' if len(found)>1 else 'niepełny kontakt'
                 raise ConfigurationError(f"PCB port {side}: {reason} w {point!r} m; "
-                                         f"oczekiwano miedzi {geometry.copper[owner].id!r}.")
+                                         f"oczekiwano miedzi {geometry.top_copper[owner].id!r}.")
     centres_y = tuple(a+(b-a)/2 for a,b in zip(rows,rows[1:]))
     for a,b in zip(x[ix0:ix1],x[ix0+1:ix1+1]):
         centre_x = a+(b-a)/2
@@ -109,11 +109,11 @@ def resolve_pcb_lumped_port(
             point = (centre_x,row)
             found = members(point)
             if found:
-                raise ConfigurationError(f"PCB port: miedź {geometry.copper[found[0]].id!r} "
+                raise ConfigurationError(f"PCB port: miedź {geometry.top_copper[found[0]].id!r} "
                                          f"wewnątrz szczeliny w {point!r} m.")
     return PcbLumpedPortSpec(1, geometry.port.id, start, stop, 'x',
-        settings.reference_impedance_ohm, 1.0, 5, geometry.copper[negative].id,
-        geometry.copper[positive].id, nx, ny, nx*(ny+1))
+        settings.reference_impedance_ohm, 1.0, 5, geometry.top_copper[negative].id,
+        geometry.top_copper[positive].id, nx, ny, nx*(ny+1))
 
 
 
@@ -143,7 +143,7 @@ def _resolve_thirds_port(geometry, mesh, settings, mode):
     if len(xi)<settings.min_port_gap_cells or len(yi)<settings.min_port_width_cells:
         raise ConfigurationError('PCB thirds: niewystarczająca liczba komórek przecinających port.')
     polygons=[]
-    for copper in geometry.copper:
+    for copper in geometry.top_copper:
         vertices=list(copper.vertices_xy_m)
         if vertices[-1]==vertices[0]: vertices.pop()
         polygons.append(vertices)
@@ -163,5 +163,5 @@ def _resolve_thirds_port(geometry, mesh, settings, mode):
             if members((xx,yy)):
                 raise ConfigurationError(f'PCB thirds: miedź w szczelinie przy {(xx,yy)}.')
     return PcbLumpedPortSpec(1,geometry.port.id,(n[0],yl,0.0),(p[0],yu,0.0),'x',
-        settings.reference_impedance_ohm,1.,5,geometry.copper[ni].id,geometry.copper[pi].id,
+        settings.reference_impedance_ohm,1.,5,geometry.top_copper[ni].id,geometry.top_copper[pi].id,
         len(xi),len(yi),len(centres_x)*len(rows))

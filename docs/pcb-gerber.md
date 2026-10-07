@@ -9,11 +9,13 @@ wskazany katalog (bez rekurencji).
 
 Wymagane są dokładnie jedna górna miedź i jeden użyteczny zamknięty obrys.
 Niejednoznaczność wyświetla nazwy kandydatów. Maska, pasta i sitodruk zostają
-zidentyfikowane i pominięte. Dolna/wewnętrzna miedź, wiercenia oraz Gerber
-bez ustalonej roli blokują PCB-v0, zamiast udawać ich obsługę.
+zidentyfikowane i pominięte. Konfiguracja v1 dopuszcza tylko górną miedź;
+wersja v2 jawnie określa cały stackup, w tym dolną i wewnętrzną miedź.
+Wiercenia i Gerber bez ustalonej roli blokują przebieg.
 
 Shapely 2.1.x sumuje regiony, pady oraz linie/łuki o kołowym przekroju pisaka.
-Każdy połączony obszar daje jeden CopperPolygon. GKO opisuje środek linii
+Każdy połączony obszar w jednej warstwie daje jeden CopperPolygon. Miedź
+z różnych warstw nigdy nie jest sumowana. GKO opisuje środek linii
 obrysu, nie krawędź pisaka. Importer przelicza współrzędne na SI; potem
 istniejąca transformacja normalizuje port dokładnie raz.
 
@@ -65,7 +67,7 @@ Schemat: schemas/pcb-physical.schema.json. Przykład parameters/pcb_fr4_1p6.json
 
 Auto obsługuje dokładnie dwa zgodne prostokątne pady typu flash, ustawione
 poziomo lub pionowo. Pady wyznaczają oś, środek i szerokość. Przecięcie osi
-z **pełną sumą miedzi** wyznacza rzeczywistą szczelinę. Potem sprawdzane są
+z **pełną sumą górnej miedzi** wyznacza rzeczywistą szczelinę. Potem sprawdzane są
 całe powierzchnie styku i pusty prostokątny port oraz dotychczasowy audyt
 siatki. Tolerancja geometryczna pozostaje 1e-10 m, bez przesuwania geometrii.
 W emstest szczelina ma 0,64412 mm; w emstest2 0,70024 mm przy szerokości
@@ -206,8 +208,9 @@ wersje bibliotek i założenia. `native/model.xml` jest przygotowanym modelem.
 Po solve powstają `impedance.csv` i `summary.json`; po błędzie pliki natywne
 pozostają, a import_failure.json opisuje błąd. Status walidacji: unverified.
 
-Model: miedź górna płaska (domyślnie PEC, opcjonalnie conducting sheet); bez dolnej miedzi, przelotek,
-soldermaski, sitodruku, pasty i chropowatości. Parametry laminatu pochodzą
+Model v1: miedź górna płaska. Model v2: jawne warstwy miedzi i dielektryków.
+Miedź może być PEC lub conducting sheet; bez przelotek, soldermaski,
+sitodruku, pasty i chropowatości. Parametry laminatu pochodzą
 z konfiguracji. W PEC grubość/przewodność są wyłącznie metadanymi; w conducting sheet są parametrami materiału powierzchniowego.
 
 Krzywe są aproksymowane odcinkami z budżetem błędu geometrycznego 0,1 um.
@@ -375,3 +378,96 @@ obowiązuje także dla conducting sheet, bez zmiany próbkowania i animacji.
 Nie dodano soldermask, dolnej miedzi, przelotek ani chropowatości.
 Starsza konfiguracja JSON zawierająca ścieżki Gerberów nadal obsługuje PEC;
 wybór conducting sheet jest częścią fizycznej konfiguracji wejścia katalogowego.
+
+
+## Wielowarstwowy stackup (PCB-011B, physical schema v2)
+
+`parameters/pcb_fr4_4layer.json` to przykład czterech warstw. Parametry FR4
+pozostają **założeniami unverified**, nie danymi producenta. Plik nie zawiera
+nazw Gerberów. Przekaż katalog z dokładnie pasującymi warstwami, np.:
+
+```bat
+.\.venv\Scripts\python.exe -m antenna_lab.pcb.gerber_control gerbs\moja_plytka_4layer ^
+  --pcb-config parameters\pcb_fr4_4layer.json ^
+  --quality preview --center-mhz 2000 --cutoff-mhz 625 ^
+  --sweep-start-mhz 1500 --sweep-stop-mhz 2500 --sweep-step-mhz 10 ^
+  --fields-mhz 2000
+```
+
+Schemat v2 zawiera `schema_version: 2`, tablicę `stackup` i `port`.
+Element `copper` ma `role`, `model`, `thickness_um`, `conductivity_s_m`.
+Element `dielectric` ma `name`, `thickness_mm`, `epsilon_r`, `loss_tangent`.
+Wszystkie pola są wymagane. Obsługiwane modele miedzi to dokładnie `pec`
+i `conducting_sheet`; grubości i przewodności muszą być dodatnie.
+
+Stos zaczyna się od `top`, kończy na `bottom`, a role pośrednie mają kolejno
+nazwy `inner1`, `inner2`, itd. Miedź rozdzielają dodatnie grubości dielektryka;
+można opisać także kilka kolejnych dielektryków bez miedzi między nimi.
+Nazwy dielektryków muszą być unikalne. Puste, niespójne lub błędne v2 są
+odrzucane, nigdy konwertowane po cichu do v1.
+
+Top leży dokładnie przy z=0. Kolejne współrzędne wynikają wyłącznie z sumy
+głębokości dielektryków, bez zaokrąglania lub dodawania grubości miedzi:
+
+| Warstwa przykładu | Z [mm] |
+|---|---:|
+| top | 0 |
+| inner1 po prepreg 0,18 mm | −0,18 |
+| inner2 po core 1,20 mm | −1,38 |
+| bottom po prepreg 0,18 mm | −1,56 |
+
+Rozpoznawane nazwy obejmują GTL/GBL, F_Cu/B_Cu, In1_Cu/In2_Cu,
+InnerLayer1/InnerLayer2 oraz G1/G2 lub GP1/GP2. Metadane X2 FileFunction
+z Gerbonara mają numery fizyczne: L1=top, L2=inner1, itd. Kolejność musi
+być jednoznaczna i zgodna z nazwą, jeśli obie są podane. Brak, nadmiar,
+duplikat, luka w numeracji lub konflikt powoduje błąd z nazwami plików.
+Każda skonfigurowana rola musi mieć dokładnie jeden Gerber. Obrys nadal
+musi być pojedynczym zamkniętym konturem. Dotychczasowe ograniczenia
+geometrii Gerberów (np. clear polarity i otwory w poligonach) pozostają.
+
+Drill/Excellon blokuje v2 komunikatem: `Drill/via connectivity is present
+but PCB-011B does not model it yet.` Brak tych plików **nie potwierdza**,
+że model odwzorowuje kompletne fizyczne PCB. Maska, pasta i sitodruk są
+wykrywane i pomijane; nie dodano wierceń, przelotek ani połączeń międzywarstwowych.
+
+Port obsługuje wyłącznie `layer: "top"` (wymagane zarówno dla auto, jak
+explicit). Auto działa na dwóch prostokątnych flashach górnej miedzi.
+Puste wnętrze i kontakt bada się tylko na top; miedź pod spodem jest
+legalna. Odległa ścieżka tej samej górnej pętli nadal może łączyć oba końce.
+Normalizacja XY jest wykonywana raz i obraca wszystkie warstwy razem.
+
+Każdy dielektryk ma własny materiał constant-kappa i własny przedział Z;
+nie uśredniamy epsilon_r. Każda miedź otrzymuje osobne AddMetal lub
+AddConductingSheet i poligony na swoim Z. Model geometrii zawiera
+`dielectric_layers`, `copper_layers` oraz `layer_role` przy każdym poligonie.
+Starsze `substrate` jest widokiem pierwszego materiału wyłącznie dla zgodności;
+solver i mesh używają pełnej listy, nie tego widoku jako całego laminatu.
+
+Siatka zachowuje dokładnie wszystkie interfejsy i płaszczyzny miedzi.
+Za bliskie interfejsy są odrzucane, nie scalane. Limity Z stosują długość fali właściwą dla materiału danego przedziału;
+min_substrate_cells_z odnosi się do łącznej głębokości dielektryków, nie
+ustanawia nowego minimum na każdą warstwę. Interfejsy mogą już spełniać ten
+warunek bez dalszego podziału cienkiego prepregu. XY używa najkrótszej fali
+w stosie, ponieważ
+płaszczyzny kartezjańskie są wspólne. Grading, port i profile jakości są
+niezmienione. Grubość conducting sheet dodaje **zero linii Z**. Cienki
+prepreg może zwiększyć koszt i zmniejszyć CFL: preflight pokazuje to przed
+native Run i blokuje przebieg, jeśli sam impuls nie mieści się w limicie kroków.
+
+summary.json i preparation.geometry zapisują `resolved_stackup`: całkowitą
+głębokość dielektryków, wszystkie Z, parametry materiałowe, kappa przy
+częstotliwości odniesienia strat, parametry sheet i źródłowy SHA256 każdej
+warstwy miedzi. geometry.json zachowuje pełne poligony i warstwy. Raport
+odtwarza tabelę „Stackup” oraz `plots/stackup.png` bez Gerberów/openEMS.
+Miedź na schemacie jest symboliczna — grubość kreski nie oznacza geometrii.
+Widok z góry pokazuje top; cięcia XZ/YZ pokazują wszystkie interfejsy
+laminatu, miedź na rzeczywistym Z i port top.
+
+Maska E/H liczy odległość od każdej płaskiej miedzi na jej własnym Z,
+nie od wspólnego rzutu wszystkich warstw. Nie maskuje dielektryków.
+Pierwszy przekrój powietrzny pozostaje pierwszą dodatnią linią Z; fazy,
+normalizacja do 1 V i liczba natywnych Run są niezmienione.
+
+Brak --pcb-config, physical v1, legacy JSON ze ścieżkami, emstest/emstest2,
+PEC/conducting_sheet, sweep i pola zachowują dotychczasowe działanie.
+Nie dodano automatycznego badania zbieżności; wyniki pozostają unverified.

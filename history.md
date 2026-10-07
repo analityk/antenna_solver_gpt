@@ -962,3 +962,52 @@ sprawdzają wywołania materiałów, identyczne siatki, walidację, metadane XML
 prepare-only, pojedynczy Run/CalcPort z E/H i regenerację raportu offline.
 Nie uruchomiono natywnego FDTD; weryfikacja rzeczywistego conducting sheet
 na lokalnym openEMS 0.37.0rc3 / CSXCAD 0.7.0rc3 pozostaje do wykonania.
+
+## 2026-10-07 — PCB-011B: physical multilayer PCB stackup
+
+Dodano physical schema v2 z jawnymi rolami top/innerN/bottom i oddzielnymi
+materiałami dielektryków. Konfiguracja nadal nie zawiera nazw Gerberów.
+Przykład pcb_fr4_4layer.json jest zbiorem założeń FR4, nie specyfikacją
+producenta. Wersja v1, domyślne wejście folderowe i legacy JSON pozostają.
+
+Import rozpoznaje role z Gerbonara/X2 i nazw KiCad/EasyEDA, sprawdza
+kolejność, brak/nadmiar/duplikaty i zapisuje SHA256 każdej warstwy. Drill/
+Excellon blokuje przebieg; nie dodano via-connectivity. Boolean union
+wykonuje się osobno na warstwę. Stabilne ID zawierają rolę, każdy poligon
+zachowuje własne Z. Port auto/explicit działa wyłącznie na top; dolna miedź
+pod szczeliną jest legalna, rzeczywista miedź w górnej szczelinie nadal
+blokuje solve. Jedna normalizacja obraca wszystkie warstwy i obrysy.
+
+Zaczynamy od top=0, głębokość wyznaczają wyłącznie dielektryki. Każdy
+materiał ma osobny zakres Z i constant-kappa, bez uśredniania epsilon_r.
+Miedź każdej warstwy jest AddMetal lub AddConductingSheet z własnymi
+parametrami; grubość sheet nie daje objętości ani nowych komórek Z.
+Dokładne interfejsy są kotwicami: za bliskie są odrzucane, nie scalane.
+XY respektuje najkrótszą falę w stosie; Z lokalną falę materiału oraz
+istniejące minimum komórek względem łącznej grubości, bez mnożenia minimum
+przez liczbę warstw. Jakości preview/design/verify nie zmieniono. Cienkie
+rzeczywiste dielektryki pozostają widoczne w kosztach/CFL i mogą zablokować
+przebieg przed ładowaniem natywnych modułów, jeżeli limit czasu obcina impuls.
+
+Zapisane geometry/summary zawierają warstwy, dokładne Z, całkowitą grubość,
+parametry/kappa/przewodność powierzchniową i SHA256. Stare pole substrate
+jest widokiem pierwszego materiału dla kompatybilności; pełen model używa
+listy rzeczywistych dielektryków. Raport offline dodaje tabelę Stackup i
+plots/stackup.png (symboliczne kreski miedzi). Top-view pokazuje górną
+miedź, pionowe cięcia wszystkie warstwy. Maski E/H mierzą odległość do
+poligonów na ich własnym Z; napięcie odniesienia, fazy i jeden Run/CalcPort
+pozostają bez zmian. Nie dodano nowych dumpów ani zmiany portu.
+
+Sprawdzenia: deterministyczne fixture'y 2-/4-warstwowe, sąsiednie dielektryki,
+rozdzielny union, poprawne role/Z, blokady konfiguracji/plików/wierceń,
+port nad zakopaną miedzią, materiały i maski wszystkich Z, dokładne siatki
+niezależne od grubości miedzi, preflight drogiego stosu, pojedynczy Run na
+atrapach i regeneracja raportu bez Gerberów/native. Obejrzano stackup.png.
+Nie uruchomiono natywnego FDTD; multilayer wymaga lokalnego sprawdzenia na
+Windows. Brak wierceń nie dowodzi kompletności fizycznej. Istniejące
+ograniczenia importera (m.in. otwory poligonów/clear polarity) nie zmienione.
+
+Końcowe testy: 228 PCB OK (1 skip), pełny zestaw 295 OK (3 skip).
+Testy v1, legacy, emstest/emstest2, preview/design/verify, sweep, E/H i
+raportów pozostają zielone. Pominięcia dotyczą opcjonalnych środowisk;
+nie są potwierdzeniem natywnego multilayer FDTD.

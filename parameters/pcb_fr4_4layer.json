@@ -1,0 +1,58 @@
+{
+  "schema_version": 2,
+  "stackup": [
+    {
+      "type": "copper",
+      "role": "top",
+      "model": "conducting_sheet",
+      "thickness_um": 35,
+      "conductivity_s_m": 58000000
+    },
+    {
+      "type": "dielectric",
+      "name": "prepreg_top",
+      "thickness_mm": 0.18,
+      "epsilon_r": 4.2,
+      "loss_tangent": 0.018
+    },
+    {
+      "type": "copper",
+      "role": "inner1",
+      "model": "conducting_sheet",
+      "thickness_um": 18,
+      "conductivity_s_m": 58000000
+    },
+    {
+      "type": "dielectric",
+      "name": "core",
+      "thickness_mm": 1.2,
+      "epsilon_r": 4.3,
+      "loss_tangent": 0.018
+    },
+    {
+      "type": "copper",
+      "role": "inner2",
+      "model": "conducting_sheet",
+      "thickness_um": 18,
+      "conductivity_s_m": 58000000
+    },
+    {
+      "type": "dielectric",
+      "name": "prepreg_bottom",
+      "thickness_mm": 0.18,
+      "epsilon_r": 4.2,
+      "loss_tangent": 0.018
+    },
+    {
+      "type": "copper",
+      "role": "bottom",
+      "model": "conducting_sheet",
+      "thickness_um": 35,
+      "conductivity_s_m": 58000000
+    }
+  ],
+  "port": {
+    "mode": "auto",
+    "layer": "top"
+  }
+}

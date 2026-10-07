@@ -38,29 +38,33 @@ def overlays(geometry, plane):
     port=geometry['port'];n,p=np.asarray(port['negative_xy_m']),np.asarray(port['positive_xy_m'])
     half=port['width_m']/2;ym=(n[1]+p[1])/2
     port_polygon=[(n[0],ym-half),(p[0],ym-half),(p[0],ym+half),(n[0],ym+half)]
-    shapes=[(geometry['outline']['vertices_xy_m'],'#394635')]
-    shapes += [(c['vertices_xy_m'],'#725018') for c in geometry['copper']]
-    shapes += [(port_polygon,'#126eaa')]
+    shapes=[(geometry['outline']['vertices_xy_m'],'#394635',0.0)]
+    shapes += [(c['vertices_xy_m'],'#725018',c['z_m']) for c in geometry['copper']]
+    shapes += [(port_polygon,'#126eaa',0.0)]
     paths=[]
     if normal==2:
-        for vertices,color in shapes:
+        # Above-board XY view shows the top layer, not opaque buried projections.
+        for vertices,color,z in shapes:
+            if z != 0.0: continue
             points=[list(v) for v in vertices];points.append(points[0])
             paths.append(dict(points=(np.asarray(points)*1000).tolist(),color=color))
     else:
         position=plane['actual_position_m']
-        all_vertices=np.asarray([v for vertices,_ in shapes for v in vertices])
+        all_vertices=np.asarray([v for vertices,_,_ in shapes for v in vertices])
         low,high=float(all_vertices[:,horizontal].min()),float(all_vertices[:,horizontal].max())
         line=LineString(((low,position),(high,position)) if normal==1 else ((position,low),(position,high)))
-        for i,(vertices,color) in enumerate(shapes):
+        for i,(vertices,color,z) in enumerate(shapes):
             cross=Polygon(vertices).intersection(line)
             parts=[cross] if cross.geom_type=='LineString' else list(getattr(cross,'geoms',()))
             for part in parts:
                 if part.geom_type!='LineString' or part.is_empty:continue
                 coords=np.asarray(part.coords);a,b=float(coords[:,horizontal].min()),float(coords[:,horizontal].max())
-                paths.append(dict(points=[[a*1000,0.],[b*1000,0.]],color=color))
+                paths.append(dict(points=[[a*1000,z*1000],[b*1000,z*1000]],color=color))
                 if i==0:
-                    bottom=geometry['substrate']['z_min_m']*1000
-                    paths.append(dict(points=[[a*1000,0],[a*1000,bottom],[b*1000,bottom],[b*1000,0]],color='#568255'))
+                    for d in geometry.get('dielectric_layers') or [geometry['substrate']]:
+                        bottom,top=d['z_min_m']*1000,d['z_max_m']*1000
+                        paths.append(dict(points=[[a*1000,top],[a*1000,bottom],[b*1000,bottom],[b*1000,top]],color='#568255'))
+
     return paths
 
 
@@ -169,7 +173,7 @@ def pcb_field_section(data, metadata, figure_image, plots_path, phase_step):
         raise ValueError('Nieobsługiwane metadane pól PCB (wymagane odniesienie 1 V).')
     phases=list(range(0,360,phase_step or 30))
     body='<section class="panel"><h2>Pola E/H — przebieg jednego okresu</h2>'
-    body+='<p>Stan harmoniczny Re(F·exp(+j·faza)); faza 0° = dodatnie maksimum napięcia portu. Odniesienie 1∠0 V portu, nie moc przyjęta. E: V/m per 1 V port; H: A/m per 1 V port. Strzałki pokazują chwilowy wektor E w przekroju; kolory podpisaną składową. Stałe symetryczne skale symlog we wszystkich fazach. Szary: konserwatywna maska geometrii copper/portu i halo jednej lokalnej komórki, nie natywna zajętość Yee. Laminat nie jest maskowany.</p>'
+    body+='<p>Stan harmoniczny Re(F·exp(+j·faza)); faza 0° = dodatnie maksimum napięcia portu. Odniesienie 1∠0 V portu, nie moc przyjęta. E: V/m per 1 V port; H: A/m per 1 V port. Strzałki pokazują chwilowy wektor E w przekroju; kolory podpisaną składową. Stałe symetryczne skale symlog we wszystkich fazach. Szary: konserwatywna maska geometrii miedzi/portu i halo jednej lokalnej komórki, nie natywna zajętość Yee. Laminat nie jest maskowany.</p>'
     body+='<p>Odtwarzanie nie uruchamia FDTD. Płaszczyzny pochodzą z istniejącej siatki, poza PML. Widok przeglądarki jest próbkowany najwyżej 80×80, strzałki dodatkowo rozrzedzone; zapis NPZ zachowuje wszystkie próbki i składowe.</p>'
     for plane in metadata['planes']:
         if plane['name'] not in PCB_VIEWS:raise ValueError('Nieznana płaszczyzna PCB E/H.')
