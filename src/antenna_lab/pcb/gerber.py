@@ -1,9 +1,9 @@
-"""Positive RS-274X top copper and one outline; Gerbonara parses, Shapely unions.
+"""Ordered RS-274X copper composition; Gerbonara parses, Shapely adds/subtracts.
 
 Gerbonara graphics are requested in mm and converted here to SI. Curves are
 polygonized with a 0.1 um geometric approximation budget (not FDTD accuracy).
-PCB-v0 cannot represent holes or point-only conductor junctions; reject these
-rather than fill holes, split a connected conductor, or repair invalid shapes.
+Interior rings remain attached to their connected conductor. Invalid images
+and point-only conductor junctions are rejected, never repaired or filled.
 """
 
 from math import acos, ceil, pi
@@ -21,7 +21,7 @@ from shapely.ops import polygonize_full
 
 from antenna_lab.core.config import ConfigurationError
 from .config import ResolvedPcbConfig
-from .model import BoardOutline, CopperPolygon, PcbGeometry, PcbPort, Substrate
+from .model import BoardOutline, CopperPolygon, PcbGeometry, PcbPort, Substrate, CopperImageStats
 from .validation import validate_pcb_geometry
 
 CURVE_ERROR_M = 1e-7
@@ -54,8 +54,6 @@ def _read(path, role):
     function = ','.join(gerber.file_attrs.get('.FileFunction', ())).lower()
     if role == 'top copper' and function and ('copper' not in function or 'top' not in function):
         raise ConfigurationError(f'{path}: FileFunction is not top copper: {function}.')
-    if any(not obj.polarity_dark for obj in gerber.objects):
-        raise ConfigurationError(f'{path}: clear/negative polarity is unsupported in PCB-v0.')
     return gerber
 
 
@@ -69,8 +67,6 @@ def _buffer(shape, radius, error_mm):
 
 def _primitive_polygon(primitive):
     error = CURVE_ERROR_M * 1e3
-    if not primitive.polarity_dark:
-        raise ConfigurationError('Clear aperture primitives/holes are unsupported in PCB-v0.')
     if isinstance(primitive, gp.Circle):
         return _buffer(Point(primitive.x, primitive.y), primitive.r, error)
     if isinstance(primitive, gp.Line):
@@ -87,11 +83,11 @@ def _primitive_polygon(primitive):
     return Polygon(polygon.outline)
 
 
-def _simple_polygon(polygon, label):
+def _simple_polygon(polygon, label, *, allow_holes=False):
     if polygon.is_empty or polygon.geom_type != 'Polygon' or not polygon.is_valid or polygon.area <= 0:
         raise ConfigurationError(f'{label}: invalid/degenerate polygon; no automatic repair.')
-    if polygon.interiors:
-        raise ConfigurationError(f'{label}: holes/cutouts are unsupported by PCB-v0 polygons.')
+    if polygon.interiors and not allow_holes:
+        raise ConfigurationError(f'{label}: board outline must have one outer contour without holes.')
     return polygon
 
 
@@ -101,8 +97,14 @@ def _vertices(polygon):
     return tuple((float(x)*1e-3, float(y)*1e-3) for x,y in polygon.exterior.coords[:-1])
 
 
-def _copper(gerber):
-    shapes = []
+def _copper(gerber, statistics=None):
+    """Compose primitives in original object/primitive order, including restores.
+
+    Never union all dark first: a later dark feature can restore cleared copper.
+    Coordinates stay in Gerbonara MM until the final importer boundary.
+    """
+    merged = Polygon()
+    counts = dict(dark_primitive_count=0, clear_primitive_count=0)
     for obj in gerber.objects:
         if isinstance(obj, (go.Line, go.Arc)) and not isinstance(obj.aperture, CircleAperture):
             raise ConfigurationError('PCB-v0 supports circular-aperture strokes only; do not approximate other strokes.')
@@ -110,22 +112,40 @@ def _copper(gerber):
             shape = _primitive_polygon(primitive)
             if shape.is_empty or not shape.is_valid or shape.area <= 0:
                 raise ConfigurationError('Invalid copper primitive; no automatic repair.')
-            shapes.append(shape)
-    merged = union_all(shapes)
-    if merged.geom_type not in ('Polygon', 'MultiPolygon'):
-        raise ConfigurationError('Copper union is not polygonal.')
+            dark = primitive.polarity_dark
+            counts['dark_primitive_count' if dark else 'clear_primitive_count'] += 1
+            try:
+                merged = merged.union(shape) if dark else merged.difference(shape)
+            except GEOSException as exc:
+                raise ConfigurationError(f'Copper image composition failed; no automatic repair: {exc}') from exc
+    if merged.is_empty or not merged.is_valid or merged.geom_type not in ('Polygon', 'MultiPolygon'):
+        raise ConfigurationError('Final copper image is empty, invalid or non-polygonal; no automatic repair.')
     polygons = [merged] if merged.geom_type == 'Polygon' else list(merged.geoms)
     for i, polygon in enumerate(polygons):
-        _simple_polygon(polygon, 'copper')
+        _simple_polygon(polygon, 'copper', allow_holes=True)
         if any(polygon.intersects(other) for other in polygons[i+1:]):
-            raise ConfigurationError('Point-only copper contact cannot be represented as one simple PCB-v0 conductor.')
-    polygons.sort(key=lambda p: (p.bounds, normalize(p).wkb))
-    return [CopperPolygon(f'copper_{i+1:04d}', _vertices(p), 0.) for i,p in enumerate(polygons)]
+            raise ConfigurationError('Point-only copper contact cannot be represented as one PCB conductor.')
+    # Same bounded cleanup as legacy import; preserve topology and holes.
+    polygons = [normalize(p.simplify(BOOLEAN_CLEANUP_M*1e3, preserve_topology=True)) for p in polygons]
+    polygons.sort(key=lambda p: (p.bounds, p.wkb))
+    result = []
+    def ring(vertices):
+        return tuple((float(x)*1e-3, float(y)*1e-3) for x,y in vertices[:-1])
+    for i,p in enumerate(polygons):
+        _simple_polygon(p, 'cleaned copper', allow_holes=True)
+        result.append(CopperPolygon(f'copper_{i+1:04d}', ring(p.exterior.coords), 0.,
+            holes_xy_m=tuple(ring(h.coords) for h in p.interiors)))
+    if statistics is not None:
+        statistics.update(counts, final_conductor_count=len(result),
+                          final_hole_count=sum(len(p.holes_xy_m) for p in result))
+    return result
 
 
 def _outline(gerber):
     lines, regions = [], []
     for obj in gerber.objects:
+        if not obj.polarity_dark:
+            raise ConfigurationError('GKO: clear polarity is not a usable single outer contour.')
         obj = obj.converted(MM)
         if isinstance(obj, go.Line):
             lines.append(LineString((obj.p1, obj.p2)))
@@ -154,13 +174,14 @@ def load_pcb_geometry(config: ResolvedPcbConfig) -> PcbGeometry:
         raise ConfigurationError('PCB-v0 Gerber copper model must be pec.')
     try:
         outline = _outline(_read(config.board_outline_path, 'board outline'))
-        copper = _copper(_read(config.copper_top_path, 'top copper'))
+        counts = {}
+        copper = _copper(_read(config.copper_top_path, 'top copper'), counts)
     except (GEOSException, ValueError, NotImplementedError) as exc:
         raise ConfigurationError(f'Gerber geometry conversion failed: {exc}') from exc
     geometry = PcbGeometry('pcb', outline, copper,
         Substrate(outline, -config.substrate_thickness_m, 0.,
                   config.substrate_epsilon_r, config.substrate_loss_tangent),
         PcbPort('gerber_feed', config.port_negative_xy_m, config.port_positive_xy_m, config.port_width_m),
-        list(ASSUMPTIONS))
+        list(ASSUMPTIONS), copper_composition=(CopperImageStats('top', **counts),))
     validate_pcb_geometry(geometry)
     return geometry

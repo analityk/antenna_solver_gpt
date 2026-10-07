@@ -11,6 +11,7 @@ import numpy as np
 from shapely import points, distance, union_all
 from shapely.geometry import Polygon, box
 
+from antenna_lab.pcb.regions import copper_shape
 from antenna_lab.core.config import ConfigurationError, write_json
 from .fields import CONVENTION, MAX_FIELD_POINTS, install_frequency_planes
 from .power import _read_surface
@@ -96,7 +97,7 @@ def pcb_sample_mask(lines, full_axes, geometry):
     xy=points(xyz[:,:2]);z=xyz[:,2]
     mask=np.zeros(len(xyz),dtype=np.uint8)
     for plane_z in sorted({c.z_m for c in geometry.copper}):
-        metal=union_all([Polygon(c.vertices_xy_m) for c in geometry.copper if c.z_m == plane_z])
+        metal=union_all([copper_shape(c) for c in geometry.copper if c.z_m == plane_z])
         d=np.hypot(distance(xy,metal),z-plane_z)
         mask[d<=1e-12]|=1;mask[d<=halo]|=2
     n,p=geometry.port.negative_xy_m,geometry.port.positive_xy_m

@@ -67,6 +67,8 @@ def run_gerber_control(config_path, output_dir, *, prepare_only=False, quality='
         'dependencies': {name: version(name) for name in ('gerbonara','shapely')},
         'normalization': asdict(transform), 'assumptions': list(geometry.assumptions),
         'port_edge_mode': 'aligned', 'validation_status': 'unverified',
+        'copper_composition': [asdict(v) for v in geometry.copper_composition],
+        'composition_method': 'ordered primitive union/difference; later dark restores copper',
     }
     metadata.update(bundle_metadata)
     metadata.setdefault('source_directory', str(config.copper_top_path.parent))

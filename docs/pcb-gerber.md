@@ -13,7 +13,8 @@ zidentyfikowane i pominięte. Konfiguracja v1 dopuszcza tylko górną miedź;
 wersja v2 jawnie określa cały stackup, w tym dolną i wewnętrzną miedź.
 Wiercenia i Gerber bez ustalonej roli blokują przebieg.
 
-Shapely 2.1.x sumuje regiony, pady oraz linie/łuki o kołowym przekroju pisaka.
+Shapely 2.1.x składa regiony, pady oraz linie/łuki o kołowym przekroju pisaka:
+dark dodaje, clear odejmuje w kolejności obiektów/prymitywów z Gerbonara.
 Każdy połączony obszar w jednej warstwie daje jeden CopperPolygon. Miedź
 z różnych warstw nigdy nie jest sumowana. GKO opisuje środek linii
 obrysu, nie krawędź pisaka. Importer przelicza współrzędne na SI; potem
@@ -216,8 +217,8 @@ z konfiguracji. W PEC grubość/przewodność są wyłącznie metadanymi; w cond
 Krzywe są aproksymowane odcinkami z budżetem błędu geometrycznego 0,1 um.
 Usuwanie pozostałości operacji geometrycznych ma tolerancję 1 pm, bez
 zaokrąglania do siatki. To nie deklaracja dokładności elektromagnetycznej.
-Importer odrzuca clear/negative polarity, otwory w końcowych poligonach,
-połączenia wyłącznie punktowe, inne niż kołowe pisaki linii oraz
+Importer składa dark/clear w kolejności i zachowuje otwory miedzi. Nadal
+odrzuca połączenia wyłącznie punktowe, inne niż kołowe pisaki linii oraz
 niejednoznaczne/otwarte/wielokrotne obrysy. Nie wypełnia otworów ani nie
 naprawia uszkodzonych kształtów. Ostrzeżenia parsera są błędami importu,
 aby pominięte polecenia nie dawały pozornie poprawnego modelu.
@@ -423,7 +424,7 @@ być jednoznaczna i zgodna z nazwą, jeśli obie są podane. Brak, nadmiar,
 duplikat, luka w numeracji lub konflikt powoduje błąd z nazwami plików.
 Każda skonfigurowana rola musi mieć dokładnie jeden Gerber. Obrys nadal
 musi być pojedynczym zamkniętym konturem. Dotychczasowe ograniczenia
-geometrii Gerberów (np. clear polarity i otwory w poligonach) pozostają.
+geometrii Gerberów poza nową obsługą dark/clear i otworów miedzi pozostają.
 
 Drill/Excellon blokuje v2 komunikatem: `Drill/via connectivity is present
 but PCB-011B does not model it yet.` Brak tych plików **nie potwierdza**,
@@ -471,3 +472,62 @@ normalizacja do 1 V i liczba natywnych Run są niezmienione.
 Brak --pcb-config, physical v1, legacy JSON ze ścieżkami, emstest/emstest2,
 PEC/conducting_sheet, sweep i pola zachowują dotychczasowe działanie.
 Nie dodano automatycznego badania zbieżności; wyniki pozostają unverified.
+
+
+## Clear polarity, antipady i wycięcia miedzi (PCB-011C)
+
+Każdy Gerber miedzi jest osobnym obrazem. Import zaczyna od pustej geometrii
+i przechodzi przez obiekty oraz ich prymitywy z Gerbonara w kolejności pliku:
+`dark → union`, `clear → difference`. Późniejsze dark może przywrócić wcześniej
+usuniętą miedź. Nie stosujemy `union(dark) - union(clear)`. Regiony, flash,
+kołowe linie/łuki używają istniejącego budżetu aproksymacji krzywych 0,1 µm
+i cleanup 1 pm z zachowaniem topologii. Pusty, błędny lub niepoligonowy
+wynik jest błędem, nie jest naprawiany. Ostrzeżenia parsera pozostają błędami.
+Obrys płytki nadal wymaga jednego zewnętrznego konturu; nie dodano NPTH.
+
+`CopperPolygon.vertices_xy_m` pozostaje pierścieniem zewnętrznym.
+Opcjonalne `holes_xy_m` zawiera pierścienie wewnętrzne w SI. Jeden połączony
+przewodnik z wieloma otworami pozostaje jednym rekordem, z ID, rolą i Z.
+Później przywrócona izolowana wyspa wewnątrz otworu jest osobnym przewodnikiem,
+zgodnie z fizyczną topologią. Clear dochodzący do krawędzi daje wcięcie;
+przecięcie całej płaszczyzny może dać rozłączne przewodniki. Normalizacja
+obraca również otwory, bez zmiany Z lub wymiarów.
+
+Wnętrze otworu nie należy do miedzi. Krawędź otworu zachowuje dotychczasową
+tolerancję styku metalu — port może stykać się z nią tak jak z krawędzią
+zewnętrzną. Pełny kontakt, pusty prostokąt i dyskretny audyt portu pozostają
+obowiązkowe. Wszystkie te kontrole dotyczą wyłącznie top, nie rzutu miedzi
+zakopanej. Prostokątne clear flashe nie są kandydatami dodatnich padów auto.
+
+Adapter nadal instaluje zewnętrzne poligony PEC lub conducting sheet;
+nie trianguluje całej płaszczyzny. Otwory otrzymują płaskie poligony materiału
+`pcb_copper_clearance_air` (epsilon=1, kappa=0) na **tym samym Z**.
+Priorytet zwykłej miedzi wynosi 10, jej clearance 11. Dla zagnieżdżonych
+przywróconych wysp priorytety wynoszą kolejno 12/13, 14/15 itd. Każdy
+clearance wygrywa ze swoim przewodnikiem macierzystym, ale nie kasuje
+przywróconej wyspy. Głębokość zagnieżdżenia liczona jest tylko na tej samej
+warstwie i Z. Wszystkie priorytety są zapisane w preparation.geometry.copper_clearances.
+
+Ani otwory, ani fizyczna grubość conducting sheet nie dodają linii siatki.
+Po ich instalacji wykonywany jest dokładny audyt zamrożonych osi i jednostki.
+Zmiana obrysu lub rozłączenie miedzi przez clear może zmienić dotychczasowe
+kotwice bounding-box przewodników; nie jest to dodatkowe zagęszczanie otworów.
+Nie wprowadzono siatki o grubości miedzi ani dodatkowych przebiegów FDTD.
+
+geometry.json przechowuje wszystkie pierścienie, role i Z. Dane
+`copper_composition` w geometrii, import.json, summary.import i metadanych
+przygotowania zawierają dla każdej warstwy liczbę prymitywów dark/clear,
+końcowych przewodników i otworów. Liczymy prymitywy rozwinięte przez Gerbonara,
+nie liczbę wierszy pliku. JSON nie zawiera obiektów parsera.
+
+Maski E/H mierzą odległość do rzeczywistego poligonu z otworami na jego Z.
+W dużym antipadzie próbki nie są metalem; konserwatywne halo jednej komórki
+może nadal objąć wąski otwór lub próbki blisko innej warstwy. Substrat nie
+jest maskowany. Normowanie do 1 V, fazy i pozycje przekrojów są niezmienione.
+Rysunki z góry używają przezroczystych otworów w ścieżce złożonej, a pionowe
+cięcia rzeczywistych przecięć poligonów; nie zamalowują otworów ani wysp.
+Raport offline odtwarza je wyłącznie z zapisanej geometrii i wyników.
+
+Nadal brak Excellon/vias, NPTH, soldermask, komponentów i chropowatości.
+Model oraz priorytety warstw wymagają natywnej weryfikacji na Windows;
+testy z atrapami nie potwierdzają fizycznej zbieżności. Status: unverified.

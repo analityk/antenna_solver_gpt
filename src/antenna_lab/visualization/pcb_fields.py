@@ -12,6 +12,7 @@ from matplotlib.colors import SymLogNorm
 from matplotlib.cm import ScalarMappable
 from shapely.geometry import Polygon, LineString
 
+from antenna_lab.pcb.regions import copper_shape
 from .fields import PCB_VIEWS, load_plane, phase_values
 
 
@@ -38,23 +39,23 @@ def overlays(geometry, plane):
     port=geometry['port'];n,p=np.asarray(port['negative_xy_m']),np.asarray(port['positive_xy_m'])
     half=port['width_m']/2;ym=(n[1]+p[1])/2
     port_polygon=[(n[0],ym-half),(p[0],ym-half),(p[0],ym+half),(n[0],ym+half)]
-    shapes=[(geometry['outline']['vertices_xy_m'],'#394635',0.0)]
-    shapes += [(c['vertices_xy_m'],'#725018',c['z_m']) for c in geometry['copper']]
-    shapes += [(port_polygon,'#126eaa',0.0)]
+    shapes=[(Polygon(geometry['outline']['vertices_xy_m']),'#394635',0.0)]
+    shapes += [(copper_shape(c),'#725018',c['z_m']) for c in geometry['copper']]
+    shapes += [(Polygon(port_polygon),'#126eaa',0.0)]
     paths=[]
     if normal==2:
         # Above-board XY view shows the top layer, not opaque buried projections.
-        for vertices,color,z in shapes:
+        for shape,color,z in shapes:
             if z != 0.0: continue
-            points=[list(v) for v in vertices];points.append(points[0])
-            paths.append(dict(points=(np.asarray(points)*1000).tolist(),color=color))
+            for ring in (shape.exterior,*shape.interiors):
+                paths.append(dict(points=(np.asarray(ring.coords)*1000).tolist(),color=color))
     else:
         position=plane['actual_position_m']
-        all_vertices=np.asarray([v for vertices,_,_ in shapes for v in vertices])
+        all_vertices=np.asarray([v for shape,_,_ in shapes for v in shape.exterior.coords])
         low,high=float(all_vertices[:,horizontal].min()),float(all_vertices[:,horizontal].max())
         line=LineString(((low,position),(high,position)) if normal==1 else ((position,low),(position,high)))
-        for i,(vertices,color,z) in enumerate(shapes):
-            cross=Polygon(vertices).intersection(line)
+        for i,(shape,color,z) in enumerate(shapes):
+            cross=shape.intersection(line)
             parts=[cross] if cross.geom_type=='LineString' else list(getattr(cross,'geoms',()))
             for part in parts:
                 if part.geom_type!='LineString' or part.is_empty:continue

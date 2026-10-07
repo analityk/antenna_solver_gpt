@@ -243,14 +243,14 @@ def _metadata(data):
 def _pcb_geometry(data, plots_path):
     """Draw only saved SI polygons; never reopen Gerbers or native modules."""
     from matplotlib.patches import Polygon as PatchPolygon
+    from .pcb_regions import copper_patch
     geometry = data['geometry']
     fig = Figure(figsize=(8, 6)); ax = fig.subplots()
     board = np.asarray(geometry['outline']['vertices_xy_m'])*1e3
     ax.add_patch(PatchPolygon(board, facecolor='#f1f4e7', edgecolor='#53604c', label='PCB'))
     for copper in geometry['copper']:
         if copper.get('layer_role', 'top') != 'top': continue
-        points = np.asarray(copper['vertices_xy_m'])*1e3
-        ax.add_patch(PatchPolygon(points, facecolor='#c77c36', edgecolor='#825323', alpha=.85))
+        ax.add_patch(copper_patch(copper, facecolor='#c77c36', edgecolor='#825323', alpha=.85))
     port = geometry['port']; n,p = np.asarray(port['negative_xy_m']),np.asarray(port['positive_xy_m'])
     delta = p-n; normal = np.array([-delta[1],delta[0]])/np.linalg.norm(delta)*port['width_m']/2
     face = np.asarray([n-normal,p-normal,p+normal,n+normal])*1e3

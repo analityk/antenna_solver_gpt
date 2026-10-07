@@ -8,7 +8,7 @@ from gerbonara import GerberFile
 
 from antenna_lab.core.config import ConfigurationError
 from .gerber import _read, _outline, _copper, ASSUMPTIONS
-from .model import PcbGeometry, PcbPort, Substrate
+from .model import PcbGeometry, PcbPort, Substrate, CopperImageStats
 from .stackup import ResolvedPcbStackupConfig, resolve_stackup
 from .validation import validate_pcb_geometry
 
@@ -82,10 +82,12 @@ def load_multilayer_bundle(directory, value):
     outline = _outline(_read(selected['outline'], 'board outline'))
     hashes = {r['role']:r['sha256'] for r in records if r['role'] in roles}
     layers, dielectrics = resolve_stackup(value, outline, hashes)
-    copper, top_file = [], None
+    copper, top_file, composition = [], None, []
     for layer in layers:
         parsed = _read(selected[layer.role], 'top copper' if layer.role == 'top' else layer.role+' copper')
-        polygons = _copper(parsed)  # Per-file boolean union; never across Z layers.
+        counts = {}
+        polygons = _copper(parsed, counts)
+        composition.append(CopperImageStats(layer.role, **counts))  # Per-file boolean union; never across Z layers.
         copper.extend(replace(p, id=layer.role+':'+p.id, z_m=layer.z_m, layer_role=layer.role) for p in polygons)
         if layer.role == 'top': top_file = parsed
     if value['port']['mode'] == 'auto':
@@ -104,7 +106,7 @@ def load_multilayer_bundle(directory, value):
         'vias/drills: not modeled; files containing drills rejected',
         'absence of drill files does not establish physical completeness',
         'copper roughness: omitted', 'conducting-sheet thickness: material parameter; no geometric extrusion']
-    geometry = PcbGeometry('pcb', outline, copper, substrate, port, assumptions, dielectrics, layers)
+    geometry = PcbGeometry('pcb', outline, copper, substrate, port, assumptions, dielectrics, layers, tuple(composition))
     validate_pcb_geometry(geometry); audit_physical_feed(geometry)
     config = ResolvedPcbStackupConfig(2, 'pcb', selected['top'], selected['outline'], layers, dielectrics,
         port.negative_xy_m, port.positive_xy_m, port.width_m)

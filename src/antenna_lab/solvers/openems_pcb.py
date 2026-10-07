@@ -10,6 +10,7 @@ from antenna_lab.pcb.model import PcbGeometry
 from antenna_lab.pcb.copper import copper_metadata
 from antenna_lab.pcb.port import resolve_pcb_lumped_port
 from antenna_lab.pcb.simulation import PcbSimulationSettings
+from .pcb_clearances import copper_priority_plan, install_copper_clearances
 from .pcb_mesh import PcbDomainMesh, make_pcb_domain_mesh, make_pcb_mesh_anchor_plan, make_pcb_solver_anchor_plan, audit_pcb_port_edge_mesh
 
 EPS0 = 8.8541878128e-12
@@ -50,6 +51,8 @@ def install_pcb_geometry(
             geometry, settings.loss_reference_frequency_hz))
     else:
         copper_info = copper_metadata(copper_config)
+    priority_plan = copper_priority_plan(geometry)
+    copper_priorities = {c.id:p["copper_priority"] for c,p in zip(geometry.copper,priority_plan)}
     axes = (domain_mesh.x_lines_m, domain_mesh.y_lines_m, domain_mesh.z_lines_m)
     if domain_mesh.pml_cells != settings.pml_cells:
         raise ConfigurationError("PCB grid: pml_cells domeny nie zgadza się z ustawieniami eksperymentu.")
@@ -99,7 +102,7 @@ def install_pcb_geometry(
             for copper in geometry.copper:
                 if copper.layer_role == layer.role:
                     material.AddPolygon(points=_xy_polygon_points(copper.vertices_xy_m),
-                        norm_dir='z', elevation=copper.z_m, priority=10)
+                        norm_dir='z', elevation=copper.z_m, priority=copper_priorities[copper.id])
     else:
         material = csx.AddMaterial('pcb_substrate', epsilon=substrate.epsilon_r, kappa=kappa)
         material.AddLinPoly(points=_xy_polygon_points(substrate.outline.vertices_xy_m),
@@ -111,10 +114,13 @@ def install_pcb_geometry(
                     thickness=copper_info['copper_thickness_m']))
         for copper in geometry.copper:
             metal.AddPolygon(points=_xy_polygon_points(copper.vertices_xy_m),
-                             norm_dir='z', elevation=0.0, priority=10)
-    _audit_port_grid(csx, domain_mesh, context='after dielectric/copper installation')
+                             norm_dir='z', elevation=0.0, priority=copper_priorities[copper.id])
+    clearance_metadata = install_copper_clearances(csx, geometry, priority_plan, _xy_polygon_points)
+    _audit_port_grid(csx, domain_mesh, context='after dielectric/copper/clearance installation')
     return {
         **copper_info,
+        'copper_clearances': clearance_metadata,
+        'copper_composition': [asdict(v) for v in geometry.copper_composition],
         'delta_unit_m': 1.0,
         'grid_line_counts': {axis: len(lines) for axis, lines in zip('xyz', readback)},
         'substrate': {

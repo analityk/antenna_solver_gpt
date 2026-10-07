@@ -6,7 +6,8 @@ from math import isfinite
 from antenna_lab.core.config import ConfigurationError
 from antenna_lab.pcb.model import PcbGeometry
 from antenna_lab.pcb.simulation import PcbSimulationSettings
-from antenna_lab.pcb.validation import _contains
+from antenna_lab.pcb.validation import _contains_copper
+from antenna_lab.pcb.regions import copper_shape
 from antenna_lab.solvers.pcb_mesh import PcbDomainMesh, make_pcb_mesh_anchor_plan, make_pcb_solver_anchor_plan
 
 
@@ -57,7 +58,7 @@ def resolve_pcb_lumped_port(
             raise ConfigurationError('Gerber port surface is unresolved at geometry tolerance.')
         interior = box(start[0]+tol, start[1]+tol, stop[0]-tol, stop[1]-tol)
         for copper in geometry.top_copper:
-            if interior.intersects(Polygon(copper.vertices_xy_m)):
+            if interior.intersects(copper_shape(copper)):
                 raise ConfigurationError(f'Gerber port: miedź {copper.id!r} wewnątrz szczeliny; '
                                          'economical anchors cannot remove physical copper.')
     axes = (domain_mesh.x_lines_m, domain_mesh.y_lines_m, domain_mesh.z_lines_m)
@@ -81,15 +82,8 @@ def resolve_pcb_lumped_port(
         raise ConfigurationError(f"PCB port: szczelina ma {nx} komórek, wymagane {settings.min_port_gap_cells}.")
     if ny < settings.min_port_width_cells:
         raise ConfigurationError(f"PCB port: szerokość ma {ny} komórek, wymagane {settings.min_port_width_cells}.")
-    polygons = []
-    for copper in geometry.top_copper:
-        vertices = list(copper.vertices_xy_m)
-        if vertices[-1] == vertices[0]:
-            vertices.pop()
-        polygons.append(vertices)
-
     def members(point):
-        return [i for i, polygon in enumerate(polygons) if _contains(point, polygon)]
+        return [i for i,copper in enumerate(geometry.top_copper) if _contains_copper(point,copper)]
 
     # The anchor planner already validated unique endpoint ownership (possibly the same RF loop).
     negative, positive = members(n)[0], members(p)[0]
@@ -142,12 +136,7 @@ def _resolve_thirds_port(geometry, mesh, settings, mode):
     xi,yi=intervals(x,n[0],p[0]),intervals(y,yl,yu)
     if len(xi)<settings.min_port_gap_cells or len(yi)<settings.min_port_width_cells:
         raise ConfigurationError('PCB thirds: niewystarczająca liczba komórek przecinających port.')
-    polygons=[]
-    for copper in geometry.top_copper:
-        vertices=list(copper.vertices_xy_m)
-        if vertices[-1]==vertices[0]: vertices.pop()
-        polygons.append(vertices)
-    members=lambda pt: [i for i,v in enumerate(polygons) if _contains(pt,v)]
+    members=lambda pt: [i for i,copper in enumerate(geometry.top_copper) if _contains_copper(pt,copper)]
     ni,pi=members(n)[0],members(p)[0]
     rows=[v for v in y if yl<v<yu]
     centres_y=[max(a,yl)+(min(b,yu)-max(a,yl))/2 for a,b in yi]

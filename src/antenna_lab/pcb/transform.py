@@ -21,7 +21,8 @@ def _map_xy(geometry, point):
         outline=outline(geometry.outline),
         substrate=replace(geometry.substrate, outline=outline(geometry.substrate.outline)),
         dielectric_layers=tuple(replace(d, outline=outline(d.outline)) for d in geometry.dielectric_layers),
-        copper=[replace(copper, vertices_xy_m=tuple(point(p) for p in copper.vertices_xy_m))
+        copper=[replace(copper, vertices_xy_m=tuple(point(p) for p in copper.vertices_xy_m),
+                        holes_xy_m=tuple(tuple(point(p) for p in ring) for ring in copper.holes_xy_m))
                 for copper in geometry.copper],
         port=replace(geometry.port, negative_xy_m=point(geometry.port.negative_xy_m),
                      positive_xy_m=point(geometry.port.positive_xy_m)),

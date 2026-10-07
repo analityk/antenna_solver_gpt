@@ -467,7 +467,7 @@ def _audit_thirds_pads(geometry, edge):
     not inferred from IDs. General polygon/edge recognition is deliberately absent.
     """
     from antenna_lab.pcb.validation import _contains, TOLERANCE_M
-    if len(geometry.copper) != 2:
+    if len(geometry.copper) != 2 or any(c.holes_xy_m for c in geometry.copper):
         raise ConfigurationError('PCB thirds: wymagane dokładnie dwa prostokątne pady syntetyczne.')
     n,p = geometry.port.negative_xy_m,geometry.port.positive_xy_m
     yl,yu = edge['physical_y_edges']

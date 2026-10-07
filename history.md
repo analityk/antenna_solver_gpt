@@ -1011,3 +1011,54 @@ Końcowe testy: 228 PCB OK (1 skip), pełny zestaw 295 OK (3 skip).
 Testy v1, legacy, emstest/emstest2, preview/design/verify, sweep, E/H i
 raportów pozostają zielone. Pominięcia dotyczą opcjonalnych środowisk;
 nie są potwierdzeniem natywnego multilayer FDTD.
+
+## 2026-10-07 — PCB-011C: Gerber copper clearances
+
+Usunięto ogólne odrzucanie clear polarity i otworów miedzi. Gerbonara nadal
+parsuje RS-274X. Shapely składa prymitywy w kolejności obiektów: dark union,
+clear difference, dzięki czemu późniejsze dark przywraca miedź. Nie ma
+sumowania wszystkich dark przed clear. Budżet aproksymacji krzywych i cleanup
+nie zmieniony; błędny/pusty/niepoligonowy wynik jest odrzucany bez napraw.
+Board outline nadal musi być pojedynczym zewnętrznym konturem, bez NPTH.
+
+CopperPolygon zachowuje vertices_xy_m jako obrys zewnętrzny i opcjonalne
+holes_xy_m jako pierścienie wewnętrzne. Jeden połączony przewodnik z otworami
+pozostaje jednym rekordem. Role/Z/ID są zachowane; transformacja obejmuje
+również otwory. Walidacja, ciągły i dyskretny audyt feedu wykluczają wnętrza
+otworów, zachowując tolerancję styku na granicach. Kontrole portu pozostają
+ograniczone do top. Metadane per warstwa zapisują liczby prymitywów dark/clear,
+końcowych przewodników i otworów; JSON nie zawiera obiektów Gerbonara.
+
+CSXCAD nadal otrzymuje zewnętrzne poligony PEC/conducting_sheet, bez
+triangulacji. Wewnętrzne pierścienie są poligonami wspólnego materiału
+pcb_copper_clearance_air (epsilon=1, kappa=0) na identycznym Z. Priorytety
+10/11 dla miedzi/clearance rosną o 2 na poziom zagnieżdżenia. Jest to konieczne,
+aby clearance macierzystego przewodnika nie skasował później przywróconej
+izolowanej wyspy (priorytet 12). Plan zależy tylko od geometrii danej warstwy,
+nie innych Z. Priorytety i brak grubości/linii Z są zapisane w metadanych.
+Po instalacji wykonywany jest dokładny audyt zamrożonej siatki. Materiał
+conducting sheet nie jest zamieniany na PEC. Same otwory nie dodają kotwic;
+zmiana zewnętrznych bounds/liczby przewodników może wpłynąć na istniejącą
+politykę kotwic tak jak każda zmiana fizycznej geometrii.
+
+Maski E/H używają wspólnej reprezentacji poligonu z otworami na każdym Z,
+z zachowaniem halo rzeczywistej miedzi i źródła. Pozycje, fazy i odniesienie
+1 V nie zmienione. Rysunki korzystają ze ścieżek złożonych z przeciwną
+orientacją pierścieni i prawdziwych przecięć pionowych, bez zamalowywania
+otworów/wysp. Regeneracja offline czyta tylko zapisane wyniki i geometrię.
+
+Testy: 235 PCB OK (1 skip), pełny zestaw 302 OK (3 skip), bez natywnego FDTD.
+Fixture'y obejmują pełną płaszczyznę, okrągły antipad, wiele otworów,
+późniejsze przywrócenie miedzi, wcięcie na brzegu, rozłączne przewodniki,
+clearances na osobnych Z, pierścień z łuku i clear prymityw apertury.
+Sprawdzono priorytety na przywróconej wyspie, identyczne poligony PEC/sheet,
+niezmienione osie, mutację natywnej siatki jako błąd, port obok antipadu/na
+krawędzi otworu, maski, piksele transparentnego wycięcia, przekroje warstwowe,
+jeden Run/CalcPort na atrapach i raport offline. Obejrzano wygenerowany
+rysunek otworu z przywróconą wyspą. Test historycznie odrzucający clear/otwory
+zastąpiono nowymi dodatnimi przypadkami; błędne wejścia/punktowe styki nadal
+są odrzucane. V1/v2 i emstest/emstest2 pozostają zielone.
+
+Wyniki nadal unverified: natywna ocena priorytetów CSXCAD/openEMS na Windows
+pozostaje do wykonania. Nie dodano Excellon, vias, NPTH, soldermask,
+komponentów, chropowatości ani dodatkowych przebiegów/zbieżności.

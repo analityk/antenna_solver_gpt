@@ -24,6 +24,16 @@ class CopperPolygon:
     vertices_xy_m: tuple[tuple[float, float], ...]
     z_m: float
     layer_role: str = "top"
+    holes_xy_m: tuple[tuple[tuple[float, float], ...], ...] = ()
+
+
+@dataclass(frozen=True)
+class CopperImageStats:
+    layer_role: str
+    dark_primitive_count: int
+    clear_primitive_count: int
+    final_conductor_count: int
+    final_hole_count: int
 
 
 @dataclass(frozen=True)
@@ -76,6 +86,7 @@ class PcbGeometry:
     assumptions: list[str] = field(default_factory=list)
     dielectric_layers: tuple[DielectricLayer, ...] = ()
     copper_layers: tuple[CopperLayer, ...] = ()
+    copper_composition: tuple[CopperImageStats, ...] = ()
 
     @property
     def dielectrics(self):

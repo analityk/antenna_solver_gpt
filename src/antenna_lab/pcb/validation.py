@@ -96,6 +96,21 @@ def _contains(point, polygon):
     return inside
 
 
+def _contains_copper(point, copper):
+    """Boundary-inclusive metal contact; interiors of cutouts are not metal.
+
+    A hole edge belongs to the metal face, matching outer-edge contact semantics.
+    The existing distance tolerance only handles numerical boundary residue.
+    """
+    if not _contains(point, copper.vertices_xy_m):
+        return False
+    for ring in copper.holes_xy_m:
+        if _contains(point, ring) and not any(_on_segment(point,a,b)
+                for a,b in zip(ring, ring[1:]+ring[:1])):
+            return False
+    return True
+
+
 def _same_outline(a, b):
     # Accept cyclic shifts, reverse winding and optional closing vertex.
     # Different vertex subdivisions are conservatively rejected in v0.
@@ -169,6 +184,12 @@ def validate_pcb_geometry(geometry: PcbGeometry):
         _require(plane is not None and _finite(copper.z_m) and abs(copper.z_m-plane) <= TOLERANCE_M,
                  f"{label}.z_m: required finite copper layer plane.")
         polygons.append(_polygon(copper.vertices_xy_m, label))
+        for h, ring in enumerate(copper.holes_xy_m):
+            _polygon(ring, f'{label}.holes[{h}]')
+        if copper.holes_xy_m:
+            from .regions import copper_shape
+            _require(copper_shape(copper).is_valid,
+                     f'{label}: holes must be valid, disjoint interior rings within the outer ring; no repair.')
 
     port = geometry.port
     _require(port is not None, "port: brak portu.")
@@ -180,7 +201,7 @@ def validate_pcb_geometry(geometry: PcbGeometry):
              "port: końce muszą być różne.")
     for name, point in (("negative", port.negative_xy_m), ("positive", port.positive_xy_m)):
         _require(_contains(point, board), f"port.{name}: koniec poza obrysem PCB.")
-        members = [i for i, polygon in enumerate(polygons) if geometry.copper[i].layer_role == "top" and _contains(point, polygon)]
+        members = [i for i, polygon in enumerate(polygons) if geometry.copper[i].layer_role == "top" and _contains_copper(point, geometry.copper[i])]
         _require(len(members) == 1, f"port.{name}: wymagana przynależność do dokładnie jednej wyspy miedzi.")
     return {"geometry_status": "passed", "electromagnetic_status": "unverified",
             "copper_count": len(polygons)}
