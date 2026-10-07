@@ -206,9 +206,9 @@ wersje bibliotek i założenia. `native/model.xml` jest przygotowanym modelem.
 Po solve powstają `impedance.csv` i `summary.json`; po błędzie pliki natywne
 pozostają, a import_failure.json opisuje błąd. Status walidacji: unverified.
 
-Model: miedź górna PEC o zerowej grubości; bez dolnej miedzi, przelotek,
+Model: miedź górna płaska (domyślnie PEC, opcjonalnie conducting sheet); bez dolnej miedzi, przelotek,
 soldermaski, sitodruku, pasty i chropowatości. Parametry laminatu pochodzą
-z konfiguracji. Grubość/przewodność miedzi pozostają metadanymi wejściowymi.
+z konfiguracji. W PEC grubość/przewodność są wyłącznie metadanymi; w conducting sheet są parametrami materiału powierzchniowego.
 
 Krzywe są aproksymowane odcinkami z budżetem błędu geometrycznego 0,1 um.
 Usuwanie pozostałości operacji geometrycznych ma tolerancję 1 pm, bez
@@ -269,7 +269,7 @@ nie cały sweep. Nie ma filmu kroków czasowych ani objętości 3D.
 
 Trzy przekroje korzystają wyłącznie z istniejących linii, ściśle poza PML:
 
-- xy_air: pierwsza dodatnia linia Z powyżej miedzi, bez próbkowania na PEC;
+- xy_air: pierwsza dodatnia linia Z powyżej miedzi, bez próbkowania na powierzchni miedzi;
 - xz_feed: najbliższa istniejąca linia Y do fizycznego środka portu;
 - yz_feed: najbliższa istniejąca linia X do fizycznego środka portu.
 
@@ -333,3 +333,45 @@ odtwarza wszystko z geometry.json i fields/*.npz/metadata.json, bez Gerberów
 ani openEMS. `--phase-step 15` zmienia wyłącznie prezentację do 24 faz.
 Brak dumpów w starym przebiegu wymaga nowego obliczenia z --fields-mhz;
 raport nie może odzyskać pól, których solver nie zapisał. Wyniki nadal unverified.
+
+
+## Miedź o skończonej przewodności (PCB-011A)
+
+Domyślny model pozostaje `pec` (`AddMetal`). Do fizycznego wariantu użyj
+`--pcb-config parameters\pcb_fr4_1p6_realistic.json`. Przykład zawiera
+`copper.model=conducting_sheet`, 35 µm i 58 MS/m oraz FR4 1,6 mm,
+epsilon_r=4,3, loss_tangent=0,018. To jawne **założenia unverified**,
+nie dane potwierdzone przez producenta laminatu.
+
+```bat
+.\.venv\Scripts\python.exe -m antenna_lab.pcb.gerber_control gerbs\emstest2 ^
+  --pcb-config parameters\pcb_fr4_1p6_realistic.json ^
+  --quality preview ^
+  --center-mhz 2000 ^
+  --cutoff-mhz 625 ^
+  --sweep-start-mhz 1500 ^
+  --sweep-stop-mhz 2500 ^
+  --sweep-step-mhz 10 ^
+  --fields-mhz 2000
+```
+
+Adapter tworzy `AddConductingSheet('pcb_top_copper_sheet', conductivity=58e6,
+thickness=35e-6)` i instaluje te same płaskie poligony przy dokładnym z=0.
+Skończona grubość jest parametrem modelu powierzchniowego, **nie bryłą 3D**.
+Nie powstają linie Z ani kotwice zależne od grubości. Dla tej samej geometrii,
+częstotliwości i jakości osie, liczba komórek i oszacowanie CFL są identyczne
+z PEC. Nie oznacza to gwarancji identycznego czasu wykonania lub zaniku energii.
+Model strat może zmienić impedancję i pola; nie uruchamiamy automatycznie
+żadnego drugiego obliczenia. Porównanie wykonaj osobnymi przebiegami,
+zmieniając wyłącznie `copper.model` w fizycznej konfiguracji.
+
+summary.json i preparation.geometry zawierają `copper_model`,
+`copper_thickness_m`, `copper_conductivity_s_m` oraz
+`copper_sheet_conductance_s = conductivity * thickness` (tu 2030 S).
+Dla PEC podane wartości pozostają zapisane, ale są jawnie nieużywane przez
+solver. Raport offline pokazuje model oraz parametry. E/H pozostają
+normalizowane do napięcia portu; konserwatywna maska płaskiej miedzi i portu
+obowiązuje także dla conducting sheet, bez zmiany próbkowania i animacji.
+Nie dodano soldermask, dolnej miedzi, przelotek ani chropowatości.
+Starsza konfiguracja JSON zawierająca ścieżki Gerberów nadal obsługuje PEC;
+wybór conducting sheet jest częścią fizycznej konfiguracji wejścia katalogowego.

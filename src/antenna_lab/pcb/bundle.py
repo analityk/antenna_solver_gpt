@@ -177,8 +177,13 @@ def load_bundle_geometry(directory, physical_path=None):
         c['thickness_um']*1e-6,c['conductivity_s_m'],c['model'],s['thickness_mm']*1e-3,
         s['epsilon_r'],s['loss_tangent'],port.negative_xy_m,port.positive_xy_m,port.width_m)
     origin='--pcb-config (unverified assumptions)' if physical_path else 'documented defaults (assumptions/unverified)'
-    assumptions=[x for x in ASSUMPTIONS if x!='substrate parameters: from pcb.json']
-    assumptions += ['substrate parameters: '+origin, 'finite copper thickness: omitted', 'copper roughness: omitted']
+    assumptions=[x for x in ASSUMPTIONS if x!='substrate parameters: from pcb.json' and not x.startswith('top copper:')]
+    from .copper import copper_metadata
+    material = copper_metadata(config)
+    assumptions += ['substrate parameters: '+origin, 'top copper: '+config.copper_model,
+        'finite conductivity: '+material['finite_conductivity'],
+        'finite physical thickness: '+material['finite_physical_thickness'],
+        'geometric copper thickness / extra Z cells: none', 'copper roughness: omitted']
     geometry=PcbGeometry('pcb',outline,copper,Substrate(outline,-config.substrate_thickness_m,0.,
         config.substrate_epsilon_r,config.substrate_loss_tangent),port,assumptions)
     validate_pcb_geometry(geometry);audit_physical_feed(geometry)

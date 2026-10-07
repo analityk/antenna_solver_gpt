@@ -934,3 +934,31 @@ Obejrzano kontaktowy PNG na rzeczywistej geometrii emstest2 z syntetycznymi
 polami testowymi. Nie uruchomiono natywnego FDTD; zapis realnych dumpów
 openEMS 0.37.0rc3 pozostaje do sprawdzenia lokalnie na Windows. Wyniki
 nadal unverified. Nie dodano NF2FF, prądów, bilansu ani nowej fizyki.
+
+## 2026-10-07 — PCB-011A: conducting-sheet PCB copper
+
+Dodano opcjonalny model `conducting_sheet` do fizycznej konfiguracji folderu
+Gerberów. PEC pozostaje domyślny i zgodny ze starszymi przebiegami. Parametry
+35 µm / 58 MS/m przykładu pcb_fr4_1p6_realistic.json są założeniami, podobnie
+jak FR4 1,6 mm / epsilon_r 4,3 / tan(delta) 0,018; brak danych producenta.
+
+CSXCAD otrzymuje AddConductingSheet z przewodnością i grubością w SI zamiast
+AddMetal. Poligony nadal mają zerową grubość geometryczną przy z=0. Parametry
+materiału przechodzą wyłącznie do instalatora, nie do meshera. Test porównuje
+dokładnie domeny, osie i poligony PEC/sheet w preview/design/verify: identyczne,
+bez dodatkowych linii Z. Fizyczne straty miedzi mogą zmienić impedancję, pola
+i zanik energii; sama identyczność siatki nie zatwierdza wyników ani czasu run.
+
+Summary i metadane przygotowania zapisują model, grubość, przewodność,
+przewodność powierzchniową (2030 S dla przykładu), użycie parametrów przez
+solver oraz brak grubości geometrycznej. Raport odróżnia PEC od sheet.
+Maska i opisy PCB E/H dotyczą płaskiej miedzi, nie zakładają już PEC;
+normalizacja, fazy i położenia przekrojów są niezmienione. Stare raporty PEC
+pozostają odtwarzalne. Bez nowych zależności, przebiegów porównawczych,
+soldermask, przelotek, dolnej miedzi lub szorstkości.
+
+Testy: 217 PCB OK (1 skip), pełny zestaw 284 OK (3 skip). Nowe testy z atrapami
+sprawdzają wywołania materiałów, identyczne siatki, walidację, metadane XML,
+prepare-only, pojedynczy Run/CalcPort z E/H i regenerację raportu offline.
+Nie uruchomiono natywnego FDTD; weryfikacja rzeczywistego conducting sheet
+na lokalnym openEMS 0.37.0rc3 / CSXCAD 0.7.0rc3 pozostaje do wykonania.

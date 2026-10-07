@@ -14,6 +14,7 @@ from antenna_lab.core.config import ConfigurationError
 from antenna_lab.solvers.openems_pcb import prepare_pcb_xml_model, read_pcb_native_statistics
 from antenna_lab.solvers.pcb_mesh import make_pcb_domain_mesh, make_gerber_mesh_anchor_plan
 from .config import load_pcb_config
+from .copper import copper_metadata
 from .control import (run_control_model, add_frequency_arguments,
                       frequency_arguments_hz)
 from .gerber import load_pcb_geometry
@@ -72,11 +73,11 @@ def run_gerber_control(config_path, output_dir, *, prepare_only=False, quality='
     print('PCB Gerber: '+str(output), flush=True)
     print(f'Material assumptions (unverified): substrate {config.substrate_thickness_m*1e3:g} mm, '
           f'epsilon_r={config.substrate_epsilon_r:g}, loss_tangent={config.substrate_loss_tangent:g}; '
-          f'copper PEC, nominal thickness {config.copper_thickness_m*1e6:g} um (not modeled)', flush=True)
+          f'copper {config.copper_model}, physical thickness input {config.copper_thickness_m*1e6:g} um', flush=True)
     for assumption in geometry.assumptions:
         print('  '+assumption, flush=True)
     output.mkdir(parents=True, exist_ok=True)
-    diagnostics = dict(sweep=sweep, quality_profile=quality, actual_iterations=None, termination_status='not_started')
+    diagnostics = dict(copper_metadata(config), sweep=sweep, quality_profile=quality, actual_iterations=None, termination_status='not_started')
     try:
         _, anchor_metadata = make_gerber_mesh_anchor_plan(geometry, settings, quality)
         diagnostics['suppressed_noncritical_anchors'] = anchor_metadata.pop('suppressed_noncritical_anchors')
@@ -102,12 +103,12 @@ def run_gerber_control(config_path, output_dir, *, prepare_only=False, quality='
             output.mkdir(parents=True, exist_ok=True)
             native = output/'native'
             native.mkdir()
-            _, _, _, _, _, preparation = prepare_pcb_xml_model(geometry, settings, native/'model.xml', gerber_quality=quality, **field_options)
+            _, _, _, _, _, preparation = prepare_pcb_xml_model(geometry, settings, native/'model.xml', gerber_quality=quality, copper_config=config, **field_options)
             result = dict(status='prepared', validation_status='unverified', preparation=preparation,
                 simulation_settings=asdict(settings), mesh={'shape_cells': mesh.shape_cells, 'cell_count': mesh.cell_count})
         else:
             result = run_control_model(geometry, settings, output, gerber_quality=quality,
-                                       exact_endcriteria=exact, dump_statistics=True, **field_options)
+                                       exact_endcriteria=exact, dump_statistics=True, copper_config=config, **field_options)
             diagnostics['actual_iterations'] = result['native_statistics']['number_of_iterations']
             if not 0 < diagnostics['actual_iterations'] < settings.max_timesteps:
                 raise ConfigurationError('Gerber native termination not established: timestep limit reached.')

@@ -307,13 +307,28 @@ def _pcb_metadata(data):
           ('Źródło założeń',imported.get('physical_config_source','legacy PCB config')),
           ('Parametry fizyczne',imported.get('physical_config',imported.get('resolved_config','not recorded')))]
     body=table(['Przebieg PCB','Wartość'],rows)
+    material = {**imported.get('resolved_config', {}),
+                **s.get('preparation', {}).get('geometry', {}), **s}
+    model = material.get('copper_model', 'pec')
+    physical = [('Copper model', 'conducting sheet' if model == 'conducting_sheet' else 'PEC')]
+    for key, label, scale, unit in (
+        ('copper_thickness_m', 'Thickness', 1e6, 'µm'),
+        ('copper_conductivity_s_m', 'Conductivity', 1e-6, 'MS/m'),
+        ('copper_sheet_conductance_s', 'Sheet conductance', 1, 'S')):
+        value = material.get(key)
+        if value is not None:
+            physical.append((label, f'{value*scale:g} {unit}'))
+    body += '<h3>Model fizyczny miedzi</h3>'+table(['Parametr', 'Wartość'], physical)
+    body += ('<p>Skończona przewodność i grubość fizyczna: model powierzchniowy conducting sheet. '
+             'Geometria płaska, bez dodatkowych komórek Z.</p>' if model == 'conducting_sheet' else
+             '<p>PEC: parametry grubości i przewodności, jeśli podane, nie są używane przez solver.</p>')
     files=imported.get('discovered_files',[])
     if not files:
         files=[dict(name=v['path'],role=k,sha256=v['sha256'],disposition='modeled') for k,v in imported.get('files',{}).items()]
     body+=table(['Plik','Rola','Obsługa','SHA256'],[(f['name'],f['role'],f['disposition'],f['sha256']) for f in files])
     assumptions=imported.get('assumptions',data['geometry'].get('assumptions',[]))
     body+='<h3>Założenia i pominięta fizyka</h3><ul>'+''.join('<li>'+escape(str(a))+'</li>' for a in assumptions)+'</ul>'
-    body+='<p>Model PEC: bez skończonej grubości i chropowatości miedzi. Soldermask, paste i silkscreen pominięto. Dolna/wewnętrzna miedź oraz otwory/vias nie są obsługiwane. E/H, NF2FF i bilans mocy: not recorded.</p>'
+    body+='<p>Chropowatość miedzi: pominięta. Soldermask, paste i silkscreen pominięto. Dolna/wewnętrzna miedź oraz otwory/vias nie są obsługiwane. E/H, NF2FF i bilans mocy: not recorded.</p>'
     if (data['root']/'fields/metadata.json').exists():
         body = body.replace('E/H, NF2FF i bilans mocy: not recorded.', 'E/H: zapisane przekroje poniżej. NF2FF i bilans mocy: not recorded.')
     body+=''.join('<p class="status">'+escape(str(w))+'</p>' for w in data['warnings'])

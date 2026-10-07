@@ -78,7 +78,7 @@ def install_pcb_fields(csx, geometry, mesh, settings, frequencies):
 
 
 def pcb_sample_mask(lines, full_axes, geometry):
-    """Bits 1 PEC, 2 one-local-cell-diagonal PEC halo, 4 port plus halo.
+    """Bits 1 copper, 2 one-local-cell-diagonal copper halo, 4 port plus halo.
 
     Distances to continuous planar copper/source; not native Yee occupancy.
     Substrate volume is deliberately not masked. Native grids are not resampled.
@@ -162,7 +162,7 @@ def finish_pcb_fields(geometry,mesh,layout,frequencies,reference,output):
         reference_voltage_v=1.,mesh_changed=False,additional_fdtd_runs=0,
         effect='Passive DFT/I/O only; physical model, port, excitation, PML and quality unchanged.',
         native_coordinate_comparison=dict(rtol=1e-6,atol_m=1e-10,interpolation=False),
-        mask_bits={'1':'PEC geometry','2':'one local cell diagonal around PEC','4':'planar port and halo'},
+        mask_bits={'1':'copper geometry','2':'one local cell diagonal around copper','4':'planar port and halo'},
         mask_note='Conservative geometric/interpolation mask, not native Yee-cell occupancy. Substrate not masked. Raw native/*.h5 untouched.',
         validation_status='unverified')
     write_json(folder/'metadata.json',metadata)

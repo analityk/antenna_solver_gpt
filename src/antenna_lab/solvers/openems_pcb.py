@@ -7,6 +7,7 @@ from math import isfinite, pi
 
 from antenna_lab.core.config import ConfigurationError
 from antenna_lab.pcb.model import PcbGeometry
+from antenna_lab.pcb.copper import copper_metadata
 from antenna_lab.pcb.port import resolve_pcb_lumped_port
 from antenna_lab.pcb.simulation import PcbSimulationSettings
 from .pcb_mesh import PcbDomainMesh, make_pcb_domain_mesh, make_pcb_mesh_anchor_plan, make_pcb_solver_anchor_plan, audit_pcb_port_edge_mesh
@@ -34,15 +35,15 @@ def _require_lines(axes, plan, domain_mesh):
 
 
 def install_pcb_geometry(
-    csx, geometry: PcbGeometry, domain_mesh: PcbDomainMesh, settings: PcbSimulationSettings, *, port_edge_mode='aligned', gerber_quality=None,
-) -> dict:
+    csx, geometry: PcbGeometry, domain_mesh: PcbDomainMesh, settings: PcbSimulationSettings, *, port_edge_mode='aligned', gerber_quality=None, copper_config=None) -> dict:
     """Install a validated geometry/mesh pair in a fresh CSXCAD structure.
 
     Dielectric loss uses constant kappa, matching tan(delta) only at the
-    configured loss-reference frequency. Copper is zero-thickness PEC.
+    configured loss-reference frequency. Copper remains planar PEC or a finite-conductivity surface sheet.
     Preflight failures do not touch CSXCAD. Readback failures stop before
     material/metal creation (the grid has necessarily already been written).
     """
+    copper_info = copper_metadata(copper_config)
     plan = make_pcb_solver_anchor_plan(geometry, settings, port_edge_mode, gerber_quality=gerber_quality)
     axes = (domain_mesh.x_lines_m, domain_mesh.y_lines_m, domain_mesh.z_lines_m)
     if domain_mesh.pml_cells != settings.pml_cells:
@@ -82,11 +83,17 @@ def install_pcb_geometry(
     material.AddLinPoly(points=_xy_polygon_points(substrate.outline.vertices_xy_m),
                         norm_dir='z', elevation=substrate.z_min_m,
                         length=substrate.z_max_m-substrate.z_min_m, priority=0)
-    metal = csx.AddMetal('pcb_top_copper_PEC')
+    if copper_info['copper_model'] == 'conducting_sheet':
+        metal = csx.AddConductingSheet('pcb_top_copper_sheet',
+            conductivity=copper_info['copper_conductivity_s_m'],
+            thickness=copper_info['copper_thickness_m'])
+    else:
+        metal = csx.AddMetal('pcb_top_copper_PEC')
     for copper in geometry.copper:
         metal.AddPolygon(points=_xy_polygon_points(copper.vertices_xy_m),
                          norm_dir='z', elevation=0.0, priority=10)
     return {
+        **copper_info,
         'delta_unit_m': 1.0,
         'grid_line_counts': {axis: len(lines) for axis, lines in zip('xyz', readback)},
         'substrate': {
@@ -97,18 +104,18 @@ def install_pcb_geometry(
             'loss_model': 'constant_kappa',
             'z_min_m': substrate.z_min_m, 'z_max_m': substrate.z_max_m,
         },
-        'copper': {'model': 'PEC', 'polygon_count': len(geometry.copper),
+        'copper': {'model': 'PEC' if copper_info['copper_model'] == 'pec' else 'conducting_sheet', 'polygon_count': len(geometry.copper),
                    'ids': [copper.id for copper in geometry.copper]},
     }
 
 
-def prepare_pcb_csx(geometry: PcbGeometry, settings: PcbSimulationSettings, *, port_edge_mode='aligned', gerber_quality=None):
+def prepare_pcb_csx(geometry: PcbGeometry, settings: PcbSimulationSettings, *, port_edge_mode='aligned', gerber_quality=None, copper_config=None):
     """Build the domain before loading native modules; return CSX, mesh, metadata."""
     domain_mesh = make_pcb_domain_mesh(geometry, settings, port_edge_mode=port_edge_mode, **({'gerber_quality': gerber_quality} if gerber_quality is not None else {}))
     from .openems import native_modules
     _, csx_module = native_modules()
     csx = csx_module.ContinuousStructure()
-    metadata = install_pcb_geometry(csx, geometry, domain_mesh, settings, port_edge_mode=port_edge_mode, **({'gerber_quality': gerber_quality} if gerber_quality is not None else {}))
+    metadata = install_pcb_geometry(csx, geometry, domain_mesh, settings, copper_config=copper_config, port_edge_mode=port_edge_mode, **({'gerber_quality': gerber_quality} if gerber_quality is not None else {}))
     return csx, domain_mesh, metadata
 
 
@@ -147,7 +154,7 @@ def install_pcb_lumped_port(engine, csx, geometry: PcbGeometry,
     return port, spec, metadata
 
 
-def prepare_pcb_native_model(geometry: PcbGeometry, settings: PcbSimulationSettings, *, port_edge_mode='aligned', gerber_quality=None):
+def prepare_pcb_native_model(geometry: PcbGeometry, settings: PcbSimulationSettings, *, port_edge_mode='aligned', gerber_quality=None, copper_config=None):
     """Return engine, CSX, port, mesh, spec, metadata; no waveform, BC, XML or run."""
     domain_mesh = make_pcb_domain_mesh(geometry, settings, port_edge_mode=port_edge_mode, **({'gerber_quality': gerber_quality} if gerber_quality is not None else {}))
     from .openems import native_modules
@@ -155,7 +162,7 @@ def prepare_pcb_native_model(geometry: PcbGeometry, settings: PcbSimulationSetti
     csx = csx_module.ContinuousStructure()
     engine = ems_module.openEMS(NrTS=settings.max_timesteps, EndCriteria=settings.end_criteria)
     engine.SetCSX(csx)
-    geometry_metadata = install_pcb_geometry(csx, geometry, domain_mesh, settings, port_edge_mode=port_edge_mode, **({'gerber_quality': gerber_quality} if gerber_quality is not None else {}))
+    geometry_metadata = install_pcb_geometry(csx, geometry, domain_mesh, settings, copper_config=copper_config, port_edge_mode=port_edge_mode, **({'gerber_quality': gerber_quality} if gerber_quality is not None else {}))
     port, spec, port_metadata = install_pcb_lumped_port(engine, csx, geometry, domain_mesh, settings, port_edge_mode=port_edge_mode, **({'gerber_quality': gerber_quality} if gerber_quality is not None else {}))
     metadata = {'geometry': geometry_metadata, 'port': port_metadata,
                 'engine': {'max_timesteps': settings.max_timesteps, 'end_criteria': settings.end_criteria}}
@@ -201,9 +208,9 @@ def write_pcb_xml(engine, csx, domain_mesh: PcbDomainMesh, xml_path) -> dict:
     return {'path': str(xml_path), 'size_bytes': size, 'parse_status': 'passed'}
 
 
-def prepare_pcb_xml_model(geometry: PcbGeometry, settings: PcbSimulationSettings, xml_path, *, port_edge_mode='aligned', gerber_quality=None, field_frequency_hz=()):
+def prepare_pcb_xml_model(geometry: PcbGeometry, settings: PcbSimulationSettings, xml_path, *, port_edge_mode='aligned', gerber_quality=None, field_frequency_hz=(), copper_config=None):
     """Prepare reusable XML; no Run, result processing or additional files."""
-    engine, csx, port, mesh, spec, metadata = prepare_pcb_native_model(geometry, settings, port_edge_mode=port_edge_mode, **({'gerber_quality': gerber_quality} if gerber_quality is not None else {}))
+    engine, csx, port, mesh, spec, metadata = prepare_pcb_native_model(geometry, settings, copper_config=copper_config, port_edge_mode=port_edge_mode, **({'gerber_quality': gerber_quality} if gerber_quality is not None else {}))
     metadata = {**metadata, **configure_pcb_fdtd(engine, csx, mesh, settings)}
     if field_frequency_hz:
         from .pcb_fields import install_pcb_fields

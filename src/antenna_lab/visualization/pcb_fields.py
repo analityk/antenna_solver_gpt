@@ -99,7 +99,7 @@ def pcb_phase_figure(view, paths, plane, phases=(0,90,180,270)):
                 title=f"{phase}° · {phase/360/view['frequency_hz']*1e9:.4g} ns · {labels[col]}")
             ax.set_aspect('equal',adjustable='box')
     fig.suptitle(f"PCB {plane['name']} · {view['frequency_hz']/1e6:g} MHz · 1∠0 V port\n"
-                'Fixed symmetric symlog scales across phases; geometric PEC/source halo mask',fontsize=11)
+                'Fixed symmetric symlog scales across phases; geometric copper/source halo mask',fontsize=11)
     fig.subplots_adjust(top=.92,bottom=.09,hspace=.5,wspace=.2)
     for col in (0,1):
         cax=fig.add_axes([.13+col*.43,.035,.32,.012])
@@ -169,7 +169,7 @@ def pcb_field_section(data, metadata, figure_image, plots_path, phase_step):
         raise ValueError('Nieobsługiwane metadane pól PCB (wymagane odniesienie 1 V).')
     phases=list(range(0,360,phase_step or 30))
     body='<section class="panel"><h2>Pola E/H — przebieg jednego okresu</h2>'
-    body+='<p>Stan harmoniczny Re(F·exp(+j·faza)); faza 0° = dodatnie maksimum napięcia portu. Odniesienie 1∠0 V portu, nie moc przyjęta. E: V/m per 1 V port; H: A/m per 1 V port. Strzałki pokazują chwilowy wektor E w przekroju; kolory podpisaną składową. Stałe symetryczne skale symlog we wszystkich fazach. Szary: konserwatywna maska geometrii PEC/portu i halo jednej lokalnej komórki, nie natywna zajętość Yee. Laminat nie jest maskowany.</p>'
+    body+='<p>Stan harmoniczny Re(F·exp(+j·faza)); faza 0° = dodatnie maksimum napięcia portu. Odniesienie 1∠0 V portu, nie moc przyjęta. E: V/m per 1 V port; H: A/m per 1 V port. Strzałki pokazują chwilowy wektor E w przekroju; kolory podpisaną składową. Stałe symetryczne skale symlog we wszystkich fazach. Szary: konserwatywna maska geometrii copper/portu i halo jednej lokalnej komórki, nie natywna zajętość Yee. Laminat nie jest maskowany.</p>'
     body+='<p>Odtwarzanie nie uruchamia FDTD. Płaszczyzny pochodzą z istniejącej siatki, poza PML. Widok przeglądarki jest próbkowany najwyżej 80×80, strzałki dodatkowo rozrzedzone; zapis NPZ zachowuje wszystkie próbki i składowe.</p>'
     for plane in metadata['planes']:
         if plane['name'] not in PCB_VIEWS:raise ValueError('Nieznana płaszczyzna PCB E/H.')

@@ -31,7 +31,10 @@
           "exclusiveMinimum": 0
         },
         "model": {
-          "const": "pec"
+          "enum": [
+            "pec",
+            "conducting_sheet"
+          ]
         }
       }
     },
