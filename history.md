@@ -1153,3 +1153,27 @@ instrukcji i kategorii w obu przejściach parsera. Osobno odczytano wskazany
 produkcyjny plik: T01, średnica 0.305 mm, XY 4.826 / 10.24543 mm,
 zaakceptowane G90 w linii 11, bez zmiany pliku. Nie wykonywano pełnego
 solve/importu całego emtest3 ani napraw innych elementów zestawu.
+
+## PCB-011D2 — odróżnienie Gerber drill drawing od Excellon (2026-10-07)
+
+Przyczyna: samo słowo drill w nazwie kierowało Gerber_DrillDrawingLayer.GDD
+z emtest3 do parsera Excellon. _role() kieruje teraz do NC tylko rozszerzenia
+.drl/.xln lub format identify_file()==excellon. Rozpoznany Gerber pozostaje
+na ścieżce Gerber. Dla rozpoznanego Gerbera .GDD/DrillDrawingLayer oznacza
+rolę drill_drawing, automatycznie omitted w istniejących metadanych bundle.
+Nazwa, ścieżka i SHA256 zostają zapisane. Nieznane dane ze słowem drill nie
+są uznawane za Excellon. Gerberowe FileFunction opisujące fizyczne wiercenia
+pozostaje nieobsługiwane i kończy się jawnym błędem bez wywołania Excellon.
+
+Nie zmieniono read_drill_source ani whitelist ostrzeżenia G90 z PCB-011D1.
+Fizyka, siatka, klasyfikacja PTH/NPTH i źródłowe pliki pozostają niezmienione.
+Dodano minimalny fixture GDD zaczynający się G04 Layer: DrillDrawingLayer*.
+Test katalogu F.Cu/B.Cu/outline/DRL/GDD śledzi wywołania read_drill_source
+oraz ExcellonFile.open: tylko DRL dociera do obu. GDD jest omitted, a PTH
+łączy top/bottom. Usunięcie GDD nie zmienia geometrii. Wcześniejszy test
+nieobsługiwanych wierceń Gerber sprawdza teraz właściwy błąd formatu,
+zamiast błędu powstałego przy próbie parsowania Gerbera jako NC.
+
+Testy: 2 nowe OK, pełny zestaw 315 OK (3 skip), bez natywnego FDTD.
+Sprawdzono też pliki produkcyjne: GDD -> drill_drawing; DRL -> drill -> PTH.
+Nie uruchamiano pełnego solve ani napraw innych elementów zestawu emtest3.

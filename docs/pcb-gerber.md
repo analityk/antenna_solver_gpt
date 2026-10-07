@@ -612,3 +612,19 @@ rysowane w skali). Nie potrzebuje źródłowych Excellonów ani openEMS.
 
 API walca: [CSXCAD CSPrimCylinder](https://docs.openems.de/en/latest/python/CSXCAD/CSPrimitives/CSPrimCylinder.html).
 Testy korzystają z atrap natywnych; nie uruchamiają FDTD ani macierzy zbieżności.
+
+
+### PCB-011D2 — drill drawing to dokumentacja
+
+`Gerber_DrillDrawingLayer.GDD` jest Gerberem dokumentacyjnym, nie plikiem NC.
+Dla formatu rozpoznanego przez Gerbonara jako Gerber rozszerzenie `.GDD`
+lub nazwa zawierająca `DrillDrawingLayer` daje rolę `drill_drawing` i
+`disposition: omitted`. Plik i SHA256 pozostają w `discovered_files`, ale
+nie trafia do parsera Excellon ani modelu PTH/NPTH.
+
+Do ścieżki NC trafiają `.drl`/`.xln` oraz dane rozpoznane jako `excellon`.
+Samo słowo `drill` w nazwie nie określa formatu. Nieznany plik tekstowy
+pozostaje niesklasyfikowany. Inne Gerbery opisujące fizyczne wiercenia
+w FileFunction są jawnie nieobsługiwane — nie próbujemy czytać ich jako
+Excellon. Prawdziwe PTH/NPTH w tym samym katalogu działają jak wcześniej,
+włącznie z niezmienionym wyjątkiem G90 z PCB-011D1.

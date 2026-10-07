@@ -217,7 +217,7 @@ class MultilayerTests(unittest.TestCase):
         drill.unlink()
         drill=directory/'fabrication.gbr'
         drill.write_text(solid_gerber().replace('%MOMM*%', '%MOMM*%\n%TF.FileFunction,Plated,1,4,PTH*%'))
-        with self.assertRaisesRegex(ConfigurationError,'unsupported/invalid Excellon'):
+        with self.assertRaisesRegex(ConfigurationError,'unsupported Gerber drill data'):
             load_bundle_geometry(directory,path)
         drill.unlink()
         # Extra bottom copper remains unsupported in v1, never silently included.

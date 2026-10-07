@@ -49,8 +49,10 @@ def _role(path):
     if re.fullmatch(r'\.g(?:[1-9][0-9]*|p[1-9][0-9]*)',ext):
         conventional = 'inner_copper'
     identified = identify_file(path.read_text(encoding='utf-8-sig', errors='replace'))
-    if conventional == 'drill' or 'drill' in name or identified == 'excellon':
+    if conventional == 'drill' or identified == 'excellon':
         return 'drill'
+    if identified == 'gerber' and (ext == '.gdd' or 'drilldrawinglayer' in name):
+        conventional = 'drill_drawing'
     gerber_like = conventional is not None or identified == 'gerber' or ext in ('.gbr','.ger','.pho')
     if not gerber_like:
         return 'unclassified'
@@ -68,7 +70,7 @@ def _role(path):
     elif 'paste' in function: metadata_role = 'paste'
     elif 'legend' in function: metadata_role = 'silkscreen'
     elif 'drill' in function or function.startswith(('plated,','nonplated,','mixedplating,')):
-        metadata_role = 'drill'
+        raise ConfigurationError(f'{path.name}: unsupported Gerber drill data; require Excellon for physical drills.')
     if metadata_role and conventional and metadata_role != conventional:
         raise ConfigurationError(f'{path.name}: filename role {conventional} conflicts with FileFunction {function}.')
     if metadata_role or conventional:
