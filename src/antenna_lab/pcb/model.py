@@ -76,6 +76,21 @@ class PcbTransform:
     rotation_rad: float
 
 
+@dataclass(frozen=True)
+class PcbDrill:
+    id: str
+    x_m: float
+    y_m: float
+    drill_diameter_m: float
+    plated: bool
+    source_file_role: str
+    source_tool: str
+    source_file_sha256: str
+    plating_thickness_m: float | None = None
+    equivalent_outer_radius_m: float | None = None
+    connected_layer_roles: tuple[str, ...] = ()
+
+
 @dataclass
 class PcbGeometry:
     model: str
@@ -87,6 +102,7 @@ class PcbGeometry:
     dielectric_layers: tuple[DielectricLayer, ...] = ()
     copper_layers: tuple[CopperLayer, ...] = ()
     copper_composition: tuple[CopperImageStats, ...] = ()
+    drills: tuple[PcbDrill, ...] = ()
 
     @property
     def dielectrics(self):

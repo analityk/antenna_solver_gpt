@@ -68,6 +68,7 @@ def run_gerber_control(config_path, output_dir, *, prepare_only=False, quality='
         'normalization': asdict(transform), 'assumptions': list(geometry.assumptions),
         'port_edge_mode': 'aligned', 'validation_status': 'unverified',
         'copper_composition': [asdict(v) for v in geometry.copper_composition],
+        'drills': [asdict(v) for v in geometry.drills],
         'composition_method': 'ordered primitive union/difference; later dark restores copper',
     }
     metadata.update(bundle_metadata)

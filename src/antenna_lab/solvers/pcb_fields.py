@@ -98,7 +98,19 @@ def pcb_sample_mask(lines, full_axes, geometry):
     mask=np.zeros(len(xyz),dtype=np.uint8)
     for plane_z in sorted({c.z_m for c in geometry.copper}):
         metal=union_all([copper_shape(c) for c in geometry.copper if c.z_m == plane_z])
+        if geometry.drills:
+            from shapely.geometry import Point
+            for hole in geometry.drills:
+                if not hole.plated:
+                    metal=metal.difference(Point(hole.x_m,hole.y_m).buffer(hole.drill_diameter_m/2,quad_segs=128))
         d=np.hypot(distance(xy,metal),z-plane_z)
+        mask[d<=1e-12]|=1;mask[d<=halo]|=2
+    bottom=min(d.z_min_m for d in geometry.dielectrics)
+    for hole in geometry.drills:
+        if not hole.plated: continue
+        radial=np.maximum(np.hypot(xyz[:,0]-hole.x_m,xyz[:,1]-hole.y_m)-hole.equivalent_outer_radius_m,0)
+        vertical=np.maximum(np.maximum(bottom-z,z),0)
+        d=np.hypot(radial,vertical)
         mask[d<=1e-12]|=1;mask[d<=halo]|=2
     n,p=geometry.port.negative_xy_m,geometry.port.positive_xy_m
     ym=(n[1]+p[1])/2;half=geometry.port.width_m/2
@@ -164,7 +176,7 @@ def finish_pcb_fields(geometry,mesh,layout,frequencies,reference,output):
         reference_voltage_v=1.,mesh_changed=False,additional_fdtd_runs=0,
         effect='Passive DFT/I/O only; physical model, port, excitation, PML and quality unchanged.',
         native_coordinate_comparison=dict(rtol=1e-6,atol_m=1e-10,interpolation=False),
-        mask_bits={'1':'copper geometry','2':'one local cell diagonal around copper','4':'planar port and halo'},
+        mask_bits={'1':'copper sheets and solid PTH cylinders','2':'one local cell diagonal around copper','4':'planar port and halo'},
         mask_note='Conservative geometric/interpolation mask, not native Yee-cell occupancy. Substrate not masked. Raw native/*.h5 untouched.',
         validation_status='unverified')
     write_json(folder/'metadata.json',metadata)

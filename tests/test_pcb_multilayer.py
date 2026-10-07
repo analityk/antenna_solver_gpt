@@ -212,12 +212,12 @@ class MultilayerTests(unittest.TestCase):
         with self.assertRaisesRegex(ConfigurationError,'ordering'):load_bundle_geometry(directory,path)
         inner.write_text(saved)
         drill=directory/'holes.drl';drill.write_text('M48\nMETRIC\n%\nM30\n')
-        with self.assertRaisesRegex(ConfigurationError,'Drill/via connectivity is present but PCB-011B does not model it yet.'):
+        with self.assertRaisesRegex(ConfigurationError,'empty drill source'):
             load_bundle_geometry(directory,path)
         drill.unlink()
         drill=directory/'fabrication.gbr'
         drill.write_text(solid_gerber().replace('%MOMM*%', '%MOMM*%\n%TF.FileFunction,Plated,1,4,PTH*%'))
-        with self.assertRaisesRegex(ConfigurationError,'Drill/via connectivity'):
+        with self.assertRaisesRegex(ConfigurationError,'unsupported/invalid Excellon'):
             load_bundle_geometry(directory,path)
         drill.unlink()
         # Extra bottom copper remains unsupported in v1, never silently included.

@@ -1062,3 +1062,65 @@ są odrzucane. V1/v2 i emstest/emstest2 pozostają zielone.
 Wyniki nadal unverified: natywna ocena priorytetów CSXCAD/openEMS na Windows
 pozostaje do wykonania. Nie dodano Excellon, vias, NPTH, soldermask,
 komponentów, chropowatości ani dodatkowych przebiegów/zbieżności.
+
+## PCB-011D — Excellon through-hole vias / NPTH (2026-10-07)
+
+Powód: v2 odrzucało wszystkie drill files, więc fizyczne wielowarstwowe
+zestawy nie mogły mieć połączeń międzywarstwowych. Dodano import okrągłych
+przelotowych wierceń Gerbonara 1.6.3. Gerbonara interpretuje wszystkie
+instrukcje NC; kod projektu sprawdza wyłącznie metadane nazw/komentarzy.
+Jawne PTH/NPTH z nazw i plating/X2 muszą być zgodne. Brak klasy, konflikt,
+pusty plik, slot/route, nieobsługiwane narzędzie, blind/buried/microvia lub
+nieprzelotowy zakres oznacza błąd. Pozostawiono odrzucanie ostrzeżeń parsera,
+w tym niepewnego formatu liczbowego. Oryginalne Txx są pobierane z mapy
+ExcellonParser przypiętej wersji, nie odtwarzane własnym parserem.
+
+Fizyczna schema v2 przyjmuje opcjonalne drills.pth_plating_um i
+pth_model=solid_pec_equivalent. PTH wymaga jawnego obiektu, NPTH nie.
+V1 nadal odrzuca wiercenia; nie dodano nazw źródeł do konfiguracji.
+PcbDrill jest odłączonym rekordem SI: środek, średnica, plated, źródłowa
+rola/narzędzie/SHA256, grubość PTH, promień równoważny i role kontaktów.
+PcbGeometry.drills domyślnie jest pustym tuple. Normalizacja/inverse mapują
+środek tą samą transformacją XY co resztę płytki, bez drugiej normalizacji.
+Kontakty wynikają z odległości środka do końcowej miedzi z otworami;
+co najmniej dwie warstwy są wymagane. Antipad nie tworzy kontaktu. Drille
+na porcie, poza obrysem lub wzajemnie zachodzące odrzucono w tej wersji.
+
+PTH instalowany jest jako pojedynczy AddCylinder na AddMetal, od z=0 do
+bottom, promień drill/2+plating. To jawny solid PEC equivalent: bez strat
+metalizacji i bez pustego wnętrza beczki. NPTH to cylinder epsilon=1,
+kappa=0 przez cały stack, usuwający także miedź. Priorytety są wyższe niż
+wszystkie poligony i clearances PCB-011C; zmieniają materiał tylko wewnątrz
+walca. Po instalacji obowiązuje dokładny audyt zamrożonych osi CSXCAD.
+Native property API porównano z dokumentacją CSPrimCylinder.
+
+Jedynymi nowymi kotwicami siatki są dokładne X/Y środków (także NPTH).
+Zapisane osobno jako drill_centres_xy_m w planie, domenie i ekonomicznej
+polityce. Brak kotwic promienia, metalizacji lub teselacji i nowych Z.
+Zmiana metalizacji zmienia fizyczny promień, nie siatkę. Nie odrzucamy
+wierceń dla oszczędności: bliskie krytyczne kotwice są zachowane albo
+jawnie nierozdzielalne; ograniczenia komórek/kosztu działają przed Run.
+Zachowany środek nie jest dowodem zbieżności EM promienia na grubej siatce.
+
+Maski pól obejmują walce PTH i lokalne halo. NPTH odejmuje maskę miedzi;
+substrat nadal nie jest maskowany. Wizualizacje mają oznaczenia otworów
+z góry, prawdziwe przekroje walców i tabelę Drills / vias. Stackup pokazuje
+przelot symbolicznie, bez pozorowania skali ścianek. Raport używa wyłącznie
+zapisanej geometrii/metadanych; źródła i liczby/narzędzia/SHA256 oraz kontakty
+są zachowane w import/summary JSON. Fazy, odniesienie 1 V, mesh policy
+rozdzielczości, port i liczba przebiegów nie zmienione.
+
+Testy: nowe 8 OK; PCB 242 OK (1 skip; przed dodaniem ostatniego regresyjnego
+przypadku bliskich środków); końcowy pełny zestaw 310 OK (3 skip), w tym
+wszystkie 8 nowych. Wykorzystano tylko atrapy natywne. Pokryto PTH/NPTH,
+jednostki mm/inch, narzędzia, X2/nazwy/konflikty, slots/routes/spans,
+kontakty top/inner/bottom i antipad, orphan, transformację, grubość bez
+zmian osi, dokładne środki i budżet, priorytety/NPTH, mutację siatki jako
+błąd, maski, jeden fake Run oraz regenerację offline po usunięciu źródeł.
+Stare testy blanket-rejection zamieniono na odrzucenie pustego/nie-Excellon
+źródła. V1/v2 bez drill oraz emstest/emstest2 pozostają zielone.
+
+Ograniczenia: wyniki unverified; rzeczywiste CSXCAD/openEMS na Windows
+wymaga lokalnego sprawdzenia. Nie wykonano natywnego FDTD. Nie dodano
+blind/buried/microvias, plated slots, strat/chropowatości barrel, soldermask,
+komponentów, konektorów, NF2FF ani sweepów zbieżności.

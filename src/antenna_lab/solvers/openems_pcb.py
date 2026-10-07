@@ -116,10 +116,13 @@ def install_pcb_geometry(
             metal.AddPolygon(points=_xy_polygon_points(copper.vertices_xy_m),
                              norm_dir='z', elevation=0.0, priority=copper_priorities[copper.id])
     clearance_metadata = install_copper_clearances(csx, geometry, priority_plan, _xy_polygon_points)
-    _audit_port_grid(csx, domain_mesh, context='after dielectric/copper/clearance installation')
+    from .pcb_drills import install_drills
+    drill_metadata = install_drills(csx, geometry, priority_plan)
+    _audit_port_grid(csx, domain_mesh, context='after dielectric/copper/clearance/drill installation')
     return {
         **copper_info,
         'copper_clearances': clearance_metadata,
+        'drills': drill_metadata,
         'copper_composition': [asdict(v) for v in geometry.copper_composition],
         'delta_unit_m': 1.0,
         'grid_line_counts': {axis: len(lines) for axis, lines in zip('xyz', readback)},

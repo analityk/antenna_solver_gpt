@@ -26,6 +26,12 @@ def stackup_section(data, plots_path, figure_image, table):
                 f"{layer['conductivity_s_m']/1e6:g} MS/m"))
             ax.plot([0, 1], [z, z], color='#ad6627', lw=2)
             ax.text(1.04, z, f"{layer['role']} · z={z:g} mm", va='center', fontsize=9)
+    drills=data['geometry'].get('drills',[])
+    # Symbolic X positions; dielectric Z extents remain physical.
+    for i,d in enumerate(drills):
+        position=(i+1)/(len(drills)+1)
+        ax.plot([position,position],[0,-stack['total_dielectric_thickness_m']*1e3],
+            color='#793b92' if d['plated'] else 'white',linewidth=3,zorder=5)
     total = stack['total_dielectric_thickness_m']*1e3
     ax.set(xlim=(-.05,1.8), ylim=(-total*1.12,total*.12), ylabel='z [mm]',
         title='Stackup · copper sheets drawn symbolically, thickness not to scale')
@@ -34,6 +40,6 @@ def stackup_section(data, plots_path, figure_image, table):
     body += f'<p>Łączna grubość dielektryków: {total:g} mm. Miedź przedstawiono symbolicznie; grubość conducting sheet jest parametrem materiału, bez objętości geometrycznej.</p>'
     body += figure_image(fig, 'Stackup: symboliczna miedź, wymiary dielektryków w mm', plots_path/'stackup.png' if plots_path else None)
     body += '<p>Dla PEC grubość i przewodność są zapisanymi założeniami, nie są używane przez solver.</p>'
-    body += '<p>Vias/drills i soldermask oraz chropowatość: nie są modelowane. Brak plików wierceń nie oznacza kompletności fizycznej modelu. Wyniki unverified.</p>'
+    body += '<p>Vias/NPTH tylko gdy zapisane w geometrii; pozycje X w tym schemacie są symboliczne. Soldermask i chropowatość: nie są modelowane. Brak plików wierceń nie oznacza kompletności fizycznej modelu. Wyniki unverified.</p>'
     fig.clear()
     return '<section class="panel"><h2>Stackup</h2>'+body+'</section>'

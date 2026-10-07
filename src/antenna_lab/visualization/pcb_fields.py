@@ -40,7 +40,14 @@ def overlays(geometry, plane):
     half=port['width_m']/2;ym=(n[1]+p[1])/2
     port_polygon=[(n[0],ym-half),(p[0],ym-half),(p[0],ym+half),(n[0],ym+half)]
     shapes=[(Polygon(geometry['outline']['vertices_xy_m']),'#394635',0.0)]
-    shapes += [(copper_shape(c),'#725018',c['z_m']) for c in geometry['copper']]
+    from shapely.geometry import Point
+    for c in geometry['copper']:
+        shape=copper_shape(c)
+        for d in geometry.get('drills',[]):
+            if not d['plated']:
+                shape=shape.difference(Point(d['x_m'],d['y_m']).buffer(d['drill_diameter_m']/2,quad_segs=128))
+        for part in ([shape] if shape.geom_type=='Polygon' else getattr(shape,'geoms',())):
+            if not part.is_empty:shapes.append((part,'#725018',c['z_m']))
     shapes += [(Polygon(port_polygon),'#126eaa',0.0)]
     paths=[]
     if normal==2:
@@ -66,7 +73,8 @@ def overlays(geometry, plane):
                         bottom,top=d['z_min_m']*1000,d['z_max_m']*1000
                         paths.append(dict(points=[[a*1000,top],[a*1000,bottom],[b*1000,bottom],[b*1000,top]],color='#568255'))
 
-    return paths
+    from .pcb_drills import drill_paths
+    return paths + drill_paths(geometry,plane)
 
 
 def _indices(count, maximum):

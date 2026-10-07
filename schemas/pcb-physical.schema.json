@@ -261,6 +261,23 @@
               }
             }
           ]
+        },
+        "drills": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "pth_plating_um",
+            "pth_model"
+          ],
+          "properties": {
+            "pth_plating_um": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "pth_model": {
+              "const": "solid_pec_equivalent"
+            }
+          }
         }
       }
     }

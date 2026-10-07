@@ -27,6 +27,7 @@ class PcbMeshAnchorPlan:
     port_length_m: float
     port_width_m: float
     substrate_thickness_m: float
+    drill_centres_xy_m: tuple[tuple[float, float], ...] = ()
 
 
 def _merge(values, critical=()):
@@ -39,7 +40,7 @@ def _merge(values, critical=()):
     """
     retained = sorted(critical)
     if any(b - a <= ANCHOR_MERGE_TOLERANCE_M for a, b in zip(retained, retained[1:])):
-        raise ConfigurationError("port: krytyczne kotwice są zbyt blisko względem tolerancji scalania.")
+        raise ConfigurationError("PCB: krytyczne kotwice portu/wierceń są zbyt blisko względem tolerancji scalania; nie zostaną scalone ani pominięte.")
     for value in sorted(values):
         if all(abs(value - other) > ANCHOR_MERGE_TOLERANCE_M for other in retained):
             retained.append(value)
@@ -99,10 +100,11 @@ def make_pcb_mesh_anchor_plan(geometry: PcbGeometry) -> PcbMeshAnchorPlan:
             anchors.extend((low, (low + high) / 2, high))
     half = geometry.port.width_m / 2
     return PcbMeshAnchorPlan(
-        _merge(x, (n[0], mx, p[0])),
-        _merge(y, (my - half, my, my + half)),
+        _merge(x, sorted({n[0], mx, p[0], *(d.x_m for d in geometry.drills)})),
+        _merge(y, sorted({my-half, my, my+half, *(d.y_m for d in geometry.drills)})),
         z, hypot(p[0] - n[0], p[1] - n[1]), geometry.port.width_m,
         max(d.z_max_m for d in geometry.dielectrics) - min(d.z_min_m for d in geometry.dielectrics),
+        tuple((d.x_m,d.y_m) for d in geometry.drills),
     )
 
 
@@ -264,6 +266,7 @@ class PcbDomainMesh:
     min_step_m: float
     max_step_m: float
     worst_growth_ratio: float
+    drill_centres_xy_m: tuple[tuple[float, float], ...] = ()
 
 
 def _domain_count_guard(shape, maximum):
@@ -437,6 +440,7 @@ def make_pcb_domain_mesh(
         tuple(a[0] for a in ordinary), tuple(a[-1] for a in ordinary),
         tuple(a[0] for a in axes), tuple(a[-1] for a in axes), pml,
         min(min(s) for s in all_steps), max(max(s) for s in all_steps), worst,
+        plan.drill_centres_xy_m,
     )
 
     audit_pcb_port_edge_mesh(geometry, settings, mesh, port_edge_mode)
@@ -567,7 +571,7 @@ def make_gerber_mesh_anchor_plan(geometry, settings, quality):
     axes, suppressed = [], []
     for axis in range(2):
         board = [v[axis] for v in geometry.outline.vertices_xy_m]
-        critical = sorted(set((*feed[axis], min(board), max(board), bounds[0][axis], bounds[1][axis])))
+        critical = sorted(set((*feed[axis], *(p[axis] for p in base.drill_centres_xy_m), min(board), max(board), bounds[0][axis], bounds[1][axis])))
         retained = list(_merge((), critical))
         def resolution(v):
             return min(policy.max_substrate_xy_step_m, port_steps[axis]) if feed[axis][0] <= v <= feed[axis][-1] else policy.max_substrate_xy_step_m
@@ -594,5 +598,5 @@ def make_gerber_mesh_anchor_plan(geometry, settings, quality):
                 retained.append(value)
         axes.append(tuple(sorted(retained)))
     return replace(base,x_required_m=axes[0],y_required_m=axes[1]), dict(
-        name='gerber_economical_v1', quality=quality, minimum_interval_fraction=.5,
+        name='gerber_economical_v1', quality=quality, drill_centres_xy_m=base.drill_centres_xy_m, minimum_interval_fraction=.5,
         copper_midpoints=quality=='verify', suppressed_noncritical_anchors=suppressed)

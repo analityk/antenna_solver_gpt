@@ -426,10 +426,10 @@ Każda skonfigurowana rola musi mieć dokładnie jeden Gerber. Obrys nadal
 musi być pojedynczym zamkniętym konturem. Dotychczasowe ograniczenia
 geometrii Gerberów poza nową obsługą dark/clear i otworów miedzi pozostają.
 
-Drill/Excellon blokuje v2 komunikatem: `Drill/via connectivity is present
-but PCB-011B does not model it yet.` Brak tych plików **nie potwierdza**,
-że model odwzorowuje kompletne fizyczne PCB. Maska, pasta i sitodruk są
-wykrywane i pomijane; nie dodano wierceń, przelotek ani połączeń międzywarstwowych.
+Od PCB-011D v2 obsługuje okrągłe przelotowe PTH i NPTH z Excellon, zgodnie
+z sekcją poniżej. V1 nadal odrzuca wiercenia. Brak plików wierceń **nie
+potwierdza**, że model odwzorowuje kompletne fizyczne PCB. Maska, pasta
+i sitodruk są wykrywane i pomijane.
 
 Port obsługuje wyłącznie `layer: "top"` (wymagane zarówno dla auto, jak
 explicit). Auto działa na dwóch prostokątnych flashach górnej miedzi.
@@ -483,7 +483,7 @@ usuniętą miedź. Nie stosujemy `union(dark) - union(clear)`. Regiony, flash,
 kołowe linie/łuki używają istniejącego budżetu aproksymacji krzywych 0,1 µm
 i cleanup 1 pm z zachowaniem topologii. Pusty, błędny lub niepoligonowy
 wynik jest błędem, nie jest naprawiany. Ostrzeżenia parsera pozostają błędami.
-Obrys płytki nadal wymaga jednego zewnętrznego konturu; nie dodano NPTH.
+Obrys płytki nadal wymaga jednego zewnętrznego konturu; NPTH są osobnymi cylindrami Excellon w v2 (PCB-011D).
 
 `CopperPolygon.vertices_xy_m` pozostaje pierścieniem zewnętrznym.
 Opcjonalne `holes_xy_m` zawiera pierścienie wewnętrzne w SI. Jeden połączony
@@ -528,6 +528,81 @@ Rysunki z góry używają przezroczystych otworów w ścieżce złożonej, a pio
 cięcia rzeczywistych przecięć poligonów; nie zamalowują otworów ani wysp.
 Raport offline odtwarza je wyłącznie z zapisanej geometrii i wyników.
 
-Nadal brak Excellon/vias, NPTH, soldermask, komponentów i chropowatości.
+Obsługę okrągłych Excellon PTH/NPTH w v2 opisuje PCB-011D poniżej. Nadal brak soldermask, komponentów i chropowatości.
 Model oraz priorytety warstw wymagają natywnej weryfikacji na Windows;
 testy z atrapami nie potwierdzają fizycznej zbieżności. Status: unverified.
+
+
+## PCB-011D — okrągłe przelotowe PTH i NPTH
+
+W katalogu Gerberów można umieścić np. `Drill_PTH.drl` i `Drill_NPTH.drl`.
+Gerbonara 1.6.3 parsuje Excellon (w tym jednostki, narzędzia i obiekty).
+Klasyfikacja używa metadanych plating z parsera, komentarza X2 FileFunction
+oraz konwencjonalnych nazw PTH/NPTH, plated/non-plated. Konflikt, nieznana
+klasa, mieszane klasy w jednym pliku, pusty plik lub ostrzeżenie parsera
+powodują błąd z nazwą źródła. Nie zgadujemy klasy ani formatu liczbowego.
+Metadane zakresu warstw muszą wskazywać od top do bottom. Nie obsługujemy
+slotów, frezowania, blind/buried/microvias ani nieokrągłych narzędzi.
+
+Opcjonalny obiekt w fizycznej konfiguracji **schema_version: 2**:
+
+```json
+"drills": {
+  "pth_plating_um": 25,
+  "pth_model": "solid_pec_equivalent"
+}
+```
+
+Jest obowiązkowy, gdy zestaw zawiera PTH; brak domyślnej ukrytej grubości
+metalizacji. Dla samych NPTH nie jest potrzebny. Grubość musi być dodatnia
+i skończona. Konfiguracja nie zawiera nazw plików. V1 oraz v2 bez wierceń
+zachowują wcześniejszy model. 25 µm to jawne założenie, nie pomiar producenta.
+
+PTH jest jednym walcem `AddCylinder` na `AddMetal('pcb_pth_solid_PEC')`,
+od dokładnego z=0 do płaszczyzny bottom. Promień wynosi połowę średnicy
+wiercenia plus grubość metalizacji. Nie jest to pusta powłoka ani walec
+conducting sheet. Raport zapisuje dosłownie:
+
+> PTH barrel model: solid PEC equivalent cylinder; plating losses and hollow barrel geometry are not modeled.
+
+Warstwa ma kontakt, gdy fizyczny dysk walca przecina końcową miedź tej
+warstwy po składaniu dark/clear. Antipad pozostaje otwarty poza dyskiem
+przelotki. Wymagane są co najmniej dwa kontakty na różnych warstwach;
+osierocony PTH jest błędem. Nie wnioskujemy sieci z nazw warstw.
+
+NPTH to `AddCylinder` materiału `pcb_npth_air` (epsilon=1, kappa=0), przez
+całą grubość dielektryków; usuwa też przypadkowo nachodzącą miedź.
+Nie ma promienia przewodnika ani kontaktów elektrycznych. Priorytet PTH
+jest o 1 większy od najwyższego priorytetu miedzi/prześwitów PCB-011C,
+a NPTH o kolejny 1. Walce nie zmieniają siatki podczas instalacji; po nich
+następuje dokładny audyt odczytu CSXCAD. Otwory przecinające port, wzajemnie
+nachodzące lub wychodzące poza obrys są odrzucane w tej pierwszej wersji.
+
+Siatka zachowuje dokładne X/Y środków każdego otworu, również w preview.
+Kotwice są zapisane osobno jako `drill_centres_xy_m`. Nie dodajemy kotwic
+promienia, grubości metalizacji, wierzchołków okręgu ani dodatkowych Z.
+Zmiana grubości metalizacji nie zmienia osi ani liczby komórek. Wiele
+różnych środków może podnieść koszt lub przekroczyć limit; istniejący
+preflight zatrzyma zadanie przed Run, bez usuwania przelotek. Skrajnie
+bliskie, różne krytyczne kotwice dają błąd zamiast scalenia. Samo zachowanie
+środka walca nie potwierdza dokładności elektromagnetycznej jego promienia
+na grubej siatce; wyniki nadal mają status unverified.
+
+`geometry.json` zapisuje ID, środek w SI, średnicę, klasę, narzędzie,
+SHA256, a dla PTH także grubość, promień równoważny i role kontaktów.
+`import.json`/`summary.json` zapisują źródła, SHA256, klasy, średnice
+narzędzi i liczby otworów. Numery narzędzi pochodzą z mapy przypiętego
+parsera Gerbonara, nie z własnego parsera NC. Normalizacja XY obejmuje
+środki razem z całą płytką dokładnie raz.
+
+Maski pól obejmują rzeczywiste walce PTH i halo jednej lokalnej komórki;
+NPTH usuwa maskę miedzi w otworze, lecz blisko jego brzegu nadal działa
+konserwatywne halo sąsiedniej miedzi. Substrat nie jest maskowany. Przekroje
+pionowe pokazują przecięte walce; widok XY oznacza obrysy otworów bez
+zamalowywania pola. Fazy, płaszczyzny i odniesienie 1 V pozostają bez zmian.
+Raport offline dodaje tabelę Drills / vias, oznaczenia PTH/NPTH z góry
+oraz symboliczne walce w schemacie stackupu (X i grubość ścianki nie są
+rysowane w skali). Nie potrzebuje źródłowych Excellonów ani openEMS.
+
+API walca: [CSXCAD CSPrimCylinder](https://docs.openems.de/en/latest/python/CSXCAD/CSPrimitives/CSPrimCylinder.html).
+Testy korzystają z atrap natywnych; nie uruchamiają FDTD ani macierzy zbieżności.

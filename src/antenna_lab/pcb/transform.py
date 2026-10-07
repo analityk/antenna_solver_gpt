@@ -16,6 +16,10 @@ def _map_xy(geometry, point):
     def outline(value):
         return replace(value, vertices_xy_m=tuple(point(p) for p in value.vertices_xy_m))
 
+    def drill(value):
+        x,y=point((value.x_m,value.y_m))
+        return replace(value,x_m=x,y_m=y)
+
     return replace(
         geometry,
         outline=outline(geometry.outline),
@@ -26,6 +30,7 @@ def _map_xy(geometry, point):
                 for copper in geometry.copper],
         port=replace(geometry.port, negative_xy_m=point(geometry.port.negative_xy_m),
                      positive_xy_m=point(geometry.port.positive_xy_m)),
+        drills=tuple(drill(d) for d in geometry.drills),
         assumptions=list(geometry.assumptions),
     )
 

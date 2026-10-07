@@ -203,5 +203,8 @@ def validate_pcb_geometry(geometry: PcbGeometry):
         _require(_contains(point, board), f"port.{name}: koniec poza obrysem PCB.")
         members = [i for i, polygon in enumerate(polygons) if geometry.copper[i].layer_role == "top" and _contains_copper(point, geometry.copper[i])]
         _require(len(members) == 1, f"port.{name}: wymagana przynależność do dokładnie jednej wyspy miedzi.")
+    if geometry.drills:
+        from .drills import validate_drills
+        validate_drills(geometry)
     return {"geometry_status": "passed", "electromagnetic_status": "unverified",
             "copper_count": len(polygons)}

@@ -251,6 +251,8 @@ def _pcb_geometry(data, plots_path):
     for copper in geometry['copper']:
         if copper.get('layer_role', 'top') != 'top': continue
         ax.add_patch(copper_patch(copper, facecolor='#c77c36', edgecolor='#825323', alpha=.85))
+    from .pcb_drills import drill_markers
+    drill_markers(ax,geometry)
     port = geometry['port']; n,p = np.asarray(port['negative_xy_m']),np.asarray(port['positive_xy_m'])
     delta = p-n; normal = np.array([-delta[1],delta[0]])/np.linalg.norm(delta)*port['width_m']/2
     face = np.asarray([n-normal,p-normal,p+normal,n+normal])*1e3
@@ -332,7 +334,7 @@ def _pcb_metadata(data):
     body+=table(['Plik','Rola','Obsługa','SHA256'],[(f['name'],f['role'],f['disposition'],f['sha256']) for f in files])
     assumptions=imported.get('assumptions',data['geometry'].get('assumptions',[]))
     body+='<h3>Założenia i pominięta fizyka</h3><ul>'+''.join('<li>'+escape(str(a))+'</li>' for a in assumptions)+'</ul>'
-    body+='<p>Chropowatość miedzi: pominięta. Soldermask, paste i silkscreen pominięto. Otwory/vias nie są modelowane; brak wierceń nie dowodzi kompletności modelu. E/H, NF2FF i bilans mocy: not recorded.</p>'
+    body+='<p>Chropowatość miedzi: pominięta. Soldermask, paste i silkscreen pominięto. PTH/NPTH są modelowane tylko gdy zapisane w sekcji Drills / vias; brak wierceń nie dowodzi kompletności modelu. E/H, NF2FF i bilans mocy: not recorded.</p>'
     if (data['root']/'fields/metadata.json').exists():
         body = body.replace('E/H, NF2FF i bilans mocy: not recorded.', 'E/H: zapisane przekroje poniżej. NF2FF i bilans mocy: not recorded.')
     body+=''.join('<p class="status">'+escape(str(w))+'</p>' for w in data['warnings'])
@@ -357,7 +359,8 @@ def render_html(data, *, plots_path=None, phase_step=None, field_components=None
     if pcb:
         geometry = _pcb_geometry(data, plots_path)
         from .pcb_stackup import stackup_section
-        extra_sections = geometry + stackup_section(data, plots_path, figure_image, table) + _pcb_metadata(data)
+        from .pcb_drills import drill_section
+        extra_sections = geometry + stackup_section(data, plots_path, figure_image, table) + drill_section(data["geometry"],table) + _pcb_metadata(data)
         if (data["root"] / "fields" / "metadata.json").exists():
             extra_sections += field_section(data, figure_image, plots_path, phase_step, field_components)
         zeros = _pcb_diagnostics(data)

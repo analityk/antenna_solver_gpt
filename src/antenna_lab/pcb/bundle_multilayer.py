@@ -47,7 +47,9 @@ def discover_stackup_bundle(directory, expected_roles):
     for path in sorted((p for p in directory.iterdir() if p.is_file()), key=lambda p:p.name):
         role = _role(path)
         if role == 'drill':
-            raise ConfigurationError('Drill/via connectivity is present but PCB-011B does not model it yet. '+path.name)
+            from .drills import read_drill_source
+            _, info = read_drill_source(path, len(expected_roles))
+            role = info['classification']
         if role in ('top_copper','bottom_copper','inner_copper'):
             index, physical = _layer_number(path, role)
             role = {'top_copper':'top','bottom_copper':'bottom'}.get(role, f'inner{index}')
@@ -56,7 +58,7 @@ def discover_stackup_bundle(directory, expected_roles):
             raise ConfigurationError(f'{path.name}: unsupported or unrecognized Gerber role; supply conventional copper/outline filenames or X2 metadata.')
         records.append(dict(name=path.name, path=str(path), role=role,
             sha256=sha256(path.read_bytes()).hexdigest(),
-            disposition='modeled' if role in (*expected_roles,'outline') else 'omitted'))
+            disposition='modeled' if role in (*expected_roles,'outline','PTH','NPTH') else 'omitted'))
     available = ', '.join(r['name'] for r in records)
     copper_records = [r for r in records if r['role'] in ('top','bottom') or r['role'].startswith('inner')]
     extras = [r['name'] for r in copper_records if r['role'] not in expected_roles]
@@ -103,12 +105,14 @@ def load_multilayer_bundle(directory, value):
     substrate = Substrate(outline, first.z_min_m, first.z_max_m, first.epsilon_r, first.loss_tangent)
     assumptions = [a for a in ASSUMPTIONS if not a.startswith(('top copper:', 'no bottom copper', 'no vias', 'substrate parameters:'))]
     assumptions += ['stackup materials: from physical config v2, assumptions/unverified',
-        'vias/drills: not modeled; files containing drills rejected',
+        'PTH barrel model: solid PEC equivalent cylinder; plating losses and hollow barrel geometry are not modeled.',
         'absence of drill files does not establish physical completeness',
         'copper roughness: omitted', 'conducting-sheet thickness: material parameter; no geometric extrusion']
     geometry = PcbGeometry('pcb', outline, copper, substrate, port, assumptions, dielectrics, layers, tuple(composition))
+    from .drills import load_drills
+    geometry, drill_sources = load_drills(geometry, records, value.get('drills'))
     validate_pcb_geometry(geometry); audit_physical_feed(geometry)
     config = ResolvedPcbStackupConfig(2, 'pcb', selected['top'], selected['outline'], layers, dielectrics,
         port.negative_xy_m, port.positive_xy_m, port.width_m)
     return config, geometry, dict(source_directory=str(Path(directory).resolve()), discovered_files=records,
-        physical_config=value, physical_config_source='--pcb-config v2 (unverified assumptions)', feed_detection=feed)
+        drill_sources=drill_sources, physical_config=value, physical_config_source='--pcb-config v2 (unverified assumptions)', feed_detection=feed)
