@@ -540,7 +540,13 @@ Gerbonara 1.6.3 parsuje Excellon (w tym jednostki, narzędzia i obiekty).
 Klasyfikacja używa metadanych plating z parsera, komentarza X2 FileFunction
 oraz konwencjonalnych nazw PTH/NPTH, plated/non-plated. Konflikt, nieznana
 klasa, mieszane klasy w jednym pliku, pusty plik lub ostrzeżenie parsera
-powodują błąd z nazwą źródła. Nie zgadujemy klasy ani formatu liczbowego.
+powodują błąd z nazwą źródła, z jednym wyjątkiem PCB-011D1: dokładny
+komunikat `G90 header statement found after end of header` dla instrukcji
+`G90` jest akceptowany i zapisany w `drill_sources[].compatibility_warnings`
+(z nazwą źródła, instrukcją, pełnym tekstem i disposition
+`accepted_gerbonara_compatibility_warning`). Źródłowy Excellon nie jest
+przepisywany. Wszystkie inne ostrzeżenia parsera pozostają błędami.
+Nie zgadujemy klasy ani formatu liczbowego.
 Metadane zakresu warstw muszą wskazywać od top do bottom. Nie obsługujemy
 slotów, frezowania, blind/buried/microvias ani nieokrągłych narzędzi.
 

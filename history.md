@@ -1124,3 +1124,32 @@ Ograniczenia: wyniki unverified; rzeczywiste CSXCAD/openEMS na Windows
 wymaga lokalnego sprawdzenia. Nie wykonano natywnego FDTD. Nie dodano
 blind/buried/microvias, plated slots, strat/chropowatości barrel, soldermask,
 komponentów, konektorów, NF2FF ani sweepów zbieżności.
+
+## PCB-011D1 — zgodność Excellon G90 po nagłówku (2026-10-07)
+
+Przyczyna: EasyEDA umieszcza G90 po %, co Gerbonara 1.6.3 prawidłowo
+interpretuje jako tryb absolutny, lecz zgłasza SyntaxWarning. Import
+odrzucał z tego powodu Drill_PTH_Through.DRL z gerbs/emtest3.
+
+read_drill_source przechwytuje ostrzeżenia obu przejść parsera. Jedyny
+wyjątek to kategoria SyntaxWarning i pełny komunikat Gerbonara wskazujący
+bieżący plik, numer linii oraz instrukcję "G90", zakończony dokładnie:
+G90 header statement found after end of header. Każda inna instrukcja,
+wiadomość lub kategoria pozostaje błędem ConfigurationError. Nie zmieniono
+parsera NC, klasyfikacji, geometrii, połączeń ani fizyki. Źródłowe pliki
+Excellon pozostają bez zmian.
+
+Metadane źródła mają compatibility_warnings: source_filename, statement,
+warning_text i disposition=accepted_gerbonara_compatibility_warning.
+Powtórzenie tej samej diagnostyki przez open() i przejście identyfikujące
+Txx jest zapisane raz. Metadane przechodzą istniejącą ścieżką drill_sources
+do import/summary. Czysty import zapisuje pustą listę.
+
+Testy: 3 nowe OK; pełny zestaw 313 OK (3 skip), bez natywnego FDTD.
+Fixture'y G90 przed/po końcu nagłówka dają identyczne współrzędne,
+narzędzia i średnice; test zachowuje bajty źródeł. Pokryto inne rzeczywiste
+ostrzeżenia, błędny/niejednoznaczny Excellon oraz warianty komunikatu,
+instrukcji i kategorii w obu przejściach parsera. Osobno odczytano wskazany
+produkcyjny plik: T01, średnica 0.305 mm, XY 4.826 / 10.24543 mm,
+zaakceptowane G90 w linii 11, bez zmiany pliku. Nie wykonywano pełnego
+solve/importu całego emtest3 ani napraw innych elementów zestawu.

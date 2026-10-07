@@ -29,13 +29,27 @@ PTH_MODEL_NOTE = 'PTH barrel model: solid PEC equivalent cylinder; plating losse
 def read_drill_source(path, layer_count):
     path = Path(path)
     try:
-        with warnings.catch_warnings():
-            warnings.simplefilter('error', SyntaxWarning)
+        with warnings.catch_warnings(record=True) as parser_warnings:
+            warnings.simplefilter('always')
             parsed = ExcellonFile.open(path)
             parser = ExcellonParser(settings=parsed.import_settings)
             parser.do_parse(path.read_text(encoding='utf-8-sig'), filename=str(path))
     except (ValueError, SyntaxError, OSError, Warning) as exc:
         raise ConfigurationError(f'{path.name}: unsupported/invalid Excellon: {exc}') from exc
+    compatibility_warnings = []
+    # Match Gerbonara's complete diagnostic, including the actual statement.
+    # No source rewriting or NC parsing; all other parser warnings stay fatal.
+    accepted = re.compile(re.escape(str(path)) +
+        r':\d+ "G90": G90 header statement found after end of header')
+    for warning in parser_warnings:
+        text = str(warning.message)
+        if warning.category is not SyntaxWarning or accepted.fullmatch(text) is None:
+            raise ConfigurationError(f'{path.name}: unsupported/invalid Excellon parser warning: {text}')
+        record = dict(source_filename=path.name, statement='G90', warning_text=text,
+                      disposition='accepted_gerbonara_compatibility_warning')
+        # open() and the tool-ID parse can report the same source occurrence.
+        if record not in compatibility_warnings:
+            compatibility_warnings.append(record)
     if not parser.objects:
         raise ConfigurationError(f'{path.name}: empty drill source.')
     if any(not isinstance(o, Flash) or not isinstance(o.aperture, ExcellonTool) for o in parser.objects):
@@ -87,6 +101,7 @@ def read_drill_source(path, layer_count):
         holes.append((x,y,diameter,identifier))
     info=dict(path=str(path.resolve()),sha256=sha256(path.read_bytes()).hexdigest(),
         classification=role,tool_diameters_m=diameters,hole_count=len(holes),span='through',
+        compatibility_warnings=compatibility_warnings,
         classification_policy='Gerbonara plating metadata + X2 comments + conventional filename; conflicts rejected')
     return holes,info
 
