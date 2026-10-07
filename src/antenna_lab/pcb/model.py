@@ -70,10 +70,13 @@ class PcbPort:
 
 @dataclass(frozen=True)
 class PcbTransform:
-    """Metadata for translation followed by rotation in XY."""
+    """Translation then XY rotation; exact_orthogonal selects quarter-turn
+    coefficients instead of trig. False preserves legacy/generic transforms.
+    """
 
     translation_xy_m: tuple[float, float]
     rotation_rad: float
+    exact_orthogonal: bool = False
 
 
 @dataclass(frozen=True)

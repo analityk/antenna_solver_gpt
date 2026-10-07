@@ -651,3 +651,28 @@ do PcbDrill, kotwic siatki, walców CSXCAD i maski pól.
 PTH/NPTH w tym samym miejscu, różne średnice poza tolerancją oraz odrębne
 nachodzące otwory pozostają błędami. Walidacja nakładania nie jest wyłączona.
 Wyjątek G90 z PCB-011D1 pozostaje niezmieniony.
+
+### PCB-011D4 — dokładne obroty ortogonalne
+
+Dla źródłowego portu dokładnie +X/-X/+Y/-Y normalizacja po przesunięciu
+środka stosuje współczynniki -1, 0, +1, również w transformacji odwrotnej.
+Nie wykorzystuje przybliżonego cos(pi/2). Wspólne mapowanie obejmuje obrys,
+wszystkie warstwy, otwory miedzi, port i środki wierceń. Nie ma snapowania,
+zaokrąglania ani zmian tolerancji siatki/geometrii. Port ukośny nadal używa
+atan2/cos/sin. Metadane transformacji zawierają `exact_orthogonal`; znacznik
+zapobiega potraktowaniu prawdziwie ukośnego portu jako osiowego, gdy samo
+atan2 zaokrągli się do kąta ćwierćobrotu. Stare metadane bez znacznika
+zachowują dotychczasowe zachowanie trygonometryczne.
+
+`parameters/pcb_fr4_2layer_pth.json` to jawne założenia: dwie warstwy
+conducting sheet 35 µm, 58 MS/m, FR4 1,6 mm, epsilon_r=4,3, tan(delta)=0,018,
+PTH solid PEC equivalent z metalizacją 25 µm. Nie są to dane producenta.
+Przykład przygotowania bez FDTD (CMD):
+
+```bat
+.\.venv\Scripts\python.exe -m antenna_lab.pcb.gerber_control gerbs\emtest3 ^
+  --pcb-config parameters\pcb_fr4_2layer_pth.json ^
+  --quality preview --center-mhz 2000 --cutoff-mhz 625 ^
+  --sweep-start-mhz 1500 --sweep-stop-mhz 2500 --sweep-step-mhz 10 ^
+  --prepare-only
+```

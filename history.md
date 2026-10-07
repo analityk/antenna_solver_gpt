@@ -1211,3 +1211,38 @@ etapu wykryto osobną przeszkodę: obrócony środek ma Y=-1.347460503399846e-19
 a krytyczna kotwica portu leży niemal w zerze. Obecny planner odrzuca te
 różne kotwice jako zbyt bliskie. Pełna domena/XML dla emtest3 nie powstała;
 nie uruchamiano FDTD. Nie zmieniono normalizacji ani tolerancji w tym ticket.
+
+## PCB-011D4 — dokładna ortogonalna normalizacja portu (2026-10-07)
+
+Przyczyna: cos(pi/2) pozostawiał Y via około -1.35e-19 m przy obrocie
+pionowego portu emtest3, co poprawnie uruchamiało ochronę zbyt bliskich
+krytycznych kotwic siatki. Dla dokładnie osiowego źródłowego portu transform
+używa współczynników -1/0/+1, po dotychczasowym przesunięciu środka. Te same
+współczynniki obowiązują w inverse oraz dla całej geometrii: obrys, miedź,
+otwory, dielektryki, port i drille. Nie zmieniono tolerancji, _merge ani
+reguł deduplikacji; nie dodano snapowania/zaokrąglania współrzędnych.
+
+PcbTransform ma opcjonalne exact_orthogonal=False; nowa normalizacja ustawia
+True tylko dla dokładnie osiowego wejścia. To informacja potrzebna inverse:
+sam kąt może się zaokrąglić do ćwierćobrotu również dla rzeczywiście ukośnego
+portu. Ogólne źródła zachowują atan2/cos/sin w obie strony. Stare konstruktory
+i metadane bez flagi pozostają zgodne z wcześniejszym zachowaniem.
+
+Dodano brakujący w baseline plik parameters/pcb_fr4_2layer_pth.json z jawnymi
+niezweryfikowanymi założeniami FR4 1.6 mm, epsilon_r 4.3, loss tangent .018,
+dwiema warstwami conducting sheet 35 µm/58 MS/m i PTH plating 25 µm.
+Testy: 2 nowe OK (cztery osie, exact Y/midpoint, planner, inverse, wszystkie
+rodzaje obiektów, oblique 37 i 89.999999999 stopni); pełny zestaw 321 OK,
+3 skip. Nie wykonano natywnego FDTD.
+
+Rzeczywisty CLI emtest3 + nowy plik fizyczny, preview, center 2000 MHz,
+cutoff 625 MHz, sweep 1500..2500 co 10 MHz, --prepare-only: import PASS,
+deduplikacja PASS (1 PTH), siatka PASS: (56,46,31), 79856 komórek.
+Port w metrach: (-0.00035012000000000064,-0.0) ->
+(0.0003501199999999989,0.0). PTH: (-0.0022005700000000007,-0.0).
+Nie zerowano reszt zaokrąglenia translacji wzdłuż osi; Y jest dokładnie 0.
+
+XML preparation zatrzymało się na ładowaniu native_modules: No module named
+openEMS. To środowisko nie ma natywnych openEMS/CSXCAD; pełna weryfikacja
+XML pozostaje na Windowsie. Nie przedstawiamy atrap testowych jako natywnego
+PASS. Nie zmieniano ani nie naprawiano innych elementów produkcyjnego zestawu.
