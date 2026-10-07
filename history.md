@@ -1302,3 +1302,31 @@ max XY 6,820704 µm; emtest4 PASS, 4540/4566, max XY 7,019105 µm.
 Max Z=0 w obu. Kontakty PTH i liczby regionów zachowane. Bez FDTD.
 PASS dotyczy audytu geometrii, nie dokładności EM. Integracja solvera dopiero
 w kolejnych ticketach; żadnego publicznego przełącznika nie dodano.
+
+## PCB-012B — odłączona budowa domeny w całkowitych tickach
+
+Baza: 15c159d. Dodano pcb_lattice_mesh z jawnym planem wymaganych kotwic
+tickowych i istniejącą polityką fizyczną. To osobna wewnętrzna ścieżka:
+aktywny importer, wybór kotwic, make_pcb_domain_mesh, CLI i native XML
+pozostają bez zmian. Nie uruchamiano FDTD ani benchmarków.
+
+Podziały używają dzielenia całkowitego z resztą, grading — dokładnych
+porównań wymiernych i całkowitych punktów podziału. Maksima fizyczne są
+zaokrąglane w dół do ticków, wymagane powietrze w górę. PML kopiuje
+szerokość komórki powietrza bez ułamkowych współrzędnych. Brak legalnego
+kroku albo budżetu kończy się błędem. Istniejące tolerancje nie zmieniły się.
+
+Wynik przechowuje osie i granice jako tuple[int,...]; SI jest pojedynczym
+eksportem to_domain_mesh. Audyt obejmuje kotwice, minimalny tick, maksima
+lokalne, grading, PML i max_cells. Metadata zawierają kwant, min/max ticków,
+kroki w metrach i off_grid_line_count. Zmiana dotyczy wyłącznie infrastruktury;
+nowy typ nie jest automatycznie podłączony do solvera ani do raportów run.
+
+Sprawdzenia: 15 nowych testów (wszystkie cztery kwanty, 1000 małych podziałów,
+trudne przejścia gradingu, dokładne limity budżetu, PML, polityki jakości,
+eksport SI, odrzucenie floatowych kotwic i niezmienność ścieżki legacy).
+PCB: 273 testy OK. Pełny zestaw: 356 testów OK, 3 pominięte natywne.
+Syntetyczna płytka 20×20 mm: q=100 µm daje 82×83×72=490032 komórki;
+q=10/1/0,1 µm daje 76×70×65=345800. Wszystkie audyty off_grid_line_count=0.
+Grubszy kwant może wymagać większego zagęszczenia dla zachowania gradingu.
+Migracja wyboru kotwic z geometrii i publicznego workflow pozostaje PCB-012C.

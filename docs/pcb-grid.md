@@ -1,4 +1,4 @@
-# Globalna kratownica PCB — infrastruktura PCB-012A
+# Globalna kratownica PCB — infrastruktura PCB-012A/012B
 
 Ten moduł **nie jest włączony do FDTD**. Nie ma przełącznika CLI. Aktywne
 Gerbery, siatka, materiały, XML i domyślne ustawienia pozostają bez zmian.
@@ -105,3 +105,74 @@ Przykłady projekcji: 4,393995 → 4,390000 mm (emtest3),
 13,365880 → 13,370000 mm (emtest4), 10,245430 → 10,250000 mm (arytmetyka).
 Nie zmieniono źródeł ani ich SHA256. Nie wykonano migracji aktywnego solvera;
 jego komórki i koszt FDTD nie ulegają zmianie w tym tickecie.
+
+## Odłączona siatka całkowitoliczbowa — PCB-012B
+
+`antenna_lab.solvers.pcb_lattice_mesh.make_pcb_lattice_domain_mesh(plan,
+policy, grid)` to jawna, wewnętrzna ścieżka używana przez testy. Nie zastępuje
+`make_pcb_domain_mesh`, nie wprowadza przełącznika CLI i nie zmienia XML.
+
+Wejściowy `PcbLatticeAnchorPlan` zawiera **wyłącznie całkowite kotwice** osi
+X/Y/Z, granice prostokąta portu oraz opcjonalne środki wierceń. Caller odpowiada
+za kompletny wybór kotwic płyty, warstw, portu, elementów i wierceń. Mesher
+nie kwantyzuje surowych floatów i nie wybiera ani nie pomija krawędzi miedzi.
+Połączenie tego planu z audytowaną geometrią i workflow należy do PCB-012C.
+Granice i środek portu muszą już być kotwicami całkowitymi; połówkowy tick
+nie jest zaokrąglany. Identyczne ticki są usuwane przez tożsamość liczby
+całkowitej. `ANCHOR_MERGE_TOLERANCE_M` nie uczestniczy w tej operacji.
+
+`policy` jest istniejącym `PcbPhysicalMeshPolicy`, pochodzącym z ustawień
+eksperymentu/profilu. Zachowane są fizyczne maksima kroków, minimum komórek
+podłoża/szczeliny/szerokości portu, grading i budżet. Dla niejednorodnego
+stackupu można jawnie przekazać `substrate_z_max_steps_m`: jedno maksimum
+fizyczne na każdy przedział wymaganych kotwic Z, zgodne z materiałem warstwy.
+Bez tego używane jest konserwatywne maksimum dla najkrótszej fali w podłożu.
+Minimum komórek Z dotyczy całej grubości stosu, jak w istniejącej polityce.
+
+Reguły arytmetyczne:
+
+- Maksymalny krok fizyczny daje `floor(max_step / quantum)` ticków. Dla tej
+  granicy używamy wartości dziesiętnej bez osłony ULP projekcji współrzędnych:
+  limit nigdy nie jest zaokrąglany w górę. Wynik mniejszy od 1 jest błędem.
+- Przedział L ticków otrzymuje `ceil(L/M)` komórek. Dzielenie z resztą
+  rozdziela dodatkowy tick do pierwszych komórek; szerokości różnią się
+  najwyżej o 1, a suma jest dokładnie L. Każdy prawy koniec pozostaje kotwicą.
+- Grading porównuje proporcje dokładnie jako ułamki liczb całkowitych.
+  Dzieli większą komórkę, wybierając całkowitą część docelowego odcinka przy
+  mniejszym sąsiedzie. Nie usuwa kotwic. Ponownie sprawdza oba sąsiedztwa.
+  Wymusza target (1,4), a audyt niezależnie sprawdza limit (1,5).
+- Jednotickowy sąsiad przy limicie poniżej 2 może wymusić dalsze komórki
+  jednotickowe. To rzeczywiste ograniczenie dyskretnej kratownicy. Jeśli
+  grading nie mieści się w budżecie, jest jawny błąd, bez zmiany kwantu ani
+  zgody na ułamkowe ticki. Każda iteracja przechodzi dalej lub dodaje tick;
+  liczba podziałów jest ograniczona rozpiętością osi i budżetem.
+- Powietrze ma `ceil(padding/quantum)` ticków, więc nie jest krótsze niż
+  żądane. PML nie jest częścią tego odstępu. Jego N komórek kopiuje dokładnie
+  całkowitą szerokość sąsiedniej komórki zwykłego powietrza.
+
+Audyt końcowy sprawdza typ int, dodatnie szerokości, zachowanie kotwic,
+lokalne maksima, grading, liczbę/równość komórek PML i iloczyn wymiarów.
+Wstępny limit komórek jest sprawdzany przed alokacją osi, a ponownie po
+każdym gradingu, z uwzględnieniem wszystkich sześciu obszarów PML.
+
+Wynik `PcbLatticeDomainMesh` zachowuje osie i granice w tickach.
+`metadata()` zwraca odłączony słownik z `grid_quantum_um`, `min_cell_ticks`,
+`max_cell_ticks`, krokami w metrach i `off_grid_line_count=0`.
+`to_domain_mesh()` jest pojedynczą granicą eksportu do istniejącego typu
+SI. Nie należy traktować odejmowania eksportowanych floatów jako nowej
+definicji ticków; ich szerokości pozostają zapisane dokładnie w liczbach
+całkowitych. Utrata rozróżnialności linii przy skrajnie wielkim przesunięciu
+współrzędnych powoduje błąd eksportu.
+
+Przykład syntetyczny: płytka 20 × 20 mm, podłoże 1,6 mm, szczelina 2 mm,
+szerokość portu 1 mm; wspólna polityka EM i fizycznie te same kotwice:
+
+| Kwant [µm] | Kształt komórek | Liczba | Min/max szerokość [ticki] | Linie poza kratownicą |
+| ---: | --- | ---: | --- | ---: |
+| 100 | 82 × 83 × 72 | 490 032 | 4 / 48 | 0 |
+| 10 | 76 × 70 × 65 | 345 800 | 40 / 480 | 0 |
+| 1 | 76 × 70 × 65 | 345 800 | 400 / 4804 | 0 |
+| 0,1 | 76 × 70 × 65 | 345 800 | 4000 / 48043 | 0 |
+
+Grubszy kwant nie gwarantuje mniejszej liczby komórek: może utrudnić grading.
+To test mechaniki siatki, nie benchmark ani sprawdzenie zbieżności FDTD.
