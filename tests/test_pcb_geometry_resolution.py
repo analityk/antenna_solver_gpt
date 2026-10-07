@@ -152,7 +152,7 @@ class GeometryResolutionTests(unittest.TestCase):
         before=make_pcb_domain_mesh(g,s,gerber_quality='preview')
         candidate.prepare_geometry_resolution_candidate(raw,s)
         self.assertEqual(make_pcb_domain_mesh(g,s,gerber_quality='preview'),before)
-        for option in ('--grid-quantum-um','--geometry-resolution-um'):
+        for option in ('--grid-quantum-um',):
             with contextlib.redirect_stderr(io.StringIO()),self.assertRaises(SystemExit) as error:
                 main(['unused',option,'10'])
             self.assertEqual(error.exception.code,2)

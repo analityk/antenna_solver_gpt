@@ -1,6 +1,6 @@
-"""Detached geometry-resolution experiment; the existing float EM mesher is used.
+"""Geometry-resolution projection; the existing float EM mesher is independent.
 
-No CLI/default workflow calls this module. Geometry coordinates are projected
+Production and detached diagnostics share this projection. Coordinates are projected
 after one normalization; mesh coordinates are NOT restricted to the geometry
 lattice. Raw source data are provenance, never a source of downstream anchors.
 """
@@ -60,6 +60,12 @@ def materialize_quantized_geometry(value: QuantizedPcbGeometry) -> PcbGeometry:
     )
     validate_pcb_geometry(result)
     return result
+
+
+def apply_geometry_resolution(normalized_geometry: PcbGeometry, grid: PcbGrid):
+    """Project an already normalized model exactly once; never normalize here."""
+    quantized, audit = quantize_pcb_geometry(normalized_geometry, grid)
+    return materialize_quantized_geometry(quantized), quantized, audit
 
 
 def geometry_anchor_diagnostics(value: QuantizedPcbGeometry, mesh):
@@ -147,8 +153,7 @@ def prepare_geometry_resolution_candidate(source: PcbGeometry, settings, *, grid
     from antenna_lab.pcb.port import resolve_pcb_lumped_port
     from antenna_lab.solvers.pcb_components import resolve_component_boxes
     normalized,transform=normalize_port_orientation(source)
-    quantized,audit=quantize_pcb_geometry(normalized,grid)
-    modeled=materialize_quantized_geometry(quantized)
+    modeled,quantized,audit=apply_geometry_resolution(normalized,grid)
     plan,anchor_metadata=make_gerber_mesh_anchor_plan(modeled,settings,quality)
     mesh=make_pcb_domain_mesh(modeled,settings,gerber_quality=quality)
     port=resolve_pcb_lumped_port(modeled,mesh,settings,gerber_quality=quality)

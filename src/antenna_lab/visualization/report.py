@@ -312,6 +312,33 @@ def _pcb_metadata(data):
           ('Źródło założeń',imported.get('physical_config_source','legacy PCB config')),
           ('Parametry fizyczne',imported.get('physical_config',imported.get('resolved_config','not recorded')))]
     body=table(['Przebieg PCB','Wartość'],rows)
+    resolution = s.get('geometry_resolution', imported.get('geometry_resolution'))
+    if resolution:
+        from antenna_lab.pcb.grid import PcbGrid
+        from antenna_lab.pcb.geometry_resolution import format_modeled_mm
+        grid = PcbGrid(resolution['quantum_nm'])
+        port = data['geometry']['port']
+        modeled = [
+            ('Geometry resolution', f"{resolution['requested_um']:g} um"),
+            ('Geometry topology', resolution['topology_status']),
+            ('Adjusted spatial values', f"{resolution['adjusted']} / {resolution['total_spatial_values_examined']}"),
+            ('Maximum XY geometry displacement', f"{resolution['maximum_xy_displacement_m']*1e6:.3g} um"),
+            ('Maximum Z geometry displacement', f"{resolution['maximum_z_displacement_m']*1e6:.3g} um"),
+            ('Modeled CSRC gap', format_modeled_mm(port['negative_xy_m'][0],grid)+' → '+format_modeled_mm(port['positive_xy_m'][0],grid)),
+            ('Modeled CSRC width', format_modeled_mm(port['width_m'],grid)),
+        ]
+        # Native drill metadata is a dictionary, never a collection of holes.
+        drills = s.get('preparation',{}).get('geometry',{}).get('drills',{})
+        if drills:
+            modeled.append(('Modeled drills', f"PTH: {drills['pth_count']}; NPTH: {drills['npth_count']}"))
+        body += '<h3>Geometry resolution</h3>'+table(['Model','Value'],modeled)
+        body += '<p>Dokładność geometrii jest niezależna od rozdzielczości siatki FDTD.</p>'
+        examples = resolution.get('examples',[])[:5]
+        body += '<details><summary>Przykłady projekcji (źródło → model)</summary>'+table(
+            ['Feature','Source [mm]','Modeled','Delta [µm]'],
+            [(e['feature'],f"{e['source_m']*1e3:.6g}",format_modeled_mm(e['modeled_m'],grid),
+              f"{e['delta_m']*1e6:.3g}") for e in examples])+'</details>'
+
     material = {**imported.get('resolved_config', {}),
                 **s.get('preparation', {}).get('geometry', {}), **s}
     model = material.get('copper_model', 'pec')
@@ -363,7 +390,7 @@ def render_html(data, *, plots_path=None, phase_step=None, field_components=None
         from .pcb_stackup import stackup_section
         from .pcb_drills import drill_section
         from .pcb_components import component_section
-        extra_sections = geometry + stackup_section(data, plots_path, figure_image, table) + drill_section(data["geometry"],table) + component_section(data,table) + _pcb_metadata(data)
+        extra_sections = geometry + stackup_section(data, plots_path, figure_image, table) + drill_section(data["geometry"],table, data["summary"].get("geometry_resolution")) + component_section(data,table) + _pcb_metadata(data)
         if (data["root"] / "fields" / "metadata.json").exists():
             extra_sections += field_section(data, figure_image, plots_path, phase_step, field_components)
         zeros = _pcb_diagnostics(data)

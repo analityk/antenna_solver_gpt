@@ -16,18 +16,23 @@ def drill_markers(ax, geometry):
             ax.plot(d['x_m']*1e3,d['y_m']*1e3,'+',color='#47266e',markersize=4,zorder=7)
 
 
-def drill_section(geometry,table):
+def drill_section(geometry,table,resolution=None):
     drills=geometry.get('drills',[])
     if not drills:return ''
+    from antenna_lab.pcb.grid import PcbGrid
+    from antenna_lab.pcb.geometry_resolution import format_modeled_mm
+    def mm(value):
+        return format_modeled_mm(value,PcbGrid(resolution['quantum_nm'])) if resolution else f"{value*1e3:g} mm"
     rows=[]
     for d in drills:
         rows.append((d['id'],d['source_file_role'],d['source_tool'],
-            f"{d['drill_diameter_m']*1e3:g}",
+            mm(d['drill_diameter_m']),
+            mm(d['equivalent_outer_radius_m']) if d['plated'] else '—',
             f"{d['plating_thickness_m']*1e6:g}" if d['plated'] else '—',
             ', '.join(d['connected_layer_roles']) or 'none'))
     counts=f"PTH: {sum(d['plated'] for d in drills)}; NPTH: {sum(not d['plated'] for d in drills)}"
     return '<section class="panel"><h2>Drills / vias</h2><p>'+counts+'</p>'+table(
-        ['ID','Role','Tool','Diameter [mm]','Plating assumption [µm]','Connected layers'],rows)+\
+        ['ID','Role','Tool','Modeled diameter','Modeled outer radius','Plating assumption [µm]','Connected layers'],rows)+\
         '<p>'+escape(NOTE)+'</p><p>NPTH: air cylinder, no electrical connection. Plating is an unverified physical assumption.</p></section>'
 
 

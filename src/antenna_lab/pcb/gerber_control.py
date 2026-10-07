@@ -22,14 +22,23 @@ from .gerber_quality import gerber_quality_settings, gerber_cost_preflight, requ
 from .gerber_sweep import sweep_frequencies_hz, sampled_diagnostics, print_sweep_summary
 from .port import resolve_pcb_lumped_port
 from .transform import normalize_port_orientation
+from .grid import PcbGrid
+from .geometry_resolution import apply_geometry_resolution, format_modeled_mm
+from .quantization import QuantizationError
 
+
+GEOMETRY_POLICY = "Geometry resolution applies before EM meshing; FDTD mesh remains independent."
 
 def _write_json(path, value):
     path.write_text(json.dumps(value, indent=2, allow_nan=False)+'\n', encoding='utf-8')
 
 
-def run_gerber_control(config_path, output_dir, *, prepare_only=False, quality='design', sweep_request=None, pcb_config=None, field_frequency_hz=(), **frequency_settings):
-    """Import, normalize once, preflight, then XML or one solve for all frequencies."""
+def run_gerber_control(config_path, output_dir, *, prepare_only=False, quality='design', sweep_request=None, pcb_config=None, field_frequency_hz=(), geometry_resolution_um=10, **frequency_settings):
+    """Import, normalize once, project geometry, preflight, then XML or one solve."""
+    # Public API uses the same explicit choices as the CLI; no implicit string/bool coercion.
+    if isinstance(geometry_resolution_um, bool) or not isinstance(geometry_resolution_um, (int, float)) or geometry_resolution_um not in (100, 10, 1, .1):
+        raise ConfigurationError("Geometry resolution must be one of 100, 10, 1, 0.1 um.")
+    grid = PcbGrid({100:100000, 10:10000, 1:1000, .1:100}[geometry_resolution_um])
     bundle_metadata = {}
     if Path(config_path).is_dir():
         from .bundle import load_bundle_geometry
@@ -41,7 +50,9 @@ def run_gerber_control(config_path, output_dir, *, prepare_only=False, quality='
         source = load_pcb_geometry(config)
         from .bundle import audit_physical_feed
         audit_physical_feed(source)
-    geometry, transform = normalize_port_orientation(source)
+    normalized_source, transform = normalize_port_orientation(source)
+    geometry = normalized_source  # provenance only until projection below
+    modeled = False
     settings, exact = gerber_quality_settings(quality, **frequency_settings)
     from antenna_lab.solvers.pcb_fields import validate_field_frequencies, pcb_field_layout
     field_frequency_hz = validate_field_frequencies(field_frequency_hz, settings)
@@ -93,6 +104,41 @@ def run_gerber_control(config_path, output_dir, *, prepare_only=False, quality='
     output.mkdir(parents=True, exist_ok=True)
     diagnostics = dict(material_metadata, sweep=sweep, quality_profile=quality, actual_iterations=None, termination_status='not_started')
     try:
+        try:
+            geometry, _, audit = apply_geometry_resolution(normalized_source, grid)
+        except QuantizationError as exc:
+            resolution = dict(exc.audit, requested_um=geometry_resolution_um,
+                              quantum_nm=grid.quantum_nm, policy=GEOMETRY_POLICY)
+            diagnostics['geometry_resolution'] = metadata['geometry_resolution'] = resolution
+            port = normalized_source.port
+            source_width = port.width_m
+            modeled_width = grid.to_metres(grid.nearest_tick(source_width))
+            finer = {100: "10 um or finer", 10: "1 um or finer", 1: "0.1 um"}.get(geometry_resolution_um)
+            advice = (f"Choose a finer geometry resolution: {finer}." if finer else
+                      "No finer supported geometry resolution; revise the affected source feature.")
+            raise ConfigurationError(
+                f"Geometry resolution {geometry_resolution_um:g} um is too coarse for this PCB: {exc}. "
+                f"Source port width {source_width*1e3:g} mm -> modeled {modeled_width*1e3:g} mm. "
+                + advice
+            ) from exc
+        modeled = True
+        if geometry.copper_layers:
+            diagnostics['resolved_stackup'] = resolved_stackup_metadata(geometry, settings.loss_reference_frequency_hz)
+        resolution = dict(audit, requested_um=geometry_resolution_um,
+                          quantum_nm=grid.quantum_nm, policy=GEOMETRY_POLICY)
+        diagnostics['geometry_resolution'] = metadata['geometry_resolution'] = resolution
+        # These records describe the actual solver model. Original values remain in source files.
+        metadata.update(drills=[asdict(d) for d in geometry.drills],
+                        components=[asdict(c) for c in geometry.components],
+                        source_port=asdict(geometry.source_port) if geometry.source_port else None)
+        print(f"Geometry resolution: {geometry_resolution_um:g} um\n"
+              f"Geometry quantization: {audit['adjusted']} / {audit['total_spatial_values_examined']} spatial values adjusted\n"
+              f"Maximum XY geometry change: {audit['maximum_xy_displacement_m']*1e6:.3g} um\n"
+              f"Maximum Z geometry change: {audit['maximum_z_displacement_m']*1e6:.3g} um\n"
+              f"Geometry topology: {audit['topology_status']}", flush=True)
+        p = geometry.port
+        print(f"CSRC gap: {format_modeled_mm(p.negative_xy_m[0],grid)} -> {format_modeled_mm(p.positive_xy_m[0],grid)}\n"
+              f"CSRC width: {format_modeled_mm(p.width_m,grid)}", flush=True)
         _, anchor_metadata = make_gerber_mesh_anchor_plan(geometry, settings, quality)
         diagnostics['suppressed_noncritical_anchors'] = anchor_metadata.pop('suppressed_noncritical_anchors')
         diagnostics['mesh_anchor_policy'] = anchor_metadata
@@ -120,12 +166,14 @@ def run_gerber_control(config_path, output_dir, *, prepare_only=False, quality='
             output.mkdir(parents=True, exist_ok=True)
             native = output/'native'
             native.mkdir()
-            _, _, _, _, _, preparation = prepare_pcb_xml_model(geometry, settings, native/'model.xml', gerber_quality=quality, copper_config=config, **field_options)
+            _, _, _, native_mesh, _, preparation = prepare_pcb_xml_model(geometry, settings, native/'model.xml', gerber_quality=quality, copper_config=config, **field_options)
+            if native_mesh != mesh:
+                raise ConfigurationError("Native PCB mesh differs from geometry-resolution preflight mesh.")
             result = dict(status='prepared', validation_status='unverified', preparation=preparation,
                 simulation_settings=asdict(settings), mesh={'shape_cells': mesh.shape_cells, 'cell_count': mesh.cell_count})
         else:
             result = run_control_model(geometry, settings, output, gerber_quality=quality,
-                                       exact_endcriteria=exact, dump_statistics=True, copper_config=config, **field_options)
+                                       exact_endcriteria=exact, dump_statistics=True, copper_config=config, expected_domain_mesh=mesh, **field_options)
             diagnostics['actual_iterations'] = result['native_statistics']['number_of_iterations']
             if not 0 < diagnostics['actual_iterations'] < settings.max_timesteps:
                 raise ConfigurationError('Gerber native termination not established: timestep limit reached.')
@@ -162,7 +210,9 @@ def run_gerber_control(config_path, output_dir, *, prepare_only=False, quality='
     finally:
         if output.is_dir():
             _write_json(output/'geometry.source.json', source.as_dict())
-            _write_json(output/'geometry.json', geometry.as_dict())
+            _write_json(output/'geometry.normalized_source.json', normalized_source.as_dict())
+            if modeled:
+                _write_json(output/'geometry.json', geometry.as_dict())
             _write_json(output/'import.json', metadata)
     if not prepare_only:
         # Match antenna best-effort reporting: presentation never invalidates FDTD.
@@ -186,6 +236,8 @@ def main(argv=None):
     parser.add_argument('config', type=Path, help='Gerber directory (or legacy PCB JSON)')
     parser.add_argument('--pcb-config', type=Path, help='Physical assumptions only; default FR4 1.6 mm, auto port')
     parser.add_argument('--output', type=Path)
+    parser.add_argument('--geometry-resolution-um', type=float, choices=(100,10,1,.1), default=10,
+                        help='CAD geometry resolution in um (default 10); independent of FDTD mesh resolution')
     parser.add_argument('--quality', choices=('preview','design','verify'), default='design')
     parser.add_argument('--fields-mhz', type=float, nargs='+', help='1–3 passive E/H frequencies; same single Run')
     parser.add_argument('--prepare-only', action='store_true', help='Write native XML without running FDTD')
@@ -221,7 +273,7 @@ def main(argv=None):
             root = Path('outcomes/pcb_gerber')
             root.mkdir(parents=True, exist_ok=True)
             output = Path(mkdtemp(prefix=datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ_'), dir=root))
-        result = run_gerber_control(args.config, output, prepare_only=args.prepare_only, quality=args.quality, **sweep_options, pcb_config=args.pcb_config, **field_options, **band)
+        result = run_gerber_control(args.config, output, prepare_only=args.prepare_only, quality=args.quality, geometry_resolution_um=args.geometry_resolution_um, **sweep_options, pcb_config=args.pcb_config, **field_options, **band)
         print(f"Status: {result['status']}; validation_status: unverified\n{output.resolve()/'summary.json'}")
         if not args.prepare_only:
             print(output.resolve()/'impedance.csv')

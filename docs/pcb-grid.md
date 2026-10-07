@@ -1,8 +1,15 @@
-# Rozdzielczość geometrii PCB — infrastruktura PCB-012A/012B
+# Rozdzielczość geometrii PCB — PCB-012A/012B/012C
 
-Ten moduł **nie jest włączony do FDTD**. Nie ma przełącznika CLI. Aktywne
-Gerbery, siatka, materiały, XML i domyślne ustawienia pozostają bez zmian.
-Nie należy przekazywać nowego typu do obecnego adaptera openEMS.
+Od PCB-012C produkcyjny `pcb.gerber_control` używa domyślnie **10 µm**
+rozdzielczości geometrii. Wybór `--geometry-resolution-um {100,10,1,0.1}`
+jest niezależny od preview/design/verify. Typ tickowy po audycie materializuje
+się do zwykłego PcbGeometry; adapter nie dostaje nowego typu geometrii.
+
+Przed PCB-012C produkcja korzystała ze znormalizowanej surowej geometrii.
+Zmiana domyślna może zmienić koszt siatki. Nie jest deklaracją zbieżności.
+**10 µm geometrii nie tworzy siatki 10 µm**: stare reguły EM nadal wyznaczają
+kroki float; legalne są kroki mniejsze od rozdzielczości geometrii i linie
+niepokrywające się z kratownicą geometrii.
 
 ## Arytmetyka i reprezentacja
 
@@ -84,7 +91,7 @@ oraz zmiany wymiarów. Maksimum Z uwzględnia również skumulowane przesunięci
 interfejsów. Przykładów jest najwyżej 20; wynik jest deterministyczny.
 
 PASS oznacza zachowanie sprawdzanej topologii, **nie** dokładność obliczeń
-EM ani gotowość nowej reprezentacji do aktualnego solvera.
+EM; gotowość eksportu sprawdza osobno istniejący adapter.
 
 Audyt porównuje również relacje połączenia wszystkich sprawdzanych terminali
 przez miedź i PTH. Dzięki temu sama zgodność liczby obszarów nie może ukryć
@@ -142,8 +149,9 @@ Kolejność: istniejący import → jedna istniejąca normalizacja → PCB-012A
 `quantize_pcb_geometry` i audyt → `materialize_quantized_geometry` → zwykłe
 `PcbGeometry` w metrach → niezmienione `make_gerber_mesh_anchor_plan` oraz
 `make_pcb_domain_mesh`. Następuje pełny dotychczasowy audyt portu i boxów
-elementów. Nie ma XML, natywnych obiektów, Run ani publicznej opcji CLI.
-Produkcyjny workflow pozostaje niezmieniony; przykład niczego nie zapisuje.
+elementów. Sam helper diagnostyczny nie tworzy XML, natywnych obiektów ani Run.
+Produkcja korzysta ze wspólnego `apply_geometry_resolution(normalized, grid)`;
+powyższy przykład pozostaje odłączony i niczego nie zapisuje.
 
 Materializacja konwertuje ticki na metry raz. R/L/C, epsilon, straty,
 przewodność, materiałowa grubość conducting sheet, identyfikatory i hashe

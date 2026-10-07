@@ -261,7 +261,8 @@ class MultilayerTests(unittest.TestCase):
         from unittest.mock import patch
         with patch('antenna_lab.solvers.openems.native_modules') as native, contextlib.redirect_stdout(io.StringIO()) as console:
             with self.assertRaises(ConfigurationError):
-                run_gerber_control(directory,self.root/'too_costly',pcb_config=path,quality='preview',**BAND)
+                run_gerber_control(directory,self.root/'too_costly',pcb_config=path,quality='preview',
+                    geometry_resolution_um=.1,**BAND)  # Preserve the 1 um layer to exercise cost, not collapse rejection.
             native.assert_not_called()
         self.assertIn('Estimated excitation:',console.getvalue())
         failed=json.loads((self.root/'too_costly/summary.json').read_text())

@@ -1373,3 +1373,43 @@ Sprawdzenia: 9 nowych testów jednostkowych i 1 integracyjny na emtest3/emtest4;
 rozdzielczości geometrii linii FDTD oraz kroku EM mniejszego od tej skali.
 PASS dotyczy eksperymentu geometrii i kontaktów; brak publicznej aktywacji
 i brak nowego sprawdzenia fizycznej zbieżności.
+
+## 2026-10-07 — PCB-012C: produkcyjna rozdzielczość geometrii
+
+**Powód:** odłączony wariant PCB-012B został sprawdzony przez użytkownika
+natywnie na Windows: emtest4 10 µm dał identyczne 195615 komórek w preflight
+oraz XML. Ten etap włącza projekcję do zwykłego workflow, bez zmiany meshera.
+
+**Zmiana:** `--geometry-resolution-um {100,10,1,0.1}`, domyślnie 10,
+również dla legacy JSON i API Python. Wspólne `apply_geometry_resolution`
+przyjmuje już znormalizowaną geometrię; normalizacja i materializacja odbywają
+się raz. Wszystkie kotwice, mesh, port, elementy, pola i native otrzymują
+modelowaną geometrię. Kontrola dokładnej równości preflight/native blokuje
+Run przy rozbieżności. Audyt odrzuca niepoprawną topologię przed mesherem.
+Nie zmieniono fizyki, profili, siatki float, częstotliwości ani wartości RLC.
+
+**Zapis i raport:** osobno geometry.source.json, geometry.normalized_source.json
+oraz geometry.json; import/summary zawierają blok geometry_resolution.
+Nieudana projekcja zapisuje źródła i audyt, bez udawania poprawnego geometry.json.
+Raport offline wyświetla modelowane CSRC/wiercenia, liczniki zmian i krótkie
+przykłady. Liczba wierceń pochodzi z pth_count/npth_count, nie liczby kluczy.
+Brak współdzielonego cache przebiegów, więc nie dodano mechanizmu cache.
+
+**Akceptacja bez natywnego FDTD:** produkcyjne prepare-only z atrapami native
+odtwarza emtest4 (69,81,35)=195615, 30446 kroków impulsu, 5955694290 aktualizacji;
+raw miał 288120 komórek. Jedno CSRC, C1=100 pF, L1=18 nH, R1=49,9 Ω i jeden
+PTH top–bottom zachowane. emtest3: raw 99750 → (60,49,35)=102900 (+3,16%).
+emtest4 100 µm poprawnie odrzucony przed mesherem: port 0,9 mm nie mieści się
+na miedzi kontaktowej 0,8 mm. Nie wykonuje się automatycznego retry.
+
+**Testy:** testy produkcyjnej tożsamości geometrii, CLI/API, provenance,
+rozbieżności native/preflight, jednego Run/CalcPort z polami, offline report
+oraz rzeczywistych emtest3/emtest4. Oczekiwania testu pól dostosowano do
+modelowanej geometrii. Test kosztu dielektryka 1 µm jawnie używa 0,1 µm,
+aby nadal badać koszt, a nie wcześniejsze odrzucenie zanikającej warstwy.
+Pełny zestaw: 357 testów, OK, 3 pominięte (natywne openEMS/CSXCAD,
+Windows UCRT i GUI Tk). Testy kierunkowe PCB/pól/stackupu: 24, OK.
+
+**Ograniczenia:** kontener nie ma openEMS/CSXCAD; testy produkcyjne używają
+atrap native. Nowy publiczny prepare-only pozostaje do potwierdzenia na
+Windows. To akceptacja architektury, nie badanie zbieżności ani walidacja EM.

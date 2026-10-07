@@ -20,6 +20,69 @@ z różnych warstw nigdy nie jest sumowana. GKO opisuje środek linii
 obrysu, nie krawędź pisaka. Importer przelicza współrzędne na SI; potem
 istniejąca transformacja normalizuje port dokładnie raz.
 
+
+## Rozdzielczość geometrii (PCB-012C)
+
+`--geometry-resolution-um {100,10,1,0.1}` domyślnie wynosi **10 µm**,
+także przy wejściu legacy JSON. Python: `run_gerber_control(...,
+geometry_resolution_um=10)`. Wartość określa dokładność modelu CAD,
+a nie rozdzielczość komórki FDTD. Profil preview/design/verify pozostaje
+niezależny. 10 µm geometrii **nie tworzy siatki 10 µm**.
+
+Przed PCB-012C produkcja używała znormalizowanej surowej geometrii.
+Teraz normalizacja zachodzi raz, potem projekcja i audyt topologii, po czym
+ta sama modelowana geometria trafia do istniejącego meshera, portu,
+elementów, pól i XML/FDTD. Nie zmieniono meshera ani polityki EM.
+
+```bat
+set "PY=.\.venv\Scripts\python.exe"
+set "CSXCAD_INSTALL_PATH=C:\dev\openems\openEMS"
+set "GERBERS=gerbs\emtest4"
+set "PCB_CONFIG=parameters\pcb_fr4_2layer_pth.json"
+
+%PY% -m antenna_lab.pcb.gerber_control "%GERBERS%" ^
+  --pcb-config "%PCB_CONFIG%" ^
+  --geometry-resolution-um 10 ^
+  --quality preview ^
+  --center-mhz 2000 ^
+  --cutoff-mhz 1000 ^
+  --sweep-start-mhz 1500 ^
+  --sweep-stop-mhz 2500 ^
+  --sweep-step-mhz 10 ^
+  --prepare-only
+```
+
+Usuń `--prepare-only`, aby wykonać jeden normalny solve.
+`--geometry-resolution-um 1` wybiera większą wierność CAD, nie dokładniejszy
+profil EM. Wariant 100 µm jest bardzo zgrubny: audyt może go odrzucić.
+emtest4 przy 100 µm traci pełny kontakt CSRC (szerokość portu 0,9 mm,
+miedzi 0,8 mm); program zatrzymuje się przed siatką/native i nie ponawia
+automatycznie przy 10 µm. Dobierz dokładniejszy wariant jawnie.
+
+Pliki pochodzenia są rozdzielone:
+
+- `geometry.source.json`: import przed normalizacją;
+- `geometry.normalized_source.json`: normalizacja przed projekcją;
+- `geometry.json`: rzeczywisty model przekazany do solvera;
+- `import.json` i `summary.json`: blok `geometry_resolution`, audyt,
+  przesunięcia i ograniczona liczba przykładów.
+
+Przy odrzuconej projekcji nie powstaje `geometry.json` udający poprawny model;
+źródła i audyt błędu pozostają zapisane. Hashe dotyczą niezmienionych plików
+CAD. Raport offline pokazuje rozdzielczość, status topologii i modelowane
+wymiary CSRC/wierceń. R/L/C i parametry materiałów nie podlegają projekcji.
+
+Preflight i przygotowanie natywne muszą zwrócić identyczną siatkę;
+rozbieżność blokuje Run. Przebiegi mają oddzielne katalogi, brak współdzielonego
+cache geometrii/siatki/wyników; nie jest potrzebna nowa warstwa cache.
+
+Akceptacja bez FDTD przy powyższych częstotliwościach:
+emtest4 raw 288120 → **195615 (69×81×35)**, impuls 30446 kroków,
+5955694290 aktualizacji komórek; emtest3 raw 99750 → **102900 (60×49×35)**.
+Z, kontakty PTH, źródło i RLC zachowane. To test kontraktu, nie zbieżności.
+
+Source CAD precision is not simulation accuracy.
+
 ## Uruchomienie w CMD
 
 ```bat

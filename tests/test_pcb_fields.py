@@ -153,7 +153,12 @@ class PcbFieldTests(unittest.TestCase):
         self.assertEqual(len(engine.port.calls),1)
         self.assertEqual(tuple(engine.port.calls[0][1]),(1.3e9,1.411e9,1.42e9,1.5e9,1.501e9))
         self.assertEqual(result['frequency_hz'],[1.3e9,1.42e9,1.5e9])
-        for a in 'xyz':self.assertEqual(csx.grid.lines[a],getattr(self.mesh,a+'_lines_m'))
+        # Production now projects CAD geometry to 10 um; fields still leave its EM mesh unchanged.
+        from antenna_lab.pcb.geometry_resolution import apply_geometry_resolution
+        from antenna_lab.pcb.grid import PcbGrid
+        modeled,_,_=apply_geometry_resolution(self.g,PcbGrid())
+        expected=make_pcb_domain_mesh(modeled,self.s,gerber_quality='preview')
+        for a in 'xyz':self.assertEqual(csx.grid.lines[a],getattr(expected,a+'_lines_m'))
         self.assertEqual(len(csx.dumps),6)
         self.assertEqual([d['dump_type'] for d in csx.dumps],[10,11]*3)
         for d in csx.dumps:

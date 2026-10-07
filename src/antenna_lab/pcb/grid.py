@@ -1,4 +1,4 @@
-"""Integer PCB lattice; detached infrastructure, NOT an active solver policy.
+"""Integer PCB geometry lattice; independent of the float FDTD mesh.
 
 Input numbers are metres. Decimal/string input is exact. For float inputs,
 only a two-ULP neighbourhood of integer/half ticks is canonicalized at the

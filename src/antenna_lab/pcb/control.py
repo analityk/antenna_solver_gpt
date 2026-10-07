@@ -76,7 +76,7 @@ def run_synthetic_control(output_dir, *,
 
 
 def run_control_model(geometry: PcbGeometry, settings: PcbSimulationSettings, output_dir, *,
-                      port_edge_mode='aligned', exact_endcriteria=False, dump_statistics=False, gerber_quality=None, field_frequency_hz=(), copper_config=None) -> dict:
+                      port_edge_mode='aligned', exact_endcriteria=False, dump_statistics=False, gerber_quality=None, field_frequency_hz=(), copper_config=None, expected_domain_mesh=None) -> dict:
     """Run a supplied control geometry/settings pair in an isolated directory."""
     validate_pcb_simulation_settings(settings)
     output = Path(output_dir).resolve()
@@ -93,6 +93,8 @@ def run_control_model(geometry: PcbGeometry, settings: PcbSimulationSettings, ou
     if field_frequency_hz:
         mode_options['field_frequency_hz'] = field_frequency_hz
     engine, csx, port, mesh, spec, metadata = prepare_pcb_xml_model(geometry, settings, native/'model.xml', **mode_options)
+    if expected_domain_mesh is not None and mesh != expected_domain_mesh:
+        raise ConfigurationError("Native PCB mesh differs from geometry-resolution preflight mesh; FDTD was not started.")
     run_options = {}
     if exact_endcriteria: run_options['exact_endcriteria'] = True
     if dump_statistics: run_options['dump_statistics'] = True
