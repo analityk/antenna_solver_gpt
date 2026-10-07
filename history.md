@@ -1275,3 +1275,30 @@ limitu 50 000. Jawny cutoff 1000 MHz daje 288 120 komórek i minimum
 Prepare-only dochodzi do braku natywnych bibliotek w środowisku agenta;
 XML/kontakt natywny pozostają do wykonania na Windowsie. Nie uruchamiano
 natywnego FDTD. Wszystkie wyniki pozostają unverified.
+
+## PCB-012A — globalna całkowitoliczbowa kratownica i odłączony audyt
+
+Baza: aff797a. Wprowadzono PcbGrid dla 100/10/1/0,1 µm, dokładne
+zaokrąglenia dziesiętne (połowy od zera), floor/ceil oraz zamrożone rekordy
+geometrii tickowej. Oddzielne quantize_pcb_geometry nie ma połączenia
+z aktywnym importerem/CLI/siatką/adapterem. Nie zmieniono XML ani parametrów
+FDTD, tolerancji geometrii czy łączenia kotwic. RLC, epsilon, straty,
+przewodność i materiałowa grubość conducting sheet nie są kwantyzowane.
+
+Warstwy akumulują wspólne interfejsy w tickach. Promienie kół są całkowite,
+średnice modelowane wynoszą 2*promień; oryginalne średnice i galwanizacja
+pozostają provenance. Zapis source_json zachowuje pełny odłączony obraz
+wejścia wraz z SHA256. Metadata audytu liczą zmiany i maksymalne przesunięcia,
+przykładów jest najwyżej 20. Zanik lub zmiana topologii zwraca błąd z audytem,
+a nie naprawiony model. Nie stosuje się make_valid ani naprawy buforem.
+Sprawdzana jest własność i sieć połączeń terminali, regiony/otwory, PTH/NPTH.
+
+Sprawdzenia: nowe testy arytmetyki dla wszystkich kwantów, pierścieni, zaników,
+wspólnych interfejsów, otworów, błędnych kontaktów i zwarć, zachowania
+provenance oraz niezmienności aktywnej siatki; pełny zestaw unittest:
+341 testów, OK, 3 pominięte (zależności natywne).
+Odłączony audyt 10 µm: emtest3 PASS, 550/577 zmienionych wartości,
+max XY 6,820704 µm; emtest4 PASS, 4540/4566, max XY 7,019105 µm.
+Max Z=0 w obu. Kontakty PTH i liczby regionów zachowane. Bez FDTD.
+PASS dotyczy audytu geometrii, nie dokładności EM. Integracja solvera dopiero
+w kolejnych ticketach; żadnego publicznego przełącznika nie dodano.
