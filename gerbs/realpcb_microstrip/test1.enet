@@ -1,0 +1,81 @@
+{
+    "gge1": {
+        "props": {
+            "LCSC Part Name": "100nF ±10% 50V",
+            "Manufacturer": "YAGEO(国巨)",
+            "Manufacturer Part": "CC0603KRX7R9BB104",
+            "JLCPCB Part Class": "Basic Part",
+            "Datasheet": "https://item.szlcsc.com/datasheet/CC0603KRX7R9BB104/15331.html",
+            "Supplier": "LCSC",
+            "Add into BOM": "yes",
+            "Convert to PCB": "yes",
+            "Symbol": "9da24e4ad22940429fd085b4dc8e02c8",
+            "3D Model": "624118aa3cc7497086c383c2d72e0852",
+            "3D Model Title": "C0603_L1.6-W0.8-H0.8",
+            "3D Model Transform": "62.992,31.496,0,0,0,0,0,0,0",
+            "Tolerance": "±10%",
+            "Voltage Rating": "50V",
+            "Temperature Coefficient": "X7R",
+            "Description": "Capacitance:100nF Tolerance:±10% Tolerance:±10% Voltage Rating:50V Temperature Coefficient:X7R",
+            "Supplier Part": "",
+            "Value": "0",
+            "Name": "={Value}",
+            "Designator": "CSRC",
+            "Supplier Footprint": "0603",
+            "Footprint": "e8bf627583724bdebefbaa0be79b0d2f",
+            "Device": "9031e3536a2e4419aaeb7e74753ecfcc",
+            "Reuse Block": "",
+            "Group ID": "",
+            "Channel ID": "$1e65",
+            "Unique ID": "gge1",
+            "FootprintName": "R0603",
+            "DeviceName": "CC0603KRX7R9BB104",
+            "SymbolName": "CC0603KRX7R9BB104"
+        },
+        "pins": {
+            "1": "A",
+            "2": "B"
+        }
+    },
+    "gge4": {
+        "props": {
+            "LCSC Part Name": "49.9Ω ±1% 100mW 厚膜电阻",
+            "Supplier Part": "C23185",
+            "Manufacturer": "UNI-ROYAL(厚声)",
+            "Manufacturer Part": "0603WAF499JT5E",
+            "Supplier Footprint": "0603",
+            "JLCPCB Part Class": "Basic Part",
+            "Datasheet": "https://item.szlcsc.com/datasheet/0603WAF499JT5E/23912.html",
+            "Supplier": "LCSC",
+            "Add into BOM": "yes",
+            "Convert to PCB": "yes",
+            "Footprint": "e8bf627583724bdebefbaa0be79b0d2f",
+            "3D Model": "112863783b5b41f1b5254f87eedc7932",
+            "3D Model Title": "R0603",
+            "3D Model Transform": "31.8897,63.7794,0,90,0,0,0,0,0",
+            "Type": "Thick Film Resistor",
+            "Value": "49.9Ω",
+            "Tolerance": "±1%",
+            "Power(Watts)": "100mW",
+            "Voltage-Supply(Max)": "75V",
+            "Temperature Coefficient": "±100ppm/℃",
+            "Operating Temperature": "-55℃~+155℃",
+            "Description": "Type:Thick Film Resistor Resistance:49.9Ω Tolerance:±1% Tolerance:±1% Power(Watts):100mW Voltage-Supply(Max):75V Temperature Coefficient:±100ppm/℃ Temperature Coefficient:±100ppm/℃ Operating Temperature:-55℃~+155℃ Operating Temperature:-55℃~+155℃",
+            "Symbol": "0badcf194da24767a3791ac98f491145",
+            "Designator": "R1",
+            "Name": "={Value}",
+            "Device": "83148e11552e4111bae3e41f41ccc705",
+            "Reuse Block": "",
+            "Group ID": "",
+            "Channel ID": "$1e460",
+            "Unique ID": "gge4",
+            "FootprintName": "R0603",
+            "DeviceName": "0603WAF499JT5E_C23185",
+            "SymbolName": "0603WAF499JT5E"
+        },
+        "pins": {
+            "1": "A",
+            "2": "B"
+        }
+    }
+}
