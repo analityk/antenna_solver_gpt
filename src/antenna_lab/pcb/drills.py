@@ -113,19 +113,41 @@ def connected_layers(geometry, x, y, radius):
 
 
 def load_drills(geometry, records, settings):
-    drills=[];sources=[]
+    from .validation import TOLERANCE_M
+    drills=[];sources=[];parsed=[];owners=[]
+    # Parse every source, including auxiliary exports, before deduplicating.
+    # Lexical order puts Through.DRL before Through_Via.DRL, independent of
+    # discovery/input order. Coordinates are retained from the owner, not averaged.
+    records=sorted((r for r in records if r['role'] in ('PTH','NPTH')),
+        key=lambda r:(Path(r['path']).name.casefold(),Path(r['path']).name,str(r['path'])))
     for record in records:
-        if record['role'] not in ('PTH','NPTH'): continue
-        holes, info=read_drill_source(record['path'],len(geometry.copper_layers));sources.append(info)
+        holes,info=read_drill_source(record['path'],len(geometry.copper_layers))
+        info.update(suppressed_duplicate_holes=[],modeled_hole_count=0)
+        sources.append(info);parsed.append((record,holes,info))
+    for record,holes,info in parsed:
         plated=info['classification']=='PTH'
         if plated and settings is None:
             raise ConfigurationError('PTH requires explicit v2 drills.pth_plating_um and pth_model=solid_pec_equivalent.')
         thickness=settings['pth_plating_um']*1e-6 if plated else None
         for index,(x,y,diameter,tool) in enumerate(holes,1):
+            identifier=f'{Path(record["path"]).name}:{index}'
+            canonical=next((d for d,source in owners
+                if plated and d.plated and info['span']=='through' and source['span']=='through'
+                and source['path']!=info['path']
+                and hypot(x-d.x_m,y-d.y_m)<=TOLERANCE_M
+                and abs(diameter-d.drill_diameter_m)<=TOLERANCE_M),None)
+            if canonical is not None:
+                info['suppressed_duplicate_holes'].append(dict(
+                    source_filename=Path(record['path']).name,tool=tool,x_m=x,y_m=y,
+                    drill_diameter_m=diameter,disposition='duplicate_pth_suppressed',
+                    canonical_source=next(source['path'] for d,source in owners if d is canonical),
+                    canonical_drill_id=canonical.id))
+                continue
             radius=diameter/2+thickness if plated else None
             contacts=connected_layers(geometry,x,y,radius) if plated else ()
-            drills.append(PcbDrill(f'{Path(record["path"]).name}:{index}',x,y,diameter,plated,
-                info['classification'],tool,info['sha256'],thickness,radius,contacts))
+            drill=PcbDrill(identifier,x,y,diameter,plated,info['classification'],
+                tool,info['sha256'],thickness,radius,contacts)
+            drills.append(drill);owners.append((drill,info));info['modeled_hole_count']+=1
     result=replace(geometry,drills=tuple(drills))
     if drills: validate_drills(result)
     return result,sources

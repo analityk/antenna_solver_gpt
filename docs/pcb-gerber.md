@@ -628,3 +628,26 @@ pozostaje niesklasyfikowany. Inne Gerbery opisujące fizyczne wiercenia
 w FileFunction są jawnie nieobsługiwane — nie próbujemy czytać ich jako
 Excellon. Prawdziwe PTH/NPTH w tym samym katalogu działają jak wcześniej,
 włącznie z niezmienionym wyjątkiem G90 z PCB-011D1.
+
+### PCB-011D3 — pomocniczy eksport Through_Via
+
+EasyEDA może zapisać ten sam PTH w `Drill_PTH_Through.DRL` oraz
+`Drill_PTH_Through_Via.DRL`. Wszystkie źródła są normalnie parsowane przed
+deduplikacją. Pomiędzy różnymi źródłami tłumimy tylko przelotowe PTH,
+których odległość środków XY i różnica średnic nie przekraczają istniejącej
+tolerancji geometrii PCB (1e-10 m). Nie uśredniamy ani nie zaokrąglamy
+wymiarów. Właścicielem jest pierwsze źródło w deterministycznej kolejności
+nazw (casefold, potem oryginalna nazwa i ścieżka). `Through.DRL` poprzedza
+`Through_Via.DRL`; samo `Through_Via.DRL` pozostaje normalnie modelowane.
+Porównania dotyczą zachowanego właściciela, bez łańcuchowego rozszerzania
+tolerancji przez kolejne kopie.
+
+Każdy wpis `drill_sources` zachowuje ścieżkę, SHA256 i surowe `hole_count`.
+Dodano `modeled_hole_count` i `suppressed_duplicate_holes` z nazwą źródła,
+narzędziem, XY, średnicą, `disposition: duplicate_pth_suppressed`,
+`canonical_source` i `canonical_drill_id`. Tylko zachowane otwory trafiają
+do PcbDrill, kotwic siatki, walców CSXCAD i maski pól.
+
+PTH/NPTH w tym samym miejscu, różne średnice poza tolerancją oraz odrębne
+nachodzące otwory pozostają błędami. Walidacja nakładania nie jest wyłączona.
+Wyjątek G90 z PCB-011D1 pozostaje niezmieniony.

@@ -1177,3 +1177,37 @@ zamiast błędu powstałego przy próbie parsowania Gerbera jako NC.
 Testy: 2 nowe OK, pełny zestaw 315 OK (3 skip), bez natywnego FDTD.
 Sprawdzono też pliki produkcyjne: GDD -> drill_drawing; DRL -> drill -> PTH.
 Nie uruchamiano pełnego solve ani napraw innych elementów zestawu emtest3.
+
+## PCB-011D3 — deduplikacja pomocniczego eksportu via (2026-10-07)
+
+Przyczyna: EasyEDA eksportuje ten sam przelotowy PTH w Through.DRL oraz
+Through_Via.DRL, co tworzyło dwa walce i uruchamiało walidację nakładania.
+load_drills parsuje teraz wszystkie źródła przed składaniem końcowych
+rekordów. Między różnymi źródłami identyczne przelotowe PTH są porównywane
+z zachowanym właścicielem przez istniejące TOLERANCE_M: odległość XY oraz
+różnica średnicy <= 1e-10 m. Nie ma zaokrąglania, uśredniania ani łańcuchowego
+rozszerzania tolerancji. Deterministyczna kolejność nazw (casefold, nazwa,
+ścieżka) stawia Drill_PTH_Through.DRL przed Drill_PTH_Through_Via.DRL.
+
+Każde źródło zachowuje SHA256 i surowe hole_count. Nowe modeled_hole_count
+oraz suppressed_duplicate_holes opisują narzędzie, XY, średnicę, nazwę,
+disposition=duplicate_pth_suppressed, canonical_source i canonical_drill_id.
+Tylko zachowane rekordy trafiają do geometrii, siatki, walców i masek pól.
+Via-only działa samodzielnie. Nie zmieniono validate_drills ani whitelist
+G90; różne średnice poza tolerancją, PTH/NPTH w tym samym miejscu oraz
+odrębne nakładające się otwory nadal są błędami. Nie zmieniono fizyki ani
+źródłowych Excellonów.
+
+Testy: 4 nowe OK; pełny zestaw 319 OK (3 skip), bez natywnego FDTD.
+Sprawdzono parsowanie obu źródeł, odwróconą kolejność wejściową, preferowane
+źródło, lexical fallback, provenance, tolerancję, via-only i konflikty.
+Fixture EasyEDA 4.826 / 10.24543 mm, T01=0.305 mm daje jeden PcbDrill,
+jeden rekord środka siatki i jeden AddCylinder na atrapach natywnych.
+
+Rzeczywisty gerbs/emtest3 przeszedł import z jawną tymczasową konfiguracją
+2 warstw FR4 1.6 mm i metalizacją 25 µm (założenia). Surowe PTH: Through=1,
+Through_Via=1. Finalnie 1 PTH, właściciel Through.DRL. Przy próbie kolejnego
+etapu wykryto osobną przeszkodę: obrócony środek ma Y=-1.347460503399846e-19 m,
+a krytyczna kotwica portu leży niemal w zerze. Obecny planner odrzuca te
+różne kotwice jako zbyt bliskie. Pełna domena/XML dla emtest3 nie powstała;
+nie uruchamiano FDTD. Nie zmieniono normalizacji ani tolerancji w tym ticket.
