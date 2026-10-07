@@ -19,7 +19,8 @@ from shapely import union_all
 from antenna_lab.core.config import ConfigurationError, validate_schema
 from .config import ResolvedPcbConfig
 from .gerber import _read, _copper, _outline, ASSUMPTIONS
-from .model import PcbGeometry, PcbPort, Substrate
+from .model import PcbGeometry, PcbPort, Substrate, CopperImageStats
+from .regions import copper_shape
 from .validation import validate_pcb_geometry, TOLERANCE_M
 
 DEFAULT_PHYSICAL = dict(schema_version=1,
@@ -32,6 +33,9 @@ def load_physical_config(path=None):
     value = (json.loads(Path(path).read_text(encoding='utf-8-sig')) if path else
              json.loads(json.dumps(DEFAULT_PHYSICAL)))
     validate_schema(value, 'pcb-physical.schema.json')
+    if value['schema_version'] == 2:
+        from .stackup import validate_stackup_sequence
+        validate_stackup_sequence(value)
     return value
 
 
@@ -63,7 +67,8 @@ def _role(path):
     elif 'soldermask' in function: metadata_role = 'soldermask'
     elif 'paste' in function: metadata_role = 'paste'
     elif 'legend' in function: metadata_role = 'silkscreen'
-    elif 'drill' in function: metadata_role = 'drill'
+    elif 'drill' in function or function.startswith(('plated,','nonplated,','mixedplating,')):
+        metadata_role = 'drill'
     if metadata_role and conventional and metadata_role != conventional:
         raise ConfigurationError(f'{path.name}: filename role {conventional} conflicts with FileFunction {function}.')
     if metadata_role or conventional:
@@ -72,6 +77,8 @@ def _role(path):
                         ('toplayer','top_copper'),('b_cu','bottom_copper'),('bottomlayer','bottom_copper'),
                         ('mask','soldermask'),('paste','paste'),('silk','silkscreen')):
         if token in name: return role
+    if re.search(r'(?:^|[_. -])(?:in|inner(?:layer)?)[_. -]?[1-9][0-9]*(?:[_ .-]|$)', name):
+        return 'inner_copper'
     return 'unclassified_gerber'
 
 
@@ -102,6 +109,7 @@ def detect_feed(gerber, copper):
     pads=[]
     for obj in gerber.objects:
         if isinstance(obj,Flash) and isinstance(obj.aperture,RectangleAperture):
+            if not obj.polarity_dark: continue
             obj=obj.converted(MM)
             primitive=list(obj.to_primitives(unit=MM))
             if len(primitive)!=1 or getattr(primitive[0],'rotation',0)!=0 or obj.aperture.hole_dia:
@@ -120,7 +128,7 @@ def detect_feed(gerber, copper):
     centre=(a[transverse]+b[transverse])/2
     width=a[3 if axis==0 else 2]
     # Work in physical SI; swap coordinates for vertical feed, not geometry.
-    shapes=[Polygon([(v[axis],v[transverse]) for v in c.vertices_xy_m]) for c in copper]
+    shapes=[copper_shape(c, lambda v:(v[axis],v[transverse])) for c in copper]
     merged=union_all(shapes)
     clear=LineString(((a[axis],centre),(b[axis],centre))).difference(merged)
     intervals=[clear] if clear.geom_type=='LineString' else list(getattr(clear,'geoms',()))
@@ -146,7 +154,7 @@ def audit_physical_feed(geometry):
     def local(v):
         dx,dy=v[0]-n[0],v[1]-n[1]
         return (dx*ux+dy*uy,-dx*uy+dy*ux)
-    shapes=[Polygon([local(v) for v in c.vertices_xy_m]) for c in geometry.copper]
+    shapes=[copper_shape(c,local) for c in geometry.top_copper]
     tol=TOLERANCE_M;half=geometry.port.width_m/2
     if length<=2*tol or half<=tol:
         raise ConfigurationError('Physical feed gap/width unresolved at geometry tolerance.')
@@ -162,10 +170,14 @@ def audit_physical_feed(geometry):
 
 
 def load_bundle_geometry(directory, physical_path=None):
-    selected,records=discover_bundle(directory)
     value=load_physical_config(physical_path)
+    if value['schema_version'] == 2:
+        from .bundle_multilayer import load_multilayer_bundle
+        return load_multilayer_bundle(directory, value)
+    selected,records=discover_bundle(directory)
     top=_read(selected['top_copper'],'top copper')
-    copper=_copper(top);outline=_outline(_read(selected['outline'],'board outline'))
+    counts={}
+    copper=_copper(top,counts);outline=_outline(_read(selected['outline'],'board outline'))
     if value['port']['mode']=='auto': port,feed=detect_feed(top,copper)
     else:
         v=value['port']
@@ -185,7 +197,8 @@ def load_bundle_geometry(directory, physical_path=None):
         'finite physical thickness: '+material['finite_physical_thickness'],
         'geometric copper thickness / extra Z cells: none', 'copper roughness: omitted']
     geometry=PcbGeometry('pcb',outline,copper,Substrate(outline,-config.substrate_thickness_m,0.,
-        config.substrate_epsilon_r,config.substrate_loss_tangent),port,assumptions)
+        config.substrate_epsilon_r,config.substrate_loss_tangent),port,assumptions,
+        copper_composition=(CopperImageStats('top',**counts),))
     validate_pcb_geometry(geometry);audit_physical_feed(geometry)
     return config,geometry,dict(source_directory=str(Path(directory).resolve()),discovered_files=records,
         physical_config=value,physical_config_source=origin,feed_detection=feed)

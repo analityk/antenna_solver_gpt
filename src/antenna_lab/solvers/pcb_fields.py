@@ -11,6 +11,7 @@ import numpy as np
 from shapely import points, distance, union_all
 from shapely.geometry import Polygon, box
 
+from antenna_lab.pcb.regions import copper_shape
 from antenna_lab.core.config import ConfigurationError, write_json
 from .fields import CONVENTION, MAX_FIELD_POINTS, install_frequency_planes
 from .power import _read_surface
@@ -94,10 +95,23 @@ def pcb_sample_mask(lines, full_axes, geometry):
         widths.append(np.maximum(full[indices]-full[indices-1],full[indices+1]-full[indices]))
     halo=np.sqrt(sum(w*w for w in np.meshgrid(*widths,indexing='ij'))).ravel()
     xy=points(xyz[:,:2]);z=xyz[:,2]
-    metal=union_all([Polygon(c.vertices_xy_m) for c in geometry.copper])
-    d=np.hypot(distance(xy,metal),z)
     mask=np.zeros(len(xyz),dtype=np.uint8)
-    mask[d<=1e-12]|=1;mask[d<=halo]|=2
+    for plane_z in sorted({c.z_m for c in geometry.copper}):
+        metal=union_all([copper_shape(c) for c in geometry.copper if c.z_m == plane_z])
+        if geometry.drills:
+            from shapely.geometry import Point
+            for hole in geometry.drills:
+                if not hole.plated:
+                    metal=metal.difference(Point(hole.x_m,hole.y_m).buffer(hole.drill_diameter_m/2,quad_segs=128))
+        d=np.hypot(distance(xy,metal),z-plane_z)
+        mask[d<=1e-12]|=1;mask[d<=halo]|=2
+    bottom=min(d.z_min_m for d in geometry.dielectrics)
+    for hole in geometry.drills:
+        if not hole.plated: continue
+        radial=np.maximum(np.hypot(xyz[:,0]-hole.x_m,xyz[:,1]-hole.y_m)-hole.equivalent_outer_radius_m,0)
+        vertical=np.maximum(np.maximum(bottom-z,z),0)
+        d=np.hypot(radial,vertical)
+        mask[d<=1e-12]|=1;mask[d<=halo]|=2
     n,p=geometry.port.negative_xy_m,geometry.port.positive_xy_m
     ym=(n[1]+p[1])/2;half=geometry.port.width_m/2
     source=box(n[0],ym-half,p[0],ym+half)
@@ -162,7 +176,7 @@ def finish_pcb_fields(geometry,mesh,layout,frequencies,reference,output):
         reference_voltage_v=1.,mesh_changed=False,additional_fdtd_runs=0,
         effect='Passive DFT/I/O only; physical model, port, excitation, PML and quality unchanged.',
         native_coordinate_comparison=dict(rtol=1e-6,atol_m=1e-10,interpolation=False),
-        mask_bits={'1':'copper geometry','2':'one local cell diagonal around copper','4':'planar port and halo'},
+        mask_bits={'1':'copper sheets and solid PTH cylinders','2':'one local cell diagonal around copper','4':'planar port and halo'},
         mask_note='Conservative geometric/interpolation mask, not native Yee-cell occupancy. Substrate not masked. Raw native/*.h5 untouched.',
         validation_status='unverified')
     write_json(folder/'metadata.json',metadata)

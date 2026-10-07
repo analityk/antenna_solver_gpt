@@ -96,6 +96,21 @@ def _contains(point, polygon):
     return inside
 
 
+def _contains_copper(point, copper):
+    """Boundary-inclusive metal contact; interiors of cutouts are not metal.
+
+    A hole edge belongs to the metal face, matching outer-edge contact semantics.
+    The existing distance tolerance only handles numerical boundary residue.
+    """
+    if not _contains(point, copper.vertices_xy_m):
+        return False
+    for ring in copper.holes_xy_m:
+        if _contains(point, ring) and not any(_on_segment(point,a,b)
+                for a,b in zip(ring, ring[1:]+ring[:1])):
+            return False
+    return True
+
+
 def _same_outline(a, b):
     # Accept cyclic shifts, reverse winding and optional closing vertex.
     # Different vertex subdivisions are conservatively rejected in v0.
@@ -130,14 +145,51 @@ def validate_pcb_geometry(geometry: PcbGeometry):
     substrate_outline = _polygon(substrate.outline.vertices_xy_m, "substrate.outline")
     _require(_same_outline(board, substrate_outline), "substrate.outline: obrys nie zgadza się z PCB.")
 
+    if geometry.dielectric_layers or geometry.copper_layers:
+        layers, sheets = geometry.dielectric_layers, geometry.copper_layers
+        _require(bool(layers) and 2 <= len(sheets) <= len(layers)+1, 'stackup: inconsistent dielectric/copper layer count.')
+        _require([c.role for c in sheets] == ['top', *[f'inner{i}' for i in range(1,len(sheets)-1)], 'bottom'],
+                 'stackup: invalid copper role ordering.')
+        _require(len({d.name for d in layers}) == len(layers), 'stackup: duplicate dielectric names.')
+        _require(all(getattr(substrate,k) == getattr(layers[0],k)
+                     for k in ('outline','z_min_m','z_max_m','epsilon_r','loss_tangent')),
+                 'substrate: legacy view must equal first actual dielectric material.')
+        top = 0.0
+        for layer in layers:
+            _require(bool(layer.name.strip()), 'stackup: empty dielectric name.')
+            _require(all(_finite(getattr(layer,k)) for k in ('z_min_m','z_max_m','epsilon_r','loss_tangent')),
+                     'stackup: finite dielectric coordinates/material required.')
+            _require(layer.z_max_m == top and layer.z_min_m < top, 'stackup: dielectric gap, overlap or invalid thickness.')
+            _require(layer.epsilon_r >= 1 and layer.loss_tangent >= 0, 'stackup: invalid dielectric material.')
+            _require(_same_outline(board, _polygon(layer.outline.vertices_xy_m, layer.name)), 'stackup: outline mismatch.')
+            top = layer.z_min_m
+        interfaces = {v for d in layers for v in (d.z_min_m,d.z_max_m)}
+        _require(sheets[0].z_m == 0.0 and sheets[-1].z_m == top, 'stackup: top/bottom copper/interface mismatch.')
+        _require(all(c.z_m in interfaces for c in sheets) and
+                 all(a.z_m > b.z_m for a,b in zip(sheets,sheets[1:])), 'stackup: copper/interface mismatch or order.')
+        for sheet in sheets:
+            _require(sheet.model in ('pec','conducting_sheet'), 'stackup: unsupported copper model.')
+            _require(all(_finite(v) and v > 0 for v in (sheet.thickness_m,sheet.conductivity_s_m)),
+                     'stackup: positive finite copper inputs required.')
+        _require(len({c.id for c in geometry.copper}) == len(geometry.copper), 'stackup: duplicate copper polygon ids.')
+        _require({c.layer_role for c in geometry.copper} == {c.role for c in sheets}, 'stackup: missing/extra polygon layer.')
+
     _require(bool(geometry.copper), "copper: wymagana co najmniej jedna wyspa miedzi.")
     polygons = []
     for index, copper in enumerate(geometry.copper):
         label = f"copper[{index}]"
         _require(isinstance(copper.id, str) and bool(copper.id.strip()), f"{label}.id: puste ID.")
-        _require(_finite(copper.z_m) and abs(copper.z_m) <= TOLERANCE_M,
-                 f"{label}.z_m: wymagana skończona współrzędna z=0.")
+        plane = next((c.z_m for c in geometry.copper_layers if c.role == copper.layer_role), None) if geometry.copper_layers else 0.0
+        _require(copper.layer_role == 'top' or bool(geometry.copper_layers), f'{label}: unexpected non-top layer.')
+        _require(plane is not None and _finite(copper.z_m) and abs(copper.z_m-plane) <= TOLERANCE_M,
+                 f"{label}.z_m: required finite copper layer plane.")
         polygons.append(_polygon(copper.vertices_xy_m, label))
+        for h, ring in enumerate(copper.holes_xy_m):
+            _polygon(ring, f'{label}.holes[{h}]')
+        if copper.holes_xy_m:
+            from .regions import copper_shape
+            _require(copper_shape(copper).is_valid,
+                     f'{label}: holes must be valid, disjoint interior rings within the outer ring; no repair.')
 
     port = geometry.port
     _require(port is not None, "port: brak portu.")
@@ -149,7 +201,10 @@ def validate_pcb_geometry(geometry: PcbGeometry):
              "port: końce muszą być różne.")
     for name, point in (("negative", port.negative_xy_m), ("positive", port.positive_xy_m)):
         _require(_contains(point, board), f"port.{name}: koniec poza obrysem PCB.")
-        members = [i for i, polygon in enumerate(polygons) if _contains(point, polygon)]
+        members = [i for i, polygon in enumerate(polygons) if geometry.copper[i].layer_role == "top" and _contains_copper(point, geometry.copper[i])]
         _require(len(members) == 1, f"port.{name}: wymagana przynależność do dokładnie jednej wyspy miedzi.")
+    if geometry.drills:
+        from .drills import validate_drills
+        validate_drills(geometry)
     return {"geometry_status": "passed", "electromagnetic_status": "unverified",
             "copper_count": len(polygons)}

@@ -962,3 +962,165 @@ sprawdzają wywołania materiałów, identyczne siatki, walidację, metadane XML
 prepare-only, pojedynczy Run/CalcPort z E/H i regenerację raportu offline.
 Nie uruchomiono natywnego FDTD; weryfikacja rzeczywistego conducting sheet
 na lokalnym openEMS 0.37.0rc3 / CSXCAD 0.7.0rc3 pozostaje do wykonania.
+
+## 2026-10-07 — PCB-011B: physical multilayer PCB stackup
+
+Dodano physical schema v2 z jawnymi rolami top/innerN/bottom i oddzielnymi
+materiałami dielektryków. Konfiguracja nadal nie zawiera nazw Gerberów.
+Przykład pcb_fr4_4layer.json jest zbiorem założeń FR4, nie specyfikacją
+producenta. Wersja v1, domyślne wejście folderowe i legacy JSON pozostają.
+
+Import rozpoznaje role z Gerbonara/X2 i nazw KiCad/EasyEDA, sprawdza
+kolejność, brak/nadmiar/duplikaty i zapisuje SHA256 każdej warstwy. Drill/
+Excellon blokuje przebieg; nie dodano via-connectivity. Boolean union
+wykonuje się osobno na warstwę. Stabilne ID zawierają rolę, każdy poligon
+zachowuje własne Z. Port auto/explicit działa wyłącznie na top; dolna miedź
+pod szczeliną jest legalna, rzeczywista miedź w górnej szczelinie nadal
+blokuje solve. Jedna normalizacja obraca wszystkie warstwy i obrysy.
+
+Zaczynamy od top=0, głębokość wyznaczają wyłącznie dielektryki. Każdy
+materiał ma osobny zakres Z i constant-kappa, bez uśredniania epsilon_r.
+Miedź każdej warstwy jest AddMetal lub AddConductingSheet z własnymi
+parametrami; grubość sheet nie daje objętości ani nowych komórek Z.
+Dokładne interfejsy są kotwicami: za bliskie są odrzucane, nie scalane.
+XY respektuje najkrótszą falę w stosie; Z lokalną falę materiału oraz
+istniejące minimum komórek względem łącznej grubości, bez mnożenia minimum
+przez liczbę warstw. Jakości preview/design/verify nie zmieniono. Cienkie
+rzeczywiste dielektryki pozostają widoczne w kosztach/CFL i mogą zablokować
+przebieg przed ładowaniem natywnych modułów, jeżeli limit czasu obcina impuls.
+
+Zapisane geometry/summary zawierają warstwy, dokładne Z, całkowitą grubość,
+parametry/kappa/przewodność powierzchniową i SHA256. Stare pole substrate
+jest widokiem pierwszego materiału dla kompatybilności; pełen model używa
+listy rzeczywistych dielektryków. Raport offline dodaje tabelę Stackup i
+plots/stackup.png (symboliczne kreski miedzi). Top-view pokazuje górną
+miedź, pionowe cięcia wszystkie warstwy. Maski E/H mierzą odległość do
+poligonów na ich własnym Z; napięcie odniesienia, fazy i jeden Run/CalcPort
+pozostają bez zmian. Nie dodano nowych dumpów ani zmiany portu.
+
+Sprawdzenia: deterministyczne fixture'y 2-/4-warstwowe, sąsiednie dielektryki,
+rozdzielny union, poprawne role/Z, blokady konfiguracji/plików/wierceń,
+port nad zakopaną miedzią, materiały i maski wszystkich Z, dokładne siatki
+niezależne od grubości miedzi, preflight drogiego stosu, pojedynczy Run na
+atrapach i regeneracja raportu bez Gerberów/native. Obejrzano stackup.png.
+Nie uruchomiono natywnego FDTD; multilayer wymaga lokalnego sprawdzenia na
+Windows. Brak wierceń nie dowodzi kompletności fizycznej. Istniejące
+ograniczenia importera (m.in. otwory poligonów/clear polarity) nie zmienione.
+
+Końcowe testy: 228 PCB OK (1 skip), pełny zestaw 295 OK (3 skip).
+Testy v1, legacy, emstest/emstest2, preview/design/verify, sweep, E/H i
+raportów pozostają zielone. Pominięcia dotyczą opcjonalnych środowisk;
+nie są potwierdzeniem natywnego multilayer FDTD.
+
+## 2026-10-07 — PCB-011C: Gerber copper clearances
+
+Usunięto ogólne odrzucanie clear polarity i otworów miedzi. Gerbonara nadal
+parsuje RS-274X. Shapely składa prymitywy w kolejności obiektów: dark union,
+clear difference, dzięki czemu późniejsze dark przywraca miedź. Nie ma
+sumowania wszystkich dark przed clear. Budżet aproksymacji krzywych i cleanup
+nie zmieniony; błędny/pusty/niepoligonowy wynik jest odrzucany bez napraw.
+Board outline nadal musi być pojedynczym zewnętrznym konturem, bez NPTH.
+
+CopperPolygon zachowuje vertices_xy_m jako obrys zewnętrzny i opcjonalne
+holes_xy_m jako pierścienie wewnętrzne. Jeden połączony przewodnik z otworami
+pozostaje jednym rekordem. Role/Z/ID są zachowane; transformacja obejmuje
+również otwory. Walidacja, ciągły i dyskretny audyt feedu wykluczają wnętrza
+otworów, zachowując tolerancję styku na granicach. Kontrole portu pozostają
+ograniczone do top. Metadane per warstwa zapisują liczby prymitywów dark/clear,
+końcowych przewodników i otworów; JSON nie zawiera obiektów Gerbonara.
+
+CSXCAD nadal otrzymuje zewnętrzne poligony PEC/conducting_sheet, bez
+triangulacji. Wewnętrzne pierścienie są poligonami wspólnego materiału
+pcb_copper_clearance_air (epsilon=1, kappa=0) na identycznym Z. Priorytety
+10/11 dla miedzi/clearance rosną o 2 na poziom zagnieżdżenia. Jest to konieczne,
+aby clearance macierzystego przewodnika nie skasował później przywróconej
+izolowanej wyspy (priorytet 12). Plan zależy tylko od geometrii danej warstwy,
+nie innych Z. Priorytety i brak grubości/linii Z są zapisane w metadanych.
+Po instalacji wykonywany jest dokładny audyt zamrożonej siatki. Materiał
+conducting sheet nie jest zamieniany na PEC. Same otwory nie dodają kotwic;
+zmiana zewnętrznych bounds/liczby przewodników może wpłynąć na istniejącą
+politykę kotwic tak jak każda zmiana fizycznej geometrii.
+
+Maski E/H używają wspólnej reprezentacji poligonu z otworami na każdym Z,
+z zachowaniem halo rzeczywistej miedzi i źródła. Pozycje, fazy i odniesienie
+1 V nie zmienione. Rysunki korzystają ze ścieżek złożonych z przeciwną
+orientacją pierścieni i prawdziwych przecięć pionowych, bez zamalowywania
+otworów/wysp. Regeneracja offline czyta tylko zapisane wyniki i geometrię.
+
+Testy: 235 PCB OK (1 skip), pełny zestaw 302 OK (3 skip), bez natywnego FDTD.
+Fixture'y obejmują pełną płaszczyznę, okrągły antipad, wiele otworów,
+późniejsze przywrócenie miedzi, wcięcie na brzegu, rozłączne przewodniki,
+clearances na osobnych Z, pierścień z łuku i clear prymityw apertury.
+Sprawdzono priorytety na przywróconej wyspie, identyczne poligony PEC/sheet,
+niezmienione osie, mutację natywnej siatki jako błąd, port obok antipadu/na
+krawędzi otworu, maski, piksele transparentnego wycięcia, przekroje warstwowe,
+jeden Run/CalcPort na atrapach i raport offline. Obejrzano wygenerowany
+rysunek otworu z przywróconą wyspą. Test historycznie odrzucający clear/otwory
+zastąpiono nowymi dodatnimi przypadkami; błędne wejścia/punktowe styki nadal
+są odrzucane. V1/v2 i emstest/emstest2 pozostają zielone.
+
+Wyniki nadal unverified: natywna ocena priorytetów CSXCAD/openEMS na Windows
+pozostaje do wykonania. Nie dodano Excellon, vias, NPTH, soldermask,
+komponentów, chropowatości ani dodatkowych przebiegów/zbieżności.
+
+## PCB-011D — Excellon through-hole vias / NPTH (2026-10-07)
+
+Powód: v2 odrzucało wszystkie drill files, więc fizyczne wielowarstwowe
+zestawy nie mogły mieć połączeń międzywarstwowych. Dodano import okrągłych
+przelotowych wierceń Gerbonara 1.6.3. Gerbonara interpretuje wszystkie
+instrukcje NC; kod projektu sprawdza wyłącznie metadane nazw/komentarzy.
+Jawne PTH/NPTH z nazw i plating/X2 muszą być zgodne. Brak klasy, konflikt,
+pusty plik, slot/route, nieobsługiwane narzędzie, blind/buried/microvia lub
+nieprzelotowy zakres oznacza błąd. Pozostawiono odrzucanie ostrzeżeń parsera,
+w tym niepewnego formatu liczbowego. Oryginalne Txx są pobierane z mapy
+ExcellonParser przypiętej wersji, nie odtwarzane własnym parserem.
+
+Fizyczna schema v2 przyjmuje opcjonalne drills.pth_plating_um i
+pth_model=solid_pec_equivalent. PTH wymaga jawnego obiektu, NPTH nie.
+V1 nadal odrzuca wiercenia; nie dodano nazw źródeł do konfiguracji.
+PcbDrill jest odłączonym rekordem SI: środek, średnica, plated, źródłowa
+rola/narzędzie/SHA256, grubość PTH, promień równoważny i role kontaktów.
+PcbGeometry.drills domyślnie jest pustym tuple. Normalizacja/inverse mapują
+środek tą samą transformacją XY co resztę płytki, bez drugiej normalizacji.
+Kontakty wynikają z odległości środka do końcowej miedzi z otworami;
+co najmniej dwie warstwy są wymagane. Antipad nie tworzy kontaktu. Drille
+na porcie, poza obrysem lub wzajemnie zachodzące odrzucono w tej wersji.
+
+PTH instalowany jest jako pojedynczy AddCylinder na AddMetal, od z=0 do
+bottom, promień drill/2+plating. To jawny solid PEC equivalent: bez strat
+metalizacji i bez pustego wnętrza beczki. NPTH to cylinder epsilon=1,
+kappa=0 przez cały stack, usuwający także miedź. Priorytety są wyższe niż
+wszystkie poligony i clearances PCB-011C; zmieniają materiał tylko wewnątrz
+walca. Po instalacji obowiązuje dokładny audyt zamrożonych osi CSXCAD.
+Native property API porównano z dokumentacją CSPrimCylinder.
+
+Jedynymi nowymi kotwicami siatki są dokładne X/Y środków (także NPTH).
+Zapisane osobno jako drill_centres_xy_m w planie, domenie i ekonomicznej
+polityce. Brak kotwic promienia, metalizacji lub teselacji i nowych Z.
+Zmiana metalizacji zmienia fizyczny promień, nie siatkę. Nie odrzucamy
+wierceń dla oszczędności: bliskie krytyczne kotwice są zachowane albo
+jawnie nierozdzielalne; ograniczenia komórek/kosztu działają przed Run.
+Zachowany środek nie jest dowodem zbieżności EM promienia na grubej siatce.
+
+Maski pól obejmują walce PTH i lokalne halo. NPTH odejmuje maskę miedzi;
+substrat nadal nie jest maskowany. Wizualizacje mają oznaczenia otworów
+z góry, prawdziwe przekroje walców i tabelę Drills / vias. Stackup pokazuje
+przelot symbolicznie, bez pozorowania skali ścianek. Raport używa wyłącznie
+zapisanej geometrii/metadanych; źródła i liczby/narzędzia/SHA256 oraz kontakty
+są zachowane w import/summary JSON. Fazy, odniesienie 1 V, mesh policy
+rozdzielczości, port i liczba przebiegów nie zmienione.
+
+Testy: nowe 8 OK; PCB 242 OK (1 skip; przed dodaniem ostatniego regresyjnego
+przypadku bliskich środków); końcowy pełny zestaw 310 OK (3 skip), w tym
+wszystkie 8 nowych. Wykorzystano tylko atrapy natywne. Pokryto PTH/NPTH,
+jednostki mm/inch, narzędzia, X2/nazwy/konflikty, slots/routes/spans,
+kontakty top/inner/bottom i antipad, orphan, transformację, grubość bez
+zmian osi, dokładne środki i budżet, priorytety/NPTH, mutację siatki jako
+błąd, maski, jeden fake Run oraz regenerację offline po usunięciu źródeł.
+Stare testy blanket-rejection zamieniono na odrzucenie pustego/nie-Excellon
+źródła. V1/v2 bez drill oraz emstest/emstest2 pozostają zielone.
+
+Ograniczenia: wyniki unverified; rzeczywiste CSXCAD/openEMS na Windows
+wymaga lokalnego sprawdzenia. Nie wykonano natywnego FDTD. Nie dodano
+blind/buried/microvias, plated slots, strat/chropowatości barrel, soldermask,
+komponentów, konektorów, NF2FF ani sweepów zbieżności.

@@ -16,14 +16,21 @@ def _map_xy(geometry, point):
     def outline(value):
         return replace(value, vertices_xy_m=tuple(point(p) for p in value.vertices_xy_m))
 
+    def drill(value):
+        x,y=point((value.x_m,value.y_m))
+        return replace(value,x_m=x,y_m=y)
+
     return replace(
         geometry,
         outline=outline(geometry.outline),
         substrate=replace(geometry.substrate, outline=outline(geometry.substrate.outline)),
-        copper=[replace(copper, vertices_xy_m=tuple(point(p) for p in copper.vertices_xy_m))
+        dielectric_layers=tuple(replace(d, outline=outline(d.outline)) for d in geometry.dielectric_layers),
+        copper=[replace(copper, vertices_xy_m=tuple(point(p) for p in copper.vertices_xy_m),
+                        holes_xy_m=tuple(tuple(point(p) for p in ring) for ring in copper.holes_xy_m))
                 for copper in geometry.copper],
         port=replace(geometry.port, negative_xy_m=point(geometry.port.negative_xy_m),
                      positive_xy_m=point(geometry.port.positive_xy_m)),
+        drills=tuple(drill(d) for d in geometry.drills),
         assumptions=list(geometry.assumptions),
     )
 

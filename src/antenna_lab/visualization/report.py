@@ -243,13 +243,16 @@ def _metadata(data):
 def _pcb_geometry(data, plots_path):
     """Draw only saved SI polygons; never reopen Gerbers or native modules."""
     from matplotlib.patches import Polygon as PatchPolygon
+    from .pcb_regions import copper_patch
     geometry = data['geometry']
     fig = Figure(figsize=(8, 6)); ax = fig.subplots()
     board = np.asarray(geometry['outline']['vertices_xy_m'])*1e3
     ax.add_patch(PatchPolygon(board, facecolor='#f1f4e7', edgecolor='#53604c', label='PCB'))
     for copper in geometry['copper']:
-        points = np.asarray(copper['vertices_xy_m'])*1e3
-        ax.add_patch(PatchPolygon(points, facecolor='#c77c36', edgecolor='#825323', alpha=.85))
+        if copper.get('layer_role', 'top') != 'top': continue
+        ax.add_patch(copper_patch(copper, facecolor='#c77c36', edgecolor='#825323', alpha=.85))
+    from .pcb_drills import drill_markers
+    drill_markers(ax,geometry)
     port = geometry['port']; n,p = np.asarray(port['negative_xy_m']),np.asarray(port['positive_xy_m'])
     delta = p-n; normal = np.array([-delta[1],delta[0]])/np.linalg.norm(delta)*port['width_m']/2
     face = np.asarray([n-normal,p-normal,p+normal,n+normal])*1e3
@@ -310,25 +313,28 @@ def _pcb_metadata(data):
     material = {**imported.get('resolved_config', {}),
                 **s.get('preparation', {}).get('geometry', {}), **s}
     model = material.get('copper_model', 'pec')
-    physical = [('Copper model', 'conducting sheet' if model == 'conducting_sheet' else 'PEC')]
-    for key, label, scale, unit in (
-        ('copper_thickness_m', 'Thickness', 1e6, 'µm'),
-        ('copper_conductivity_s_m', 'Conductivity', 1e-6, 'MS/m'),
-        ('copper_sheet_conductance_s', 'Sheet conductance', 1, 'S')):
-        value = material.get(key)
-        if value is not None:
-            physical.append((label, f'{value*scale:g} {unit}'))
-    body += '<h3>Model fizyczny miedzi</h3>'+table(['Parametr', 'Wartość'], physical)
-    body += ('<p>Skończona przewodność i grubość fizyczna: model powierzchniowy conducting sheet. '
-             'Geometria płaska, bez dodatkowych komórek Z.</p>' if model == 'conducting_sheet' else
-             '<p>PEC: parametry grubości i przewodności, jeśli podane, nie są używane przez solver.</p>')
+    if model == 'stackup':
+        body += '<p>Model miedzi: osobno dla każdej warstwy; patrz Stackup.</p>'
+    else:
+        physical = [('Copper model', 'conducting sheet' if model == 'conducting_sheet' else 'PEC')]
+        for key, label, scale, unit in (
+            ('copper_thickness_m', 'Thickness', 1e6, 'µm'),
+            ('copper_conductivity_s_m', 'Conductivity', 1e-6, 'MS/m'),
+            ('copper_sheet_conductance_s', 'Sheet conductance', 1, 'S')):
+            value = material.get(key)
+            if value is not None:
+                physical.append((label, f'{value*scale:g} {unit}'))
+        body += '<h3>Model fizyczny miedzi</h3>'+table(['Parametr', 'Wartość'], physical)
+        body += ('<p>Skończona przewodność i grubość fizyczna: model powierzchniowy conducting sheet. '
+                 'Geometria płaska, bez dodatkowych komórek Z.</p>' if model == 'conducting_sheet' else
+                 '<p>PEC: parametry grubości i przewodności, jeśli podane, nie są używane przez solver.</p>')
     files=imported.get('discovered_files',[])
     if not files:
         files=[dict(name=v['path'],role=k,sha256=v['sha256'],disposition='modeled') for k,v in imported.get('files',{}).items()]
     body+=table(['Plik','Rola','Obsługa','SHA256'],[(f['name'],f['role'],f['disposition'],f['sha256']) for f in files])
     assumptions=imported.get('assumptions',data['geometry'].get('assumptions',[]))
     body+='<h3>Założenia i pominięta fizyka</h3><ul>'+''.join('<li>'+escape(str(a))+'</li>' for a in assumptions)+'</ul>'
-    body+='<p>Chropowatość miedzi: pominięta. Soldermask, paste i silkscreen pominięto. Dolna/wewnętrzna miedź oraz otwory/vias nie są obsługiwane. E/H, NF2FF i bilans mocy: not recorded.</p>'
+    body+='<p>Chropowatość miedzi: pominięta. Soldermask, paste i silkscreen pominięto. PTH/NPTH są modelowane tylko gdy zapisane w sekcji Drills / vias; brak wierceń nie dowodzi kompletności modelu. E/H, NF2FF i bilans mocy: not recorded.</p>'
     if (data['root']/'fields/metadata.json').exists():
         body = body.replace('E/H, NF2FF i bilans mocy: not recorded.', 'E/H: zapisane przekroje poniżej. NF2FF i bilans mocy: not recorded.')
     body+=''.join('<p class="status">'+escape(str(w))+'</p>' for w in data['warnings'])
@@ -352,7 +358,9 @@ def render_html(data, *, plots_path=None, phase_step=None, field_components=None
         geometry = '<section class="panel"><details><summary>Geometria zapisana w przebiegu</summary><img alt="Zapisany rysunek geometrii anteny" src="data:image/png;base64,' + base64.b64encode(image_path.read_bytes()).decode() + '"></details></section>'
     if pcb:
         geometry = _pcb_geometry(data, plots_path)
-        extra_sections = geometry + _pcb_metadata(data)
+        from .pcb_stackup import stackup_section
+        from .pcb_drills import drill_section
+        extra_sections = geometry + stackup_section(data, plots_path, figure_image, table) + drill_section(data["geometry"],table) + _pcb_metadata(data)
         if (data["root"] / "fields" / "metadata.json").exists():
             extra_sections += field_section(data, figure_image, plots_path, phase_step, field_components)
         zeros = _pcb_diagnostics(data)

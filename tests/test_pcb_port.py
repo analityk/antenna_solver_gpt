@@ -97,8 +97,8 @@ class PcbPortTests(unittest.TestCase):
         # A membership oracle isolates cell-centre sampling from Ex-row sampling.
         # Real polygon semantics are covered by the intrusion/contact tests.
         def membership(point,polygon):
-            return point==centre or _contains(point,polygon)
-        with patch('antenna_lab.pcb.port._contains',side_effect=membership):
+            return point==centre or _contains(point,polygon.vertices_xy_m)
+        with patch('antenna_lab.pcb.port._contains_copper',side_effect=membership):
             with self.assertRaisesRegex(ConfigurationError,'szczeliny'):
                 resolve_pcb_lumped_port(g,m,s)
 

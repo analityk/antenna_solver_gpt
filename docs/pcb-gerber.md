@@ -9,11 +9,14 @@ wskazany katalog (bez rekurencji).
 
 Wymagane są dokładnie jedna górna miedź i jeden użyteczny zamknięty obrys.
 Niejednoznaczność wyświetla nazwy kandydatów. Maska, pasta i sitodruk zostają
-zidentyfikowane i pominięte. Dolna/wewnętrzna miedź, wiercenia oraz Gerber
-bez ustalonej roli blokują PCB-v0, zamiast udawać ich obsługę.
+zidentyfikowane i pominięte. Konfiguracja v1 dopuszcza tylko górną miedź;
+wersja v2 jawnie określa cały stackup, w tym dolną i wewnętrzną miedź.
+Wiercenia i Gerber bez ustalonej roli blokują przebieg.
 
-Shapely 2.1.x sumuje regiony, pady oraz linie/łuki o kołowym przekroju pisaka.
-Każdy połączony obszar daje jeden CopperPolygon. GKO opisuje środek linii
+Shapely 2.1.x składa regiony, pady oraz linie/łuki o kołowym przekroju pisaka:
+dark dodaje, clear odejmuje w kolejności obiektów/prymitywów z Gerbonara.
+Każdy połączony obszar w jednej warstwie daje jeden CopperPolygon. Miedź
+z różnych warstw nigdy nie jest sumowana. GKO opisuje środek linii
 obrysu, nie krawędź pisaka. Importer przelicza współrzędne na SI; potem
 istniejąca transformacja normalizuje port dokładnie raz.
 
@@ -65,7 +68,7 @@ Schemat: schemas/pcb-physical.schema.json. Przykład parameters/pcb_fr4_1p6.json
 
 Auto obsługuje dokładnie dwa zgodne prostokątne pady typu flash, ustawione
 poziomo lub pionowo. Pady wyznaczają oś, środek i szerokość. Przecięcie osi
-z **pełną sumą miedzi** wyznacza rzeczywistą szczelinę. Potem sprawdzane są
+z **pełną sumą górnej miedzi** wyznacza rzeczywistą szczelinę. Potem sprawdzane są
 całe powierzchnie styku i pusty prostokątny port oraz dotychczasowy audyt
 siatki. Tolerancja geometryczna pozostaje 1e-10 m, bez przesuwania geometrii.
 W emstest szczelina ma 0,64412 mm; w emstest2 0,70024 mm przy szerokości
@@ -206,15 +209,16 @@ wersje bibliotek i założenia. `native/model.xml` jest przygotowanym modelem.
 Po solve powstają `impedance.csv` i `summary.json`; po błędzie pliki natywne
 pozostają, a import_failure.json opisuje błąd. Status walidacji: unverified.
 
-Model: miedź górna płaska (domyślnie PEC, opcjonalnie conducting sheet); bez dolnej miedzi, przelotek,
-soldermaski, sitodruku, pasty i chropowatości. Parametry laminatu pochodzą
+Model v1: miedź górna płaska. Model v2: jawne warstwy miedzi i dielektryków.
+Miedź może być PEC lub conducting sheet; bez przelotek, soldermaski,
+sitodruku, pasty i chropowatości. Parametry laminatu pochodzą
 z konfiguracji. W PEC grubość/przewodność są wyłącznie metadanymi; w conducting sheet są parametrami materiału powierzchniowego.
 
 Krzywe są aproksymowane odcinkami z budżetem błędu geometrycznego 0,1 um.
 Usuwanie pozostałości operacji geometrycznych ma tolerancję 1 pm, bez
 zaokrąglania do siatki. To nie deklaracja dokładności elektromagnetycznej.
-Importer odrzuca clear/negative polarity, otwory w końcowych poligonach,
-połączenia wyłącznie punktowe, inne niż kołowe pisaki linii oraz
+Importer składa dark/clear w kolejności i zachowuje otwory miedzi. Nadal
+odrzuca połączenia wyłącznie punktowe, inne niż kołowe pisaki linii oraz
 niejednoznaczne/otwarte/wielokrotne obrysy. Nie wypełnia otworów ani nie
 naprawia uszkodzonych kształtów. Ostrzeżenia parsera są błędami importu,
 aby pominięte polecenia nie dawały pozornie poprawnego modelu.
@@ -375,3 +379,230 @@ obowiązuje także dla conducting sheet, bez zmiany próbkowania i animacji.
 Nie dodano soldermask, dolnej miedzi, przelotek ani chropowatości.
 Starsza konfiguracja JSON zawierająca ścieżki Gerberów nadal obsługuje PEC;
 wybór conducting sheet jest częścią fizycznej konfiguracji wejścia katalogowego.
+
+
+## Wielowarstwowy stackup (PCB-011B, physical schema v2)
+
+`parameters/pcb_fr4_4layer.json` to przykład czterech warstw. Parametry FR4
+pozostają **założeniami unverified**, nie danymi producenta. Plik nie zawiera
+nazw Gerberów. Przekaż katalog z dokładnie pasującymi warstwami, np.:
+
+```bat
+.\.venv\Scripts\python.exe -m antenna_lab.pcb.gerber_control gerbs\moja_plytka_4layer ^
+  --pcb-config parameters\pcb_fr4_4layer.json ^
+  --quality preview --center-mhz 2000 --cutoff-mhz 625 ^
+  --sweep-start-mhz 1500 --sweep-stop-mhz 2500 --sweep-step-mhz 10 ^
+  --fields-mhz 2000
+```
+
+Schemat v2 zawiera `schema_version: 2`, tablicę `stackup` i `port`.
+Element `copper` ma `role`, `model`, `thickness_um`, `conductivity_s_m`.
+Element `dielectric` ma `name`, `thickness_mm`, `epsilon_r`, `loss_tangent`.
+Wszystkie pola są wymagane. Obsługiwane modele miedzi to dokładnie `pec`
+i `conducting_sheet`; grubości i przewodności muszą być dodatnie.
+
+Stos zaczyna się od `top`, kończy na `bottom`, a role pośrednie mają kolejno
+nazwy `inner1`, `inner2`, itd. Miedź rozdzielają dodatnie grubości dielektryka;
+można opisać także kilka kolejnych dielektryków bez miedzi między nimi.
+Nazwy dielektryków muszą być unikalne. Puste, niespójne lub błędne v2 są
+odrzucane, nigdy konwertowane po cichu do v1.
+
+Top leży dokładnie przy z=0. Kolejne współrzędne wynikają wyłącznie z sumy
+głębokości dielektryków, bez zaokrąglania lub dodawania grubości miedzi:
+
+| Warstwa przykładu | Z [mm] |
+|---|---:|
+| top | 0 |
+| inner1 po prepreg 0,18 mm | −0,18 |
+| inner2 po core 1,20 mm | −1,38 |
+| bottom po prepreg 0,18 mm | −1,56 |
+
+Rozpoznawane nazwy obejmują GTL/GBL, F_Cu/B_Cu, In1_Cu/In2_Cu,
+InnerLayer1/InnerLayer2 oraz G1/G2 lub GP1/GP2. Metadane X2 FileFunction
+z Gerbonara mają numery fizyczne: L1=top, L2=inner1, itd. Kolejność musi
+być jednoznaczna i zgodna z nazwą, jeśli obie są podane. Brak, nadmiar,
+duplikat, luka w numeracji lub konflikt powoduje błąd z nazwami plików.
+Każda skonfigurowana rola musi mieć dokładnie jeden Gerber. Obrys nadal
+musi być pojedynczym zamkniętym konturem. Dotychczasowe ograniczenia
+geometrii Gerberów poza nową obsługą dark/clear i otworów miedzi pozostają.
+
+Od PCB-011D v2 obsługuje okrągłe przelotowe PTH i NPTH z Excellon, zgodnie
+z sekcją poniżej. V1 nadal odrzuca wiercenia. Brak plików wierceń **nie
+potwierdza**, że model odwzorowuje kompletne fizyczne PCB. Maska, pasta
+i sitodruk są wykrywane i pomijane.
+
+Port obsługuje wyłącznie `layer: "top"` (wymagane zarówno dla auto, jak
+explicit). Auto działa na dwóch prostokątnych flashach górnej miedzi.
+Puste wnętrze i kontakt bada się tylko na top; miedź pod spodem jest
+legalna. Odległa ścieżka tej samej górnej pętli nadal może łączyć oba końce.
+Normalizacja XY jest wykonywana raz i obraca wszystkie warstwy razem.
+
+Każdy dielektryk ma własny materiał constant-kappa i własny przedział Z;
+nie uśredniamy epsilon_r. Każda miedź otrzymuje osobne AddMetal lub
+AddConductingSheet i poligony na swoim Z. Model geometrii zawiera
+`dielectric_layers`, `copper_layers` oraz `layer_role` przy każdym poligonie.
+Starsze `substrate` jest widokiem pierwszego materiału wyłącznie dla zgodności;
+solver i mesh używają pełnej listy, nie tego widoku jako całego laminatu.
+
+Siatka zachowuje dokładnie wszystkie interfejsy i płaszczyzny miedzi.
+Za bliskie interfejsy są odrzucane, nie scalane. Limity Z stosują długość fali właściwą dla materiału danego przedziału;
+min_substrate_cells_z odnosi się do łącznej głębokości dielektryków, nie
+ustanawia nowego minimum na każdą warstwę. Interfejsy mogą już spełniać ten
+warunek bez dalszego podziału cienkiego prepregu. XY używa najkrótszej fali
+w stosie, ponieważ
+płaszczyzny kartezjańskie są wspólne. Grading, port i profile jakości są
+niezmienione. Grubość conducting sheet dodaje **zero linii Z**. Cienki
+prepreg może zwiększyć koszt i zmniejszyć CFL: preflight pokazuje to przed
+native Run i blokuje przebieg, jeśli sam impuls nie mieści się w limicie kroków.
+
+summary.json i preparation.geometry zapisują `resolved_stackup`: całkowitą
+głębokość dielektryków, wszystkie Z, parametry materiałowe, kappa przy
+częstotliwości odniesienia strat, parametry sheet i źródłowy SHA256 każdej
+warstwy miedzi. geometry.json zachowuje pełne poligony i warstwy. Raport
+odtwarza tabelę „Stackup” oraz `plots/stackup.png` bez Gerberów/openEMS.
+Miedź na schemacie jest symboliczna — grubość kreski nie oznacza geometrii.
+Widok z góry pokazuje top; cięcia XZ/YZ pokazują wszystkie interfejsy
+laminatu, miedź na rzeczywistym Z i port top.
+
+Maska E/H liczy odległość od każdej płaskiej miedzi na jej własnym Z,
+nie od wspólnego rzutu wszystkich warstw. Nie maskuje dielektryków.
+Pierwszy przekrój powietrzny pozostaje pierwszą dodatnią linią Z; fazy,
+normalizacja do 1 V i liczba natywnych Run są niezmienione.
+
+Brak --pcb-config, physical v1, legacy JSON ze ścieżkami, emstest/emstest2,
+PEC/conducting_sheet, sweep i pola zachowują dotychczasowe działanie.
+Nie dodano automatycznego badania zbieżności; wyniki pozostają unverified.
+
+
+## Clear polarity, antipady i wycięcia miedzi (PCB-011C)
+
+Każdy Gerber miedzi jest osobnym obrazem. Import zaczyna od pustej geometrii
+i przechodzi przez obiekty oraz ich prymitywy z Gerbonara w kolejności pliku:
+`dark → union`, `clear → difference`. Późniejsze dark może przywrócić wcześniej
+usuniętą miedź. Nie stosujemy `union(dark) - union(clear)`. Regiony, flash,
+kołowe linie/łuki używają istniejącego budżetu aproksymacji krzywych 0,1 µm
+i cleanup 1 pm z zachowaniem topologii. Pusty, błędny lub niepoligonowy
+wynik jest błędem, nie jest naprawiany. Ostrzeżenia parsera pozostają błędami.
+Obrys płytki nadal wymaga jednego zewnętrznego konturu; NPTH są osobnymi cylindrami Excellon w v2 (PCB-011D).
+
+`CopperPolygon.vertices_xy_m` pozostaje pierścieniem zewnętrznym.
+Opcjonalne `holes_xy_m` zawiera pierścienie wewnętrzne w SI. Jeden połączony
+przewodnik z wieloma otworami pozostaje jednym rekordem, z ID, rolą i Z.
+Później przywrócona izolowana wyspa wewnątrz otworu jest osobnym przewodnikiem,
+zgodnie z fizyczną topologią. Clear dochodzący do krawędzi daje wcięcie;
+przecięcie całej płaszczyzny może dać rozłączne przewodniki. Normalizacja
+obraca również otwory, bez zmiany Z lub wymiarów.
+
+Wnętrze otworu nie należy do miedzi. Krawędź otworu zachowuje dotychczasową
+tolerancję styku metalu — port może stykać się z nią tak jak z krawędzią
+zewnętrzną. Pełny kontakt, pusty prostokąt i dyskretny audyt portu pozostają
+obowiązkowe. Wszystkie te kontrole dotyczą wyłącznie top, nie rzutu miedzi
+zakopanej. Prostokątne clear flashe nie są kandydatami dodatnich padów auto.
+
+Adapter nadal instaluje zewnętrzne poligony PEC lub conducting sheet;
+nie trianguluje całej płaszczyzny. Otwory otrzymują płaskie poligony materiału
+`pcb_copper_clearance_air` (epsilon=1, kappa=0) na **tym samym Z**.
+Priorytet zwykłej miedzi wynosi 10, jej clearance 11. Dla zagnieżdżonych
+przywróconych wysp priorytety wynoszą kolejno 12/13, 14/15 itd. Każdy
+clearance wygrywa ze swoim przewodnikiem macierzystym, ale nie kasuje
+przywróconej wyspy. Głębokość zagnieżdżenia liczona jest tylko na tej samej
+warstwie i Z. Wszystkie priorytety są zapisane w preparation.geometry.copper_clearances.
+
+Ani otwory, ani fizyczna grubość conducting sheet nie dodają linii siatki.
+Po ich instalacji wykonywany jest dokładny audyt zamrożonych osi i jednostki.
+Zmiana obrysu lub rozłączenie miedzi przez clear może zmienić dotychczasowe
+kotwice bounding-box przewodników; nie jest to dodatkowe zagęszczanie otworów.
+Nie wprowadzono siatki o grubości miedzi ani dodatkowych przebiegów FDTD.
+
+geometry.json przechowuje wszystkie pierścienie, role i Z. Dane
+`copper_composition` w geometrii, import.json, summary.import i metadanych
+przygotowania zawierają dla każdej warstwy liczbę prymitywów dark/clear,
+końcowych przewodników i otworów. Liczymy prymitywy rozwinięte przez Gerbonara,
+nie liczbę wierszy pliku. JSON nie zawiera obiektów parsera.
+
+Maski E/H mierzą odległość do rzeczywistego poligonu z otworami na jego Z.
+W dużym antipadzie próbki nie są metalem; konserwatywne halo jednej komórki
+może nadal objąć wąski otwór lub próbki blisko innej warstwy. Substrat nie
+jest maskowany. Normowanie do 1 V, fazy i pozycje przekrojów są niezmienione.
+Rysunki z góry używają przezroczystych otworów w ścieżce złożonej, a pionowe
+cięcia rzeczywistych przecięć poligonów; nie zamalowują otworów ani wysp.
+Raport offline odtwarza je wyłącznie z zapisanej geometrii i wyników.
+
+Obsługę okrągłych Excellon PTH/NPTH w v2 opisuje PCB-011D poniżej. Nadal brak soldermask, komponentów i chropowatości.
+Model oraz priorytety warstw wymagają natywnej weryfikacji na Windows;
+testy z atrapami nie potwierdzają fizycznej zbieżności. Status: unverified.
+
+
+## PCB-011D — okrągłe przelotowe PTH i NPTH
+
+W katalogu Gerberów można umieścić np. `Drill_PTH.drl` i `Drill_NPTH.drl`.
+Gerbonara 1.6.3 parsuje Excellon (w tym jednostki, narzędzia i obiekty).
+Klasyfikacja używa metadanych plating z parsera, komentarza X2 FileFunction
+oraz konwencjonalnych nazw PTH/NPTH, plated/non-plated. Konflikt, nieznana
+klasa, mieszane klasy w jednym pliku, pusty plik lub ostrzeżenie parsera
+powodują błąd z nazwą źródła. Nie zgadujemy klasy ani formatu liczbowego.
+Metadane zakresu warstw muszą wskazywać od top do bottom. Nie obsługujemy
+slotów, frezowania, blind/buried/microvias ani nieokrągłych narzędzi.
+
+Opcjonalny obiekt w fizycznej konfiguracji **schema_version: 2**:
+
+```json
+"drills": {
+  "pth_plating_um": 25,
+  "pth_model": "solid_pec_equivalent"
+}
+```
+
+Jest obowiązkowy, gdy zestaw zawiera PTH; brak domyślnej ukrytej grubości
+metalizacji. Dla samych NPTH nie jest potrzebny. Grubość musi być dodatnia
+i skończona. Konfiguracja nie zawiera nazw plików. V1 oraz v2 bez wierceń
+zachowują wcześniejszy model. 25 µm to jawne założenie, nie pomiar producenta.
+
+PTH jest jednym walcem `AddCylinder` na `AddMetal('pcb_pth_solid_PEC')`,
+od dokładnego z=0 do płaszczyzny bottom. Promień wynosi połowę średnicy
+wiercenia plus grubość metalizacji. Nie jest to pusta powłoka ani walec
+conducting sheet. Raport zapisuje dosłownie:
+
+> PTH barrel model: solid PEC equivalent cylinder; plating losses and hollow barrel geometry are not modeled.
+
+Warstwa ma kontakt, gdy fizyczny dysk walca przecina końcową miedź tej
+warstwy po składaniu dark/clear. Antipad pozostaje otwarty poza dyskiem
+przelotki. Wymagane są co najmniej dwa kontakty na różnych warstwach;
+osierocony PTH jest błędem. Nie wnioskujemy sieci z nazw warstw.
+
+NPTH to `AddCylinder` materiału `pcb_npth_air` (epsilon=1, kappa=0), przez
+całą grubość dielektryków; usuwa też przypadkowo nachodzącą miedź.
+Nie ma promienia przewodnika ani kontaktów elektrycznych. Priorytet PTH
+jest o 1 większy od najwyższego priorytetu miedzi/prześwitów PCB-011C,
+a NPTH o kolejny 1. Walce nie zmieniają siatki podczas instalacji; po nich
+następuje dokładny audyt odczytu CSXCAD. Otwory przecinające port, wzajemnie
+nachodzące lub wychodzące poza obrys są odrzucane w tej pierwszej wersji.
+
+Siatka zachowuje dokładne X/Y środków każdego otworu, również w preview.
+Kotwice są zapisane osobno jako `drill_centres_xy_m`. Nie dodajemy kotwic
+promienia, grubości metalizacji, wierzchołków okręgu ani dodatkowych Z.
+Zmiana grubości metalizacji nie zmienia osi ani liczby komórek. Wiele
+różnych środków może podnieść koszt lub przekroczyć limit; istniejący
+preflight zatrzyma zadanie przed Run, bez usuwania przelotek. Skrajnie
+bliskie, różne krytyczne kotwice dają błąd zamiast scalenia. Samo zachowanie
+środka walca nie potwierdza dokładności elektromagnetycznej jego promienia
+na grubej siatce; wyniki nadal mają status unverified.
+
+`geometry.json` zapisuje ID, środek w SI, średnicę, klasę, narzędzie,
+SHA256, a dla PTH także grubość, promień równoważny i role kontaktów.
+`import.json`/`summary.json` zapisują źródła, SHA256, klasy, średnice
+narzędzi i liczby otworów. Numery narzędzi pochodzą z mapy przypiętego
+parsera Gerbonara, nie z własnego parsera NC. Normalizacja XY obejmuje
+środki razem z całą płytką dokładnie raz.
+
+Maski pól obejmują rzeczywiste walce PTH i halo jednej lokalnej komórki;
+NPTH usuwa maskę miedzi w otworze, lecz blisko jego brzegu nadal działa
+konserwatywne halo sąsiedniej miedzi. Substrat nie jest maskowany. Przekroje
+pionowe pokazują przecięte walce; widok XY oznacza obrysy otworów bez
+zamalowywania pola. Fazy, płaszczyzny i odniesienie 1 V pozostają bez zmian.
+Raport offline dodaje tabelę Drills / vias, oznaczenia PTH/NPTH z góry
+oraz symboliczne walce w schemacie stackupu (X i grubość ścianki nie są
+rysowane w skali). Nie potrzebuje źródłowych Excellonów ani openEMS.
+
+API walca: [CSXCAD CSPrimCylinder](https://docs.openems.de/en/latest/python/CSXCAD/CSPrimitives/CSPrimCylinder.html).
+Testy korzystają z atrap natywnych; nie uruchamiają FDTD ani macierzy zbieżności.

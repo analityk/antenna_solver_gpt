@@ -27,6 +27,7 @@ class PcbMeshAnchorPlan:
     port_length_m: float
     port_width_m: float
     substrate_thickness_m: float
+    drill_centres_xy_m: tuple[tuple[float, float], ...] = ()
 
 
 def _merge(values, critical=()):
@@ -39,7 +40,7 @@ def _merge(values, critical=()):
     """
     retained = sorted(critical)
     if any(b - a <= ANCHOR_MERGE_TOLERANCE_M for a, b in zip(retained, retained[1:])):
-        raise ConfigurationError("port: krytyczne kotwice są zbyt blisko względem tolerancji scalania.")
+        raise ConfigurationError("PCB: krytyczne kotwice portu/wierceń są zbyt blisko względem tolerancji scalania; nie zostaną scalone ani pominięte.")
     for value in sorted(values):
         if all(abs(value - other) > ANCHOR_MERGE_TOLERANCE_M for other in retained):
             retained.append(value)
@@ -51,6 +52,16 @@ def _z_interfaces(geometry):
 
     Geometry validation tolerates residue; solver-facing export does not.
     """
+    if geometry.copper_layers:
+        required = sorted({v for d in geometry.dielectrics for v in (d.z_min_m,d.z_max_m)})
+        if any(b-a <= ANCHOR_MERGE_TOLERANCE_M for a,b in zip(required, required[1:])):
+            raise ConfigurationError('PCB Z: unresolved dielectric interfaces; do not merge thin physical layers.')
+        planes = {c.role:c.z_m for c in geometry.copper_layers}
+        if required[-1] != 0.0 or any(c.z_m != planes[c.layer_role] for c in geometry.copper):
+            raise ConfigurationError('PCB stackup: exact shared copper/interface Z lines required, top z=0.')
+        if not set(planes.values()).issubset(required):
+            raise ConfigurationError('PCB stackup: copper plane missing dielectric interface.')
+        return tuple(required)
     bottom, top = geometry.substrate.z_min_m, geometry.substrate.z_max_m
     if top - bottom <= ANCHOR_MERGE_TOLERANCE_M:
         raise ConfigurationError(
@@ -89,10 +100,11 @@ def make_pcb_mesh_anchor_plan(geometry: PcbGeometry) -> PcbMeshAnchorPlan:
             anchors.extend((low, (low + high) / 2, high))
     half = geometry.port.width_m / 2
     return PcbMeshAnchorPlan(
-        _merge(x, (n[0], mx, p[0])),
-        _merge(y, (my - half, my, my + half)),
+        _merge(x, sorted({n[0], mx, p[0], *(d.x_m for d in geometry.drills)})),
+        _merge(y, sorted({my-half, my, my+half, *(d.y_m for d in geometry.drills)})),
         z, hypot(p[0] - n[0], p[1] - n[1]), geometry.port.width_m,
-        geometry.substrate.z_max_m - geometry.substrate.z_min_m,
+        max(d.z_max_m for d in geometry.dielectrics) - min(d.z_min_m for d in geometry.dielectrics),
+        tuple((d.x_m,d.y_m) for d in geometry.drills),
     )
 
 
@@ -169,7 +181,7 @@ def make_pcb_placeholder_mesh(
 class PcbPhysicalMeshPolicy:
     """Independent local step limits, not mesh axes or a complete FDTD domain.
 
-    Assumes a homogeneous isotropic substrate with relative permeability 1.
+    Uses the shortest dielectric wavelength for shared Cartesian XY planes; mu_r=1.
     Growth values are carried forward only; grading is not performed here.
     air_padding_m is the clearance from structure to START of PML, excluding
     PML thickness. pml_cells is metadata only; no PML geometry is constructed.
@@ -208,7 +220,7 @@ def derive_pcb_physical_mesh_policy(
     padding_frequency = min(settings.result_frequency_hz)
     padding_wavelength = C0 / padding_frequency
     air = C0 / f_mesh
-    substrate = air / sqrt(geometry.substrate.epsilon_r)
+    substrate = air / sqrt(max(d.epsilon_r for d in geometry.dielectrics))
     substrate_step = substrate / settings.cells_per_wavelength
     return PcbPhysicalMeshPolicy(
         padding_frequency_hz=padding_frequency,
@@ -254,6 +266,7 @@ class PcbDomainMesh:
     min_step_m: float
     max_step_m: float
     worst_growth_ratio: float
+    drill_centres_xy_m: tuple[tuple[float, float], ...] = ()
 
 
 def _domain_count_guard(shape, maximum):
@@ -371,6 +384,13 @@ def make_pcb_domain_mesh(
         core_limits = []
         for a, b in zip(required, required[1:]):
             maximum = policy.max_substrate_z_step_m if axis == 2 else policy.max_substrate_xy_step_m
+            if axis == 2 and geometry.dielectric_layers:
+                layer = next(d for d in geometry.dielectrics if d.z_min_m <= a and b <= d.z_max_m)
+                # Wavelength follows the actual material. The existing minimum
+                # substrate count applies to total dielectric depth, NOT N cells
+                # per layer: interfaces alone may already exceed that minimum.
+                maximum = min(policy.air_wavelength_m / sqrt(layer.epsilon_r) / settings.cells_per_wavelength,
+                              plan.substrate_thickness_m / settings.min_substrate_cells_z)
             if axis < 2 and local_ranges[axis][0] <= a and b <= local_ranges[axis][1]:
                 maximum = min(maximum, local_steps[axis])
             core_limits.append(maximum)
@@ -420,6 +440,7 @@ def make_pcb_domain_mesh(
         tuple(a[0] for a in ordinary), tuple(a[-1] for a in ordinary),
         tuple(a[0] for a in axes), tuple(a[-1] for a in axes), pml,
         min(min(s) for s in all_steps), max(max(s) for s in all_steps), worst,
+        plan.drill_centres_xy_m,
     )
 
     audit_pcb_port_edge_mesh(geometry, settings, mesh, port_edge_mode)
@@ -450,7 +471,7 @@ def _audit_thirds_pads(geometry, edge):
     not inferred from IDs. General polygon/edge recognition is deliberately absent.
     """
     from antenna_lab.pcb.validation import _contains, TOLERANCE_M
-    if len(geometry.copper) != 2:
+    if len(geometry.copper) != 2 or any(c.holes_xy_m for c in geometry.copper):
         raise ConfigurationError('PCB thirds: wymagane dokładnie dwa prostokątne pady syntetyczne.')
     n,p = geometry.port.negative_xy_m,geometry.port.positive_xy_m
     yl,yu = edge['physical_y_edges']
@@ -550,7 +571,7 @@ def make_gerber_mesh_anchor_plan(geometry, settings, quality):
     axes, suppressed = [], []
     for axis in range(2):
         board = [v[axis] for v in geometry.outline.vertices_xy_m]
-        critical = sorted(set((*feed[axis], min(board), max(board), bounds[0][axis], bounds[1][axis])))
+        critical = sorted(set((*feed[axis], *(p[axis] for p in base.drill_centres_xy_m), min(board), max(board), bounds[0][axis], bounds[1][axis])))
         retained = list(_merge((), critical))
         def resolution(v):
             return min(policy.max_substrate_xy_step_m, port_steps[axis]) if feed[axis][0] <= v <= feed[axis][-1] else policy.max_substrate_xy_step_m
@@ -577,5 +598,5 @@ def make_gerber_mesh_anchor_plan(geometry, settings, quality):
                 retained.append(value)
         axes.append(tuple(sorted(retained)))
     return replace(base,x_required_m=axes[0],y_required_m=axes[1]), dict(
-        name='gerber_economical_v1', quality=quality, minimum_interval_fraction=.5,
+        name='gerber_economical_v1', quality=quality, drill_centres_xy_m=base.drill_centres_xy_m, minimum_interval_fraction=.5,
         copper_midpoints=quality=='verify', suppressed_noncritical_anchors=suppressed)

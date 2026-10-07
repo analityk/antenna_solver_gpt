@@ -12,6 +12,7 @@ from matplotlib.colors import SymLogNorm
 from matplotlib.cm import ScalarMappable
 from shapely.geometry import Polygon, LineString
 
+from antenna_lab.pcb.regions import copper_shape
 from .fields import PCB_VIEWS, load_plane, phase_values
 
 
@@ -38,30 +39,42 @@ def overlays(geometry, plane):
     port=geometry['port'];n,p=np.asarray(port['negative_xy_m']),np.asarray(port['positive_xy_m'])
     half=port['width_m']/2;ym=(n[1]+p[1])/2
     port_polygon=[(n[0],ym-half),(p[0],ym-half),(p[0],ym+half),(n[0],ym+half)]
-    shapes=[(geometry['outline']['vertices_xy_m'],'#394635')]
-    shapes += [(c['vertices_xy_m'],'#725018') for c in geometry['copper']]
-    shapes += [(port_polygon,'#126eaa')]
+    shapes=[(Polygon(geometry['outline']['vertices_xy_m']),'#394635',0.0)]
+    from shapely.geometry import Point
+    for c in geometry['copper']:
+        shape=copper_shape(c)
+        for d in geometry.get('drills',[]):
+            if not d['plated']:
+                shape=shape.difference(Point(d['x_m'],d['y_m']).buffer(d['drill_diameter_m']/2,quad_segs=128))
+        for part in ([shape] if shape.geom_type=='Polygon' else getattr(shape,'geoms',())):
+            if not part.is_empty:shapes.append((part,'#725018',c['z_m']))
+    shapes += [(Polygon(port_polygon),'#126eaa',0.0)]
     paths=[]
     if normal==2:
-        for vertices,color in shapes:
-            points=[list(v) for v in vertices];points.append(points[0])
-            paths.append(dict(points=(np.asarray(points)*1000).tolist(),color=color))
+        # Above-board XY view shows the top layer, not opaque buried projections.
+        for shape,color,z in shapes:
+            if z != 0.0: continue
+            for ring in (shape.exterior,*shape.interiors):
+                paths.append(dict(points=(np.asarray(ring.coords)*1000).tolist(),color=color))
     else:
         position=plane['actual_position_m']
-        all_vertices=np.asarray([v for vertices,_ in shapes for v in vertices])
+        all_vertices=np.asarray([v for shape,_,_ in shapes for v in shape.exterior.coords])
         low,high=float(all_vertices[:,horizontal].min()),float(all_vertices[:,horizontal].max())
         line=LineString(((low,position),(high,position)) if normal==1 else ((position,low),(position,high)))
-        for i,(vertices,color) in enumerate(shapes):
-            cross=Polygon(vertices).intersection(line)
+        for i,(shape,color,z) in enumerate(shapes):
+            cross=shape.intersection(line)
             parts=[cross] if cross.geom_type=='LineString' else list(getattr(cross,'geoms',()))
             for part in parts:
                 if part.geom_type!='LineString' or part.is_empty:continue
                 coords=np.asarray(part.coords);a,b=float(coords[:,horizontal].min()),float(coords[:,horizontal].max())
-                paths.append(dict(points=[[a*1000,0.],[b*1000,0.]],color=color))
+                paths.append(dict(points=[[a*1000,z*1000],[b*1000,z*1000]],color=color))
                 if i==0:
-                    bottom=geometry['substrate']['z_min_m']*1000
-                    paths.append(dict(points=[[a*1000,0],[a*1000,bottom],[b*1000,bottom],[b*1000,0]],color='#568255'))
-    return paths
+                    for d in geometry.get('dielectric_layers') or [geometry['substrate']]:
+                        bottom,top=d['z_min_m']*1000,d['z_max_m']*1000
+                        paths.append(dict(points=[[a*1000,top],[a*1000,bottom],[b*1000,bottom],[b*1000,top]],color='#568255'))
+
+    from .pcb_drills import drill_paths
+    return paths + drill_paths(geometry,plane)
 
 
 def _indices(count, maximum):
@@ -169,7 +182,7 @@ def pcb_field_section(data, metadata, figure_image, plots_path, phase_step):
         raise ValueError('Nieobsługiwane metadane pól PCB (wymagane odniesienie 1 V).')
     phases=list(range(0,360,phase_step or 30))
     body='<section class="panel"><h2>Pola E/H — przebieg jednego okresu</h2>'
-    body+='<p>Stan harmoniczny Re(F·exp(+j·faza)); faza 0° = dodatnie maksimum napięcia portu. Odniesienie 1∠0 V portu, nie moc przyjęta. E: V/m per 1 V port; H: A/m per 1 V port. Strzałki pokazują chwilowy wektor E w przekroju; kolory podpisaną składową. Stałe symetryczne skale symlog we wszystkich fazach. Szary: konserwatywna maska geometrii copper/portu i halo jednej lokalnej komórki, nie natywna zajętość Yee. Laminat nie jest maskowany.</p>'
+    body+='<p>Stan harmoniczny Re(F·exp(+j·faza)); faza 0° = dodatnie maksimum napięcia portu. Odniesienie 1∠0 V portu, nie moc przyjęta. E: V/m per 1 V port; H: A/m per 1 V port. Strzałki pokazują chwilowy wektor E w przekroju; kolory podpisaną składową. Stałe symetryczne skale symlog we wszystkich fazach. Szary: konserwatywna maska geometrii miedzi/portu i halo jednej lokalnej komórki, nie natywna zajętość Yee. Laminat nie jest maskowany.</p>'
     body+='<p>Odtwarzanie nie uruchamia FDTD. Płaszczyzny pochodzą z istniejącej siatki, poza PML. Widok przeglądarki jest próbkowany najwyżej 80×80, strzałki dodatkowo rozrzedzone; zapis NPZ zachowuje wszystkie próbki i składowe.</p>'
     for plane in metadata['planes']:
         if plane['name'] not in PCB_VIEWS:raise ValueError('Nieznana płaszczyzna PCB E/H.')

@@ -163,13 +163,9 @@ M02*''')
             with self.assertRaisesRegex(ConfigurationError,'GKO'):
                 load_pcb_geometry(self.config)
 
-    def test_clear_holes_point_contacts_and_bad_inputs_fail_explicitly(self):
+    def test_point_contacts_and_bad_inputs_fail_explicitly(self):
         original=self.top.read_text()
-        cases=['%LPC*%\nD10*\nX500000Y1000000D03*',
-               # A positive ring away from both conductors cannot be a simple polygon.
-               '%ADD12C,0.1*%\nD12*\nG75*\nG01X100000Y100000D02*\nG02X100000Y100000I50000J0D01*',
-               # Point-only contact at the upper-left region corner.
-               '%ADD12R,1X1*%\nD12*\nX150000Y1950000D03*']
+        cases=['%ADD12R,1X1*%\nD12*\nX150000Y1950000D03*']
         for content in cases:
             self.top.write_text(original)
             self.append_graphics(content)

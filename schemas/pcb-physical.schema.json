@@ -1,116 +1,285 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "PCB physical assumptions (Gerber folder input)",
-  "type": "object",
-  "additionalProperties": false,
-  "required": [
-    "schema_version",
-    "substrate",
-    "copper",
-    "port"
-  ],
-  "properties": {
-    "schema_version": {
-      "const": 1
-    },
-    "copper": {
+  "title": "PCB physical assumptions v1/v2",
+  "oneOf": [
+    {
+      "title": "PCB physical assumptions (Gerber folder input)",
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "thickness_um",
-        "conductivity_s_m",
-        "model"
+        "schema_version",
+        "substrate",
+        "copper",
+        "port"
       ],
       "properties": {
-        "thickness_um": {
-          "type": "number",
-          "exclusiveMinimum": 0
+        "schema_version": {
+          "const": 1
         },
-        "conductivity_s_m": {
-          "type": "number",
-          "exclusiveMinimum": 0
+        "copper": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "thickness_um",
+            "conductivity_s_m",
+            "model"
+          ],
+          "properties": {
+            "thickness_um": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "conductivity_s_m": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "model": {
+              "enum": [
+                "pec",
+                "conducting_sheet"
+              ]
+            }
+          }
         },
-        "model": {
-          "enum": [
-            "pec",
-            "conducting_sheet"
+        "substrate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "thickness_mm",
+            "epsilon_r",
+            "loss_tangent"
+          ],
+          "properties": {
+            "thickness_mm": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "epsilon_r": {
+              "type": "number",
+              "minimum": 1
+            },
+            "loss_tangent": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        },
+        "port": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "mode"
+              ],
+              "properties": {
+                "mode": {
+                  "const": "auto"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "mode",
+                "negative_mm",
+                "positive_mm",
+                "width_mm"
+              ],
+              "properties": {
+                "negative_mm": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "items": {
+                    "type": "number"
+                  }
+                },
+                "positive_mm": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "items": {
+                    "type": "number"
+                  }
+                },
+                "width_mm": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "mode": {
+                  "const": "explicit"
+                }
+              }
+            }
           ]
         }
       }
     },
-    "substrate": {
+    {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "thickness_mm",
-        "epsilon_r",
-        "loss_tangent"
+        "schema_version",
+        "stackup",
+        "port"
       ],
       "properties": {
-        "thickness_mm": {
-          "type": "number",
-          "exclusiveMinimum": 0
+        "schema_version": {
+          "const": 2
         },
-        "epsilon_r": {
-          "type": "number",
-          "minimum": 1
-        },
-        "loss_tangent": {
-          "type": "number",
-          "minimum": 0
-        }
-      }
-    },
-    "port": {
-      "oneOf": [
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "mode"
-          ],
-          "properties": {
-            "mode": {
-              "const": "auto"
-            }
+        "stackup": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "type",
+                  "role",
+                  "thickness_um",
+                  "conductivity_s_m",
+                  "model"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "copper"
+                  },
+                  "role": {
+                    "type": "string",
+                    "pattern": "^(top|inner[1-9][0-9]*|bottom)$"
+                  },
+                  "thickness_um": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "conductivity_s_m": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "model": {
+                    "enum": [
+                      "pec",
+                      "conducting_sheet"
+                    ]
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "type",
+                  "name",
+                  "thickness_mm",
+                  "epsilon_r",
+                  "loss_tangent"
+                ],
+                "properties": {
+                  "type": {
+                    "const": "dielectric"
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "thickness_mm": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "epsilon_r": {
+                    "type": "number",
+                    "minimum": 1
+                  },
+                  "loss_tangent": {
+                    "type": "number",
+                    "minimum": 0
+                  }
+                }
+              }
+            ]
           }
         },
-        {
+        "port": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "mode",
+                "layer"
+              ],
+              "properties": {
+                "mode": {
+                  "const": "auto"
+                },
+                "layer": {
+                  "const": "top"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "mode",
+                "negative_mm",
+                "positive_mm",
+                "width_mm",
+                "layer"
+              ],
+              "properties": {
+                "negative_mm": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "items": {
+                    "type": "number"
+                  }
+                },
+                "positive_mm": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "items": {
+                    "type": "number"
+                  }
+                },
+                "width_mm": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "mode": {
+                  "const": "explicit"
+                },
+                "layer": {
+                  "const": "top"
+                }
+              }
+            }
+          ]
+        },
+        "drills": {
           "type": "object",
           "additionalProperties": false,
           "required": [
-            "mode",
-            "negative_mm",
-            "positive_mm",
-            "width_mm"
+            "pth_plating_um",
+            "pth_model"
           ],
           "properties": {
-            "negative_mm": {
-              "type": "array",
-              "minItems": 2,
-              "maxItems": 2,
-              "items": {
-                "type": "number"
-              }
-            },
-            "positive_mm": {
-              "type": "array",
-              "minItems": 2,
-              "maxItems": 2,
-              "items": {
-                "type": "number"
-              }
-            },
-            "width_mm": {
+            "pth_plating_um": {
               "type": "number",
               "exclusiveMinimum": 0
             },
-            "mode": {
-              "const": "explicit"
+            "pth_model": {
+              "const": "solid_pec_equivalent"
             }
           }
         }
-      ]
+      }
     }
-  }
+  ]
 }

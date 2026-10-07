@@ -67,17 +67,29 @@ def run_gerber_control(config_path, output_dir, *, prepare_only=False, quality='
         'dependencies': {name: version(name) for name in ('gerbonara','shapely')},
         'normalization': asdict(transform), 'assumptions': list(geometry.assumptions),
         'port_edge_mode': 'aligned', 'validation_status': 'unverified',
+        'copper_composition': [asdict(v) for v in geometry.copper_composition],
+        'drills': [asdict(v) for v in geometry.drills],
+        'composition_method': 'ordered primitive union/difference; later dark restores copper',
     }
     metadata.update(bundle_metadata)
     metadata.setdefault('source_directory', str(config.copper_top_path.parent))
     print('PCB Gerber: '+str(output), flush=True)
-    print(f'Material assumptions (unverified): substrate {config.substrate_thickness_m*1e3:g} mm, '
-          f'epsilon_r={config.substrate_epsilon_r:g}, loss_tangent={config.substrate_loss_tangent:g}; '
-          f'copper {config.copper_model}, physical thickness input {config.copper_thickness_m*1e6:g} um', flush=True)
+    if geometry.copper_layers:
+        from .stackup import resolved_stackup_metadata
+        material_metadata = dict(copper_model='stackup',
+            resolved_stackup=resolved_stackup_metadata(geometry, settings.loss_reference_frequency_hz))
+        print(f'Material assumptions (unverified): {len(geometry.copper_layers)} copper layers, '
+              f'{len(geometry.dielectrics)} explicit dielectrics; '
+              f"{material_metadata['resolved_stackup']['total_dielectric_thickness_m']*1e3:g} mm", flush=True)
+    else:
+        material_metadata = copper_metadata(config)
+        print(f'Material assumptions (unverified): substrate {config.substrate_thickness_m*1e3:g} mm, '
+              f'epsilon_r={config.substrate_epsilon_r:g}, loss_tangent={config.substrate_loss_tangent:g}; '
+              f'copper {config.copper_model}, physical thickness input {config.copper_thickness_m*1e6:g} um', flush=True)
     for assumption in geometry.assumptions:
         print('  '+assumption, flush=True)
     output.mkdir(parents=True, exist_ok=True)
-    diagnostics = dict(copper_metadata(config), sweep=sweep, quality_profile=quality, actual_iterations=None, termination_status='not_started')
+    diagnostics = dict(material_metadata, sweep=sweep, quality_profile=quality, actual_iterations=None, termination_status='not_started')
     try:
         _, anchor_metadata = make_gerber_mesh_anchor_plan(geometry, settings, quality)
         diagnostics['suppressed_noncritical_anchors'] = anchor_metadata.pop('suppressed_noncritical_anchors')
