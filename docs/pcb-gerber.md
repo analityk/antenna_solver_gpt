@@ -676,3 +676,63 @@ Przykład przygotowania bez FDTD (CMD):
   --sweep-start-mhz 1500 --sweep-stop-mhz 2500 --sweep-step-mhz 10 ^
   --prepare-only
 ```
+
+## ENET + FlyingProbe: idealne R/C/L i źródło CSRC (PCB-011E)
+
+W fizycznym schemacie v2 folder może zawierać jeden `*.enet` i jeden
+`FlyingProbeTesting.json`. ENET wymaga pliku FlyingProbe; oba są zapisywane
+z SHA256 w metadanych importu. Bez ENET dotychczasowe wykrywanie portu nie
+zmienia się. Nie dopisuj nazw tych plików do konfiguracji fizycznej.
+
+Elektrycznie używane są wyłącznie `props.Designator`, `props.Value` i `pins`.
+Wspierane są dwupinowe R/C/L na górnej warstwie SMD, z osiami X/Y. Wartości
+muszą być dodatnie, skończone i mieć jednostkę: R/Ω/ohm/mΩ/kΩ/MΩ,
+F/pF/nF/uF/µF lub H/pH/nH/uH/µH/mH. Parametry katalogowe, tolerancja i DCR
+nie zastępują Value. Dokładnie jeden `CSRC` z numerycznym Value=0 wskazuje
+źródło (istniejący port odniesienia, zwykle 50 Ω), a nie kondensator 0 F.
+
+FlyingProbe wiąże `REFDES_pin` z siecią i położeniem. Niezgodna sieć,
+niejednoznaczny pin, dolna warstwa, THT lub ukośna para kończą import błędem.
+Wpisy PAD nieobecne w ENET są ignorowane. Przerwę wyznacza końcowy obraz
+miedzi po union/clear, nie krawędź apertury ani wymiar obudowy.
+
+Każdy element dodaje tylko dwie krytyczne podłużne kotwice styków.
+Najmniejszy legalny istniejący przedział poprzeczny musi mieścić się w obu
+padach i mieć pełny kontakt oraz pustą przerwę. Brak takiej komórki oznacza
+jawny błąd, nie ukryte zagęszczenie. R/C/L używają `AddLumpedElement`,
+`LEtype=1`, `caps=True` i boxa od z=0 do pierwszej istniejącej linii powietrza.
+PEC end caps zapewniają kontakt z płaskimi padami; nie są modelem wyprowadzeń
+obudowy. Nie powstają nowe kotwice Z. Zmiana wartości R/C/L nie zmienia siatki.
+Sygnaturę porównano z przypiętym CSXCAD
+[`dcdb62b`, CSPropLumpedElement](https://github.com/thliebig/CSXCAD/blob/dcdb62bcfd1111ee3594ba22d06089b41b380990/python/CSXCAD/CSProperties.pyx).
+Testy atrap nie stanowią potwierdzenia natywnego kontaktu ani impedancji.
+
+`geometry.json` przechowuje elementy, położenia i pochodzenie CSRC;
+metadane przygotowania zawierają dokładne argumenty i boxy elementów.
+Raport offline pokazuje tabelę **Ideal components** i znaczniki. Pola mają
+oddzielny bit maski 8 dla boxów RLC z dotychczasowym halo jednej lokalnej
+komórki. Przekroje pionowe pokazują rzeczywisty box solvera, nie obudowę.
+Jeden Run i jeden CalcPort nadal obsługują cały eksperyment.
+
+**Components are ideal lumped elements. Package parasitics, tolerance,
+ESR/ESL/DCR and manufacturer frequency dependence are not modeled.**
+
+Przygotowanie `emtest4` w Windows CMD (bez FDTD):
+
+```bat
+set "CSXCAD_INSTALL_PATH=C:\dev\openems\openEMS"
+.\.venv\Scripts\python.exe -m antenna_lab.pcb.gerber_control gerbs\emtest4 ^
+  --pcb-config parameters\pcb_fr4_2layer_pth.json ^
+  --quality preview --center-mhz 2000 --cutoff-mhz 1000 ^
+  --sweep-start-mhz 1500 --sweep-stop-mhz 2500 --sweep-step-mhz 10 ^
+  --prepare-only
+```
+
+Cutoff 1000 MHz jest tu **jawnym ustawieniem przykładu**, nie nowym domyślnym
+parametrem. Dla cutoff 625 MHz preview potrzebuje co najmniej 55 210 kroków
+na sam impuls i poprawnie odmawia startu przy limicie 50 000. Profil design
+z tym samym cutoff mieści impuls w swoim limicie 75 000 (ukończenie zaniku
+nadal wymaga sprawdzenia statystyk). Profile i zabezpieczenia nie zmieniły się.
+Dla powyższego preview: 288 120 komórek, minimum 34 507 kroków impulsu;
+bez kotwic elementów przy identycznym eksperymencie: 181 790 komórek.
+Oś Z jest identyczna. To preflight, nie benchmark ani dowód zbieżności.

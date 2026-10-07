@@ -94,6 +94,35 @@ class PcbDrill:
     connected_layer_roles: tuple[str, ...] = ()
 
 
+@dataclass(frozen=True)
+class PcbLumpedComponent:
+    id: str
+    kind: str
+    value_si: float
+    value_text: str
+    pin1_net: str
+    pin2_net: str
+    pin1_xy_m: tuple[float, float]
+    pin2_xy_m: tuple[float, float]
+    layer: str
+    axis: str
+    gap_start_xy_m: tuple[float, float]
+    gap_stop_xy_m: tuple[float, float]
+    contact_window_xy_m: tuple[tuple[float, float], ...]
+    source_sha256: str
+    flying_probe_sha256: str
+
+
+@dataclass(frozen=True)
+class PcbSourceProvenance:
+    source_refdes: str
+    source_pin_nets: tuple[str, str]
+    pin1_xy_m: tuple[float, float]
+    pin2_xy_m: tuple[float, float]
+    enet_sha256: str
+    flying_probe_sha256: str
+
+
 @dataclass
 class PcbGeometry:
     model: str
@@ -106,6 +135,8 @@ class PcbGeometry:
     copper_layers: tuple[CopperLayer, ...] = ()
     copper_composition: tuple[CopperImageStats, ...] = ()
     drills: tuple[PcbDrill, ...] = ()
+    components: tuple[PcbLumpedComponent, ...] = ()
+    source_port: PcbSourceProvenance | None = None
 
     @property
     def dielectrics(self):

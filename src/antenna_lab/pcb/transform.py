@@ -31,6 +31,13 @@ def _map_xy(geometry, point):
         x,y=point((value.x_m,value.y_m))
         return replace(value,x_m=x,y_m=y)
 
+    def component(value):
+        start, stop = point(value.gap_start_xy_m), point(value.gap_stop_xy_m)
+        return replace(value, pin1_xy_m=point(value.pin1_xy_m), pin2_xy_m=point(value.pin2_xy_m),
+            gap_start_xy_m=start, gap_stop_xy_m=stop,
+            axis='x' if abs(stop[0]-start[0]) > abs(stop[1]-start[1]) else 'y',
+            contact_window_xy_m=tuple(point(p) for p in value.contact_window_xy_m))
+
     return replace(
         geometry,
         outline=outline(geometry.outline),
@@ -42,6 +49,10 @@ def _map_xy(geometry, point):
         port=replace(geometry.port, negative_xy_m=point(geometry.port.negative_xy_m),
                      positive_xy_m=point(geometry.port.positive_xy_m)),
         drills=tuple(drill(d) for d in geometry.drills),
+        components=tuple(component(c) for c in geometry.components),
+        source_port=(replace(geometry.source_port,
+            pin1_xy_m=point(geometry.source_port.pin1_xy_m),
+            pin2_xy_m=point(geometry.source_port.pin2_xy_m)) if geometry.source_port else None),
         assumptions=list(geometry.assumptions),
     )
 

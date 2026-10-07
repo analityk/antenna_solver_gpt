@@ -79,7 +79,7 @@ def install_pcb_fields(csx, geometry, mesh, settings, frequencies):
 
 
 def pcb_sample_mask(lines, full_axes, geometry):
-    """Bits 1 copper, 2 one-local-cell-diagonal copper halo, 4 port plus halo.
+    """Bits 1 copper, 2 local copper halo, 4 port + halo, 8 ideal component + halo.
 
     Distances to continuous planar copper/source; not native Yee occupancy.
     Substrate volume is deliberately not masked. Native grids are not resampled.
@@ -116,6 +116,11 @@ def pcb_sample_mask(lines, full_axes, geometry):
     ym=(n[1]+p[1])/2;half=geometry.port.width_m/2
     source=box(n[0],ym-half,p[0],ym+half)
     mask[np.hypot(distance(xy,source),z)<=halo]|=4
+    from .pcb_components import resolve_component_boxes
+    for region in resolve_component_boxes(geometry, full_axes):
+        lower,upper=np.asarray(region.start_m),np.asarray(region.stop_m)
+        d=np.linalg.norm(np.maximum(np.maximum(lower-xyz,xyz-upper),0),axis=1)
+        mask[d<=halo]|=8  # Same local diagonal halo; separate ideal-component bit.
     return mask.reshape(shape)
 
 
@@ -166,7 +171,10 @@ def finish_pcb_fields(geometry,mesh,layout,frequencies,reference,output):
             normalization_factor=scale,port_voltage_phasor=voltage,reference_voltage_v=1.,
             phasor_convention=CONVENTION,array_order=ARRAY_ORDER)
         plane['masked_samples']=int(np.count_nonzero(mask))
-    metadata=dict(schema_version=1,model='pcb',planes=layout,frequency_hz=frequencies.tolist(),
+    from dataclasses import asdict
+    from .pcb_components import resolve_component_boxes
+    component_regions=[asdict(s) for s in resolve_component_boxes(geometry,axes)]
+    metadata=dict(component_regions=component_regions, schema_version=1,model='pcb',planes=layout,frequency_hz=frequencies.tolist(),
         units=dict(E='V/m per 1 V port',H='A/m per 1 V port',coordinates='m'),
         phasor_convention=CONVENTION,array_order=ARRAY_ORDER,
         normalization='total port voltage = 1∠0 V; not accepted-power normalization',
@@ -176,7 +184,7 @@ def finish_pcb_fields(geometry,mesh,layout,frequencies,reference,output):
         reference_voltage_v=1.,mesh_changed=False,additional_fdtd_runs=0,
         effect='Passive DFT/I/O only; physical model, port, excitation, PML and quality unchanged.',
         native_coordinate_comparison=dict(rtol=1e-6,atol_m=1e-10,interpolation=False),
-        mask_bits={'1':'copper sheets and solid PTH cylinders','2':'one local cell diagonal around copper','4':'planar port and halo'},
+        mask_bits={'1':'copper sheets and solid PTH cylinders','2':'one local cell diagonal around copper','4':'planar port and halo','8':'ideal lumped component box and same local halo'},
         mask_note='Conservative geometric/interpolation mask, not native Yee-cell occupancy. Substrate not masked. Raw native/*.h5 untouched.',
         validation_status='unverified')
     write_json(folder/'metadata.json',metadata)

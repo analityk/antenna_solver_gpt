@@ -61,6 +61,8 @@ def install_pcb_geometry(
                 a >= b for a, b in zip(lines, lines[1:])):
             raise ConfigurationError(f"PCB grid {axis}: wymagane skończone, ściśle rosnące linie.")
     _require_lines(axes, plan, domain_mesh)
+    from .pcb_components import resolve_component_boxes, install_components
+    component_specs = resolve_component_boxes(geometry, axes)
     audit_pcb_port_edge_mesh(geometry, settings, domain_mesh, port_edge_mode)
     substrate = geometry.substrate
     frequency = settings.loss_reference_frequency_hz
@@ -119,7 +121,10 @@ def install_pcb_geometry(
     from .pcb_drills import install_drills
     drill_metadata = install_drills(csx, geometry, priority_plan)
     _audit_port_grid(csx, domain_mesh, context='after dielectric/copper/clearance/drill installation')
+    component_metadata = install_components(csx, component_specs)
+    _audit_port_grid(csx, domain_mesh, context='after ideal component installation')
     return {
+        'ideal_components': component_metadata,
         **copper_info,
         'copper_clearances': clearance_metadata,
         'drills': drill_metadata,

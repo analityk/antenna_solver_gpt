@@ -33,7 +33,7 @@ def view_fields(data, plane, index):
         frequency_hz=float(data['frequency_hz'][index]))
 
 
-def overlays(geometry, plane):
+def overlays(geometry, plane, component_regions=()):
     """XY projections; true plane intersections with planar copper in XZ/YZ."""
     normal,horizontal,vertical,*_=PCB_VIEWS[plane['name']]
     port=geometry['port'];n,p=np.asarray(port['negative_xy_m']),np.asarray(port['positive_xy_m'])
@@ -74,7 +74,8 @@ def overlays(geometry, plane):
                         paths.append(dict(points=[[a*1000,top],[a*1000,bottom],[b*1000,bottom],[b*1000,top]],color='#568255'))
 
     from .pcb_drills import drill_paths
-    return paths + drill_paths(geometry,plane)
+    from .pcb_components import component_paths
+    return paths + drill_paths(geometry,plane) + component_paths(geometry,plane,component_regions)
 
 
 def _indices(count, maximum):
@@ -182,12 +183,12 @@ def pcb_field_section(data, metadata, figure_image, plots_path, phase_step):
         raise ValueError('Nieobsługiwane metadane pól PCB (wymagane odniesienie 1 V).')
     phases=list(range(0,360,phase_step or 30))
     body='<section class="panel"><h2>Pola E/H — przebieg jednego okresu</h2>'
-    body+='<p>Stan harmoniczny Re(F·exp(+j·faza)); faza 0° = dodatnie maksimum napięcia portu. Odniesienie 1∠0 V portu, nie moc przyjęta. E: V/m per 1 V port; H: A/m per 1 V port. Strzałki pokazują chwilowy wektor E w przekroju; kolory podpisaną składową. Stałe symetryczne skale symlog we wszystkich fazach. Szary: konserwatywna maska geometrii miedzi/portu i halo jednej lokalnej komórki, nie natywna zajętość Yee. Laminat nie jest maskowany.</p>'
+    body+='<p>Stan harmoniczny Re(F·exp(+j·faza)); faza 0° = dodatnie maksimum napięcia portu. Odniesienie 1∠0 V portu, nie moc przyjęta. E: V/m per 1 V port; H: A/m per 1 V port. Strzałki pokazują chwilowy wektor E w przekroju; kolory podpisaną składową. Stałe symetryczne skale symlog we wszystkich fazach. Szary: konserwatywna maska geometrii miedzi/portu/elementów idealnych i halo jednej lokalnej komórki, nie natywna zajętość Yee. Laminat nie jest maskowany.</p>'
     body+='<p>Odtwarzanie nie uruchamia FDTD. Płaszczyzny pochodzą z istniejącej siatki, poza PML. Widok przeglądarki jest próbkowany najwyżej 80×80, strzałki dodatkowo rozrzedzone; zapis NPZ zachowuje wszystkie próbki i składowe.</p>'
     for plane in metadata['planes']:
         if plane['name'] not in PCB_VIEWS:raise ValueError('Nieznana płaszczyzna PCB E/H.')
         fields=load_plane(data['root']/'fields'/(plane['name']+'.npz'),plane,metadata['frequency_hz'])
-        paths=overlays(data['geometry'],plane)
+        paths=overlays(data['geometry'],plane,metadata.get('component_regions',()))
         for i,f in enumerate(fields['frequency_hz']):
             view=view_fields(fields,plane,i);payload=viewer_payload(view,paths,phases)
             encoded=json.dumps(payload,allow_nan=False).replace('<','\\u003c').replace('>','\\u003e').replace('&','\\u0026')

@@ -253,6 +253,8 @@ def _pcb_geometry(data, plots_path):
         ax.add_patch(copper_patch(copper, facecolor='#c77c36', edgecolor='#825323', alpha=.85))
     from .pcb_drills import drill_markers
     drill_markers(ax,geometry)
+    from .pcb_components import component_markers
+    component_markers(ax,geometry)
     port = geometry['port']; n,p = np.asarray(port['negative_xy_m']),np.asarray(port['positive_xy_m'])
     delta = p-n; normal = np.array([-delta[1],delta[0]])/np.linalg.norm(delta)*port['width_m']/2
     face = np.asarray([n-normal,p-normal,p+normal,n+normal])*1e3
@@ -360,7 +362,8 @@ def render_html(data, *, plots_path=None, phase_step=None, field_components=None
         geometry = _pcb_geometry(data, plots_path)
         from .pcb_stackup import stackup_section
         from .pcb_drills import drill_section
-        extra_sections = geometry + stackup_section(data, plots_path, figure_image, table) + drill_section(data["geometry"],table) + _pcb_metadata(data)
+        from .pcb_components import component_section
+        extra_sections = geometry + stackup_section(data, plots_path, figure_image, table) + drill_section(data["geometry"],table) + component_section(data,table) + _pcb_metadata(data)
         if (data["root"] / "fields" / "metadata.json").exists():
             extra_sections += field_section(data, figure_image, plots_path, phase_step, field_components)
         zeros = _pcb_diagnostics(data)

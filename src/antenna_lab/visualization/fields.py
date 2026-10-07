@@ -49,7 +49,7 @@ def load_plane(path, plane, expected_frequency):
                 or frequency.ndim != 1 or not 1 <= len(frequency) <= 3 or np.any(np.diff(frequency)<=0)):
             raise ValueError('Nieprawidłowe odniesienie PCB 1 V lub układ tablic.')
     mask = result["mask"]
-    if mask.shape != shape or not np.issubdtype(mask.dtype, np.integer) or np.any(mask > 7) or np.any(mask < 0):
+    if mask.shape != shape or not np.issubdtype(mask.dtype, np.integer) or np.any(mask > (15 if pcb else 7)) or np.any(mask < 0):
         raise ValueError("Niepoprawna maska próbek E/H.")
     for key in ("E_v_per_m", "H_a_per_m"):
         values = result[key]

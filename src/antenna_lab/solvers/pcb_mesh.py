@@ -30,6 +30,12 @@ class PcbMeshAnchorPlan:
     drill_centres_xy_m: tuple[tuple[float, float], ...] = ()
 
 
+def component_terminal_anchors(geometry, axis):
+    """Only longitudinal contact faces; no package/transverse/Z refinement."""
+    return tuple(v[axis] for c in geometry.components if c.axis == 'xy'[axis]
+                 for v in (c.gap_start_xy_m, c.gap_stop_xy_m))
+
+
 def _merge(values, critical=()):
     """Keep critical coordinates first, then the smallest eligible coordinate.
 
@@ -100,8 +106,8 @@ def make_pcb_mesh_anchor_plan(geometry: PcbGeometry) -> PcbMeshAnchorPlan:
             anchors.extend((low, (low + high) / 2, high))
     half = geometry.port.width_m / 2
     return PcbMeshAnchorPlan(
-        _merge(x, sorted({n[0], mx, p[0], *(d.x_m for d in geometry.drills)})),
-        _merge(y, sorted({my-half, my, my+half, *(d.y_m for d in geometry.drills)})),
+        _merge(x, sorted({n[0], mx, p[0], *(d.x_m for d in geometry.drills), *component_terminal_anchors(geometry, 0)})),
+        _merge(y, sorted({my-half, my, my+half, *(d.y_m for d in geometry.drills), *component_terminal_anchors(geometry, 1)})),
         z, hypot(p[0] - n[0], p[1] - n[1]), geometry.port.width_m,
         max(d.z_max_m for d in geometry.dielectrics) - min(d.z_min_m for d in geometry.dielectrics),
         tuple((d.x_m,d.y_m) for d in geometry.drills),
@@ -571,7 +577,7 @@ def make_gerber_mesh_anchor_plan(geometry, settings, quality):
     axes, suppressed = [], []
     for axis in range(2):
         board = [v[axis] for v in geometry.outline.vertices_xy_m]
-        critical = sorted(set((*feed[axis], *(p[axis] for p in base.drill_centres_xy_m), min(board), max(board), bounds[0][axis], bounds[1][axis])))
+        critical = sorted(set((*feed[axis], *component_terminal_anchors(geometry, axis), *(p[axis] for p in base.drill_centres_xy_m), min(board), max(board), bounds[0][axis], bounds[1][axis])))
         retained = list(_merge((), critical))
         def resolution(v):
             return min(policy.max_substrate_xy_step_m, port_steps[axis]) if feed[axis][0] <= v <= feed[axis][-1] else policy.max_substrate_xy_step_m
@@ -599,4 +605,5 @@ def make_gerber_mesh_anchor_plan(geometry, settings, quality):
         axes.append(tuple(sorted(retained)))
     return replace(base,x_required_m=axes[0],y_required_m=axes[1]), dict(
         name='gerber_economical_v1', quality=quality, drill_centres_xy_m=base.drill_centres_xy_m, minimum_interval_fraction=.5,
-        copper_midpoints=quality=='verify', suppressed_noncritical_anchors=suppressed)
+        copper_midpoints=quality=='verify', suppressed_noncritical_anchors=suppressed,
+        component_terminal_anchors_m={a:component_terminal_anchors(geometry,i) for i,a in enumerate('xy')})

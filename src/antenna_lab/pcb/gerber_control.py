@@ -69,6 +69,8 @@ def run_gerber_control(config_path, output_dir, *, prepare_only=False, quality='
         'port_edge_mode': 'aligned', 'validation_status': 'unverified',
         'copper_composition': [asdict(v) for v in geometry.copper_composition],
         'drills': [asdict(v) for v in geometry.drills],
+        'components': [asdict(v) for v in geometry.components],
+        'source_port': asdict(geometry.source_port) if geometry.source_port else None,
         'composition_method': 'ordered primitive union/difference; later dark restores copper',
     }
     metadata.update(bundle_metadata)
@@ -96,6 +98,9 @@ def run_gerber_control(config_path, output_dir, *, prepare_only=False, quality='
         diagnostics['mesh_anchor_policy'] = anchor_metadata
         mesh = make_pcb_domain_mesh(geometry, settings, gerber_quality=quality)
         resolve_pcb_lumped_port(geometry, mesh, settings, gerber_quality=quality)
+        from antenna_lab.solvers.pcb_components import resolve_component_boxes
+        diagnostics['ideal_components'] = [asdict(c) for c in resolve_component_boxes(
+            geometry, (mesh.x_lines_m, mesh.y_lines_m, mesh.z_lines_m))]
         cost = gerber_cost_preflight(mesh, settings)
         diagnostics.update(cost)
         print(f"Quality: {quality}\nMesh: {mesh.shape_cells} = {mesh.cell_count} cells\n"

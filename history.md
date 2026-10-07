@@ -1246,3 +1246,32 @@ XML preparation zatrzymało się na ładowaniu native_modules: No module named
 openEMS. To środowisko nie ma natywnych openEMS/CSXCAD; pełna weryfikacja
 XML pozostaje na Windowsie. Nie przedstawiamy atrap testowych jako natywnego
 PASS. Nie zmieniano ani nie naprawiano innych elementów produkcyjnego zestawu.
+
+## PCB-011E — idealne elementy z ENET i port CSRC
+
+Powód: emtest4 zawiera wiele padów elementów; stare wykrywanie dokładnie
+pary prostokątnych błysków nie określa właściwego źródła. W fizycznym v2
+import ENET + FlyingProbe wiąże jawne sieci/piny z końcowym obrazem miedzi.
+CSRC Value=0 wybiera jedyny port, R/C/L biorą wyłącznie props.Value.
+Bez ENET zachowany jest dotychczasowy import. Nie dodano bibliotek.
+
+Nowe niemutowalne rekordy elementów i pochodzenia źródła są serializowane,
+transformowane razem z PCB i odtwarzalne offline. Kotwice obejmują tylko
+podłużne styki. Boxy używają istniejącej komórki poprzecznej i pierwszej
+powietrznej Z; brak legalnego kontaktu kończy przygotowanie błędem.
+AddLumpedElement: pojedyncze R/C/L, LEtype=1, caps=True; priorytet 5,
+audyt siatki przed/po. Brak nowego Run, geometrii obudowy, ESR/ESL/DCR.
+Wartości elementów nie wpływają na osie. Raport i pola pokazują elementy,
+bit maski 8 używa istniejącej polityki lokalnego halo.
+
+Sprawdzenia: parser/wartości/jednostki, sieci i odrzucenia, finalna przerwa,
+normalizacja/inverse, kotwice/stała oś Z, instalacja R/C/L na atrapach,
+jeden port/Run/CalcPort, pola i raport po usunięciu źródeł. Pełny zestaw unittest:
+329 testów, OK, 3 pominięte testy zależne od natywnego środowiska.
+Rzeczywisty emtest4: CSRC A–B; C1=100pF, L1=18nH, R1=49.9Ω.
+Preview 2 GHz/cutoff 625 MHz poprawnie blokuje impuls 55 210 kroków wobec
+limitu 50 000. Jawny cutoff 1000 MHz daje 288 120 komórek i minimum
+34 507 kroków; bez elementów 181 790 komórek, oś Z bez zmian.
+Prepare-only dochodzi do braku natywnych bibliotek w środowisku agenta;
+XML/kontakt natywny pozostają do wykonania na Windowsie. Nie uruchamiano
+natywnego FDTD. Wszystkie wyniki pozostają unverified.
