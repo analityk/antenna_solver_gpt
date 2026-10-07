@@ -20,7 +20,7 @@ from gerbonara.utils import MM
 from shapely.geometry import Point, Polygon
 
 from antenna_lab.core.config import ConfigurationError
-from .model import PcbDrill
+from .model import PcbDrill, QuantizedPcbDrill
 from .regions import copper_shape
 
 PTH_MODEL_NOTE = 'PTH barrel model: solid PEC equivalent cylinder; plating losses and hollow barrel geometry are not modeled.'
@@ -171,10 +171,28 @@ def validate_drills(geometry):
             raise ConfigurationError(f'{d.id}: invalid drill dimensions.')
         point=Point(d.x_m,d.y_m)
         radius=d.drill_diameter_m/2
+        resolution = None
+        if isinstance(d, QuantizedPcbDrill):
+            from decimal import Decimal
+            from .grid import PcbGrid
+            resolution = PcbGrid(d.geometry_resolution_nm)
+            source_diameter = d.source_drill_diameter_m
+            if source_diameter is None or not isfinite(source_diameter) or source_diameter <= 0:
+                raise ConfigurationError(f'{d.id}: geometry resolution requires a positive finite source drill diameter.')
+            tick_radius = resolution.nearest_tick(Decimal(str(source_diameter))/2)
+            if tick_radius < 1 or d.drill_diameter_m != resolution.to_metres(2*tick_radius):
+                raise ConfigurationError(f'{d.id}: modeled drill diameter does not match geometry-resolution projection.')
         if d.plated:
             if d.plating_thickness_m is None or not isfinite(d.plating_thickness_m) or d.plating_thickness_m<=0:
                 raise ConfigurationError(f'{d.id}: positive finite PTH plating required.')
             radius+=d.plating_thickness_m
+            if resolution is not None:
+                # Reproduce PCB-012A projection of the physical solid-equivalent
+                # radius. Do not restore source dimensions or loosen topology.
+                outer_tick = resolution.nearest_tick(d.source_drill_diameter_m/2+d.plating_thickness_m)
+                if outer_tick < tick_radius:
+                    raise ConfigurationError(f'{d.id}: modeled PTH outer radius smaller than drill radius.')
+                radius = resolution.to_metres(outer_tick)
             if d.equivalent_outer_radius_m != radius:
                 raise ConfigurationError(f'{d.id}: inconsistent PTH equivalent radius.')
             contacts=connected_layers(geometry,d.x_m,d.y_m,radius)

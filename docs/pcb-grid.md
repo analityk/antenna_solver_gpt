@@ -1,4 +1,4 @@
-# Globalna kratownica PCB — infrastruktura PCB-012A/012B
+# Rozdzielczość geometrii PCB — infrastruktura PCB-012A/012B
 
 Ten moduł **nie jest włączony do FDTD**. Nie ma przełącznika CLI. Aktywne
 Gerbery, siatka, materiały, XML i domyślne ustawienia pozostają bez zmian.
@@ -54,11 +54,12 @@ jej zmianę. Promień solid PEC via jest kwantyzowany niezależnie od promienia
 wiercenia; grubość galwanizacji jest zachowanym wejściem źródłowym, nie nową
 geometrią powłoki. Nie dopuszczamy zerowych promieni.
 
-`source_json` przechowuje niemutowalną kopię zaimportowanego modelu wraz
-z wartościami i SHA256. `.provenance` oraz `.as_dict()` zwracają odłączone
+`source_json` przechowuje niemutowalną kopię modelu podanego do kwantyzacji
+(w kandydacie: po normalizacji), wraz z wartościami i SHA256.
+`.provenance` oraz `.as_dict()` zwracają odłączone
 kopie JSON. Funkcja nie zmienia żadnego pliku ani źródłowego PcbGeometry.
-Nie ma jeszcze geometrii powietrza/PML ani osi siatki w tym nowym typie;
-następne moduły mają użyć tej samej kratownicy do wszystkich ich granic.
+Ten typ opisuje wyłącznie geometrię PCB, nie powietrze/PML ani osie FDTD.
+Nie wymaga się kwantyzowania wyników działania meshera.
 
 ## Audyt
 
@@ -106,73 +107,120 @@ Przykłady projekcji: 4,393995 → 4,390000 mm (emtest3),
 Nie zmieniono źródeł ani ich SHA256. Nie wykonano migracji aktywnego solvera;
 jego komórki i koszt FDTD nie ulegają zmianie w tym tickecie.
 
-## Odłączona siatka całkowitoliczbowa — PCB-012B
+## PCB-012B: rozdzielczość geometrii przed istniejącym mesherem
 
-`antenna_lab.solvers.pcb_lattice_mesh.make_pcb_lattice_domain_mesh(plan,
-policy, grid)` to jawna, wewnętrzna ścieżka używana przez testy. Nie zastępuje
-`make_pcb_domain_mesh`, nie wprowadza przełącznika CLI i nie zmienia XML.
+**Wycofano eksperyment integer-tick FDTD mesh z 9b72de4.** Usunięto osobny
+mesher tickowy i jego testy. Liczby całkowite są teraz reprezentacją geometrii
+na etapie jej upraszczania, nie wymogiem na osie ani komórki FDTD.
 
-Wejściowy `PcbLatticeAnchorPlan` zawiera **wyłącznie całkowite kotwice** osi
-X/Y/Z, granice prostokąta portu oraz opcjonalne środki wierceń. Caller odpowiada
-za kompletny wybór kotwic płyty, warstw, portu, elementów i wierceń. Mesher
-nie kwantyzuje surowych floatów i nie wybiera ani nie pomija krawędzi miedzi.
-Połączenie tego planu z audytowaną geometrią i workflow należy do PCB-012C.
-Granice i środek portu muszą już być kotwicami całkowitymi; połówkowy tick
-nie jest zaokrąglany. Identyczne ticki są usuwane przez tożsamość liczby
-całkowitej. `ANCHOR_MERGE_TOLERANCE_M` nie uczestniczy w tej operacji.
+Rozdzielczość geometrii oznacza: „nie reprezentuj szczegółów przestrzennych
+CAD dokładniej niż ta skala”. Rozdzielczość EM wynika osobno z długości fali,
+portu, podłoża, gradingu i wybranego profilu preview/design/verify. Komórka
+może mieć 1 mm albo mniej niż rozdzielczość geometrii. Linia 137,43 µm jest
+legalna. Nie ma warunku `cell >= geometry_resolution` ani wymogu całkowitych
+wielokrotności tej rozdzielczości w siatce. Precyzja zapisu CAD nie oznacza
+dokładności fizycznej ani dokładności symulacji.
 
-`policy` jest istniejącym `PcbPhysicalMeshPolicy`, pochodzącym z ustawień
-eksperymentu/profilu. Zachowane są fizyczne maksima kroków, minimum komórek
-podłoża/szczeliny/szerokości portu, grading i budżet. Dla niejednorodnego
-stackupu można jawnie przekazać `substrate_z_max_steps_m`: jedno maksimum
-fizyczne na każdy przedział wymaganych kotwic Z, zgodne z materiałem warstwy.
-Bez tego używane jest konserwatywne maksimum dla najkrótszej fali w podłożu.
-Minimum komórek Z dotyczy całej grubości stosu, jak w istniejącej polityce.
+Wyłącznie jawna ścieżka wewnętrzna/testowa:
 
-Reguły arytmetyczne:
+```python
+from antenna_lab.pcb.bundle import load_bundle_geometry
+from antenna_lab.pcb.grid import PcbGrid
+from antenna_lab.pcb.geometry_resolution import prepare_geometry_resolution_candidate
+from antenna_lab.pcb.gerber_quality import gerber_quality_settings
 
-- Maksymalny krok fizyczny daje `floor(max_step / quantum)` ticków. Dla tej
-  granicy używamy wartości dziesiętnej bez osłony ULP projekcji współrzędnych:
-  limit nigdy nie jest zaokrąglany w górę. Wynik mniejszy od 1 jest błędem.
-- Przedział L ticków otrzymuje `ceil(L/M)` komórek. Dzielenie z resztą
-  rozdziela dodatkowy tick do pierwszych komórek; szerokości różnią się
-  najwyżej o 1, a suma jest dokładnie L. Każdy prawy koniec pozostaje kotwicą.
-- Grading porównuje proporcje dokładnie jako ułamki liczb całkowitych.
-  Dzieli większą komórkę, wybierając całkowitą część docelowego odcinka przy
-  mniejszym sąsiedzie. Nie usuwa kotwic. Ponownie sprawdza oba sąsiedztwa.
-  Wymusza target (1,4), a audyt niezależnie sprawdza limit (1,5).
-- Jednotickowy sąsiad przy limicie poniżej 2 może wymusić dalsze komórki
-  jednotickowe. To rzeczywiste ograniczenie dyskretnej kratownicy. Jeśli
-  grading nie mieści się w budżecie, jest jawny błąd, bez zmiany kwantu ani
-  zgody na ułamkowe ticki. Każda iteracja przechodzi dalej lub dodaje tick;
-  liczba podziałów jest ograniczona rozpiętością osi i budżetem.
-- Powietrze ma `ceil(padding/quantum)` ticków, więc nie jest krótsze niż
-  żądane. PML nie jest częścią tego odstępu. Jego N komórek kopiuje dokładnie
-  całkowitą szerokość sąsiedniej komórki zwykłego powietrza.
+_, source, import_info = load_bundle_geometry(
+    'gerbs/emtest4', 'parameters/pcb_fr4_2layer_pth.json')
+settings, _ = gerber_quality_settings(
+    'preview', excitation_center_hz=2e9, excitation_cutoff_hz=1e9,
+    result_frequency_hz=tuple(f*1e6 for f in range(1500, 2501, 10)))
+candidate = prepare_geometry_resolution_candidate(
+    source, settings, grid=PcbGrid(10000), quality='preview')
+```
 
-Audyt końcowy sprawdza typ int, dodatnie szerokości, zachowanie kotwic,
-lokalne maksima, grading, liczbę/równość komórek PML i iloczyn wymiarów.
-Wstępny limit komórek jest sprawdzany przed alokacją osi, a ponownie po
-każdym gradingu, z uwzględnieniem wszystkich sześciu obszarów PML.
+Kolejność: istniejący import → jedna istniejąca normalizacja → PCB-012A
+`quantize_pcb_geometry` i audyt → `materialize_quantized_geometry` → zwykłe
+`PcbGeometry` w metrach → niezmienione `make_gerber_mesh_anchor_plan` oraz
+`make_pcb_domain_mesh`. Następuje pełny dotychczasowy audyt portu i boxów
+elementów. Nie ma XML, natywnych obiektów, Run ani publicznej opcji CLI.
+Produkcyjny workflow pozostaje niezmieniony; przykład niczego nie zapisuje.
 
-Wynik `PcbLatticeDomainMesh` zachowuje osie i granice w tickach.
-`metadata()` zwraca odłączony słownik z `grid_quantum_um`, `min_cell_ticks`,
-`max_cell_ticks`, krokami w metrach i `off_grid_line_count=0`.
-`to_domain_mesh()` jest pojedynczą granicą eksportu do istniejącego typu
-SI. Nie należy traktować odejmowania eksportowanych floatów jako nowej
-definicji ticków; ich szerokości pozostają zapisane dokładnie w liczbach
-całkowitych. Utrata rozróżnialności linii przy skrajnie wielkim przesunięciu
-współrzędnych powoduje błąd eksportu.
+Materializacja konwertuje ticki na metry raz. R/L/C, epsilon, straty,
+przewodność, materiałowa grubość conducting sheet, identyfikatory i hashe
+pozostają niezmienione. Surowa geometria przed normalizacją i transformacja
+są oddzielnymi danymi pochodzenia. Dane źródłowe nie odtwarzają kotwic.
 
-Przykład syntetyczny: płytka 20 × 20 mm, podłoże 1,6 mm, szczelina 2 mm,
-szerokość portu 1 mm; wspólna polityka EM i fizycznie te same kotwice:
+PTH wymaga jawnego rekordu `QuantizedPcbDrill`, dziedziczącego po zwykłym
+`PcbDrill`: zachowuje średnicę źródłową i zastosowaną rozdzielczość.
+Walidator sprawdza **dokładną projekcję PCB-012A** średnicy i promienia,
+zamiast wymuszać dawną zależność na już kwantyzowanych liczbach. Przykład:
+średnica źródłowa 0,305 mm → modelowana 0,30 mm, promień zewnętrzny
+0,1775 mm → 0,18 mm; wejście galwanizacji nadal wynosi 25 µm.
+Nie zmieniamy galwanizacji na 30 µm, żeby sztucznie odtworzyć starą sumę.
+Kontakty z miedzią, kolizje, liczba warstw i własność terminali są nadal
+sprawdzane. Zwykły `PcbDrill` zachowuje stary kontrakt i identyczny zapis JSON.
 
-| Kwant [µm] | Kształt komórek | Liczba | Min/max szerokość [ticki] | Linie poza kratownicą |
-| ---: | --- | ---: | --- | ---: |
-| 100 | 82 × 83 × 72 | 490 032 | 4 / 48 | 0 |
-| 10 | 76 × 70 × 65 | 345 800 | 40 / 480 | 0 |
-| 1 | 76 × 70 × 65 | 345 800 | 400 / 4804 | 0 |
-| 0,1 | 76 × 70 × 65 | 345 800 | 4000 / 48043 | 0 |
+Diagnostyka `geometry_and_mesh` dla każdej osi rozdziela:
 
-Grubszy kwant nie gwarantuje mniejszej liczby komórek: może utrudnić grading.
-To test mechaniki siatki, nie benchmark ani sprawdzenie zbieżności FDTD.
+- `minimum_geometry_anchor_separation_m`: odstęp między różnymi fizycznymi
+  współrzędnymi modelu, wraz z właścicielami/kategoriami najbliższej pary;
+- `minimum_mesh_step_m`: rzeczywisty minimalny krok końcowej siatki EM.
+
+Zbiór diagnostyczny geometrii zawiera m.in. wierzchołki, styki, środki/extrema
+wierceń i interfejsy. **Nie oznacza** uczynienia wszystkich wierzchołków
+kotwicami siatki. Odfiltrowane kotwice miedzi i wymagane linie są zapisane
+osobno. Nie zaliczamy numerycznych środków bbox, powietrza i PML do źródłowej
+geometrii. Pochodne powierzchnie portu są raportowane bez dodatkowego
+zaokrąglania; przy nieparzystej szerokości tickowej mogą mieć połówkowe
+położenie — diagnostyka nie ukrywa tego przez zmianę modelu.
+
+`format_modeled_mm` formatuje wyłącznie geometrię odpowiednio do skali
+(10 µm → dwa miejsca w mm). Nie służy do częstotliwości ani R/L/C.
+Pełne dane źródłowe pozostają dostępne jako provenance.
+
+## Wyniki odłączonego eksperymentu po normalizacji
+
+Ten sam config `pcb_fr4_2layer_pth.json`, preview, center 2000 MHz,
+cutoff 1000 MHz, wyniki 1500–2500 MHz co 10 MHz. Zero przebiegów FDTD.
+Koszt oznacza optymistyczne minimum przejścia impulsu, nie czas obliczeń.
+
+| emtest4: rozdzielczość geometrii | Topologia | Kształt | Komórki | Min. siatki XYZ [µm] | Min. współrzędnych geometrii XYZ [µm] | Kroki impulsu | Aktualizacje komórek |
+| --- | --- | --- | ---: | --- | --- | ---: | ---: |
+| raw | PASS | 84×98×35 | 288120 | 54,026667 / 28,06 / 800 | 1,735e-12 / 1,735e-12 / 1600 (resztki float) | 34507 | 9942156840 |
+| 100 µm | FAIL | — | — | — | — | — | — |
+| 10 µm | PASS | 69×81×35 | 195615 | 83,333333 / 30 / 800 | 10 / 10 / 1600 | 30446 | 5955694290 |
+| 1 µm | PASS | 84×98×35 | 288120 | 54 / 28 / 800 | 1 / 1 / 1600 | 34568 | 9959732160 |
+| 0,1 µm | PASS | 84×96×35 | 282240 | 54,016667 / 28,1 / 800 | 0,1 / 0,1 / 1600 | 34469 | 9728530560 |
+
+Zmiany/badane skalary: 100 µm: 4548/4566, 10 µm: 4548/4566,
+1 µm: 4518/4566, 0,1 µm: 4511/4566. Maksymalna zmiana XY wraz z wymiarami:
+odpowiednio 95; 6,934854; 1; 0,069619 µm. Maksymalna zmiana Z: 0.
+95 µm dotyczy średnicy wyprowadzonej z promienia, nie przesunięcia punktu.
+
+FAIL 100 µm jest prawidłowy: szerokość CSRC rośnie do 0,9 mm, podczas gdy
+kwantyzowane powierzchnie kontaktowe miedzi obejmują 0,8 mm. Obie pełne
+powierzchnie kontaktu przestają się mieścić. Komunikat audytu wskazuje
+`port.negative` i `port.positive: full-width contact disconnected`.
+Należy wybrać 10 µm lub dokładniej; nie generujemy siatki po tym błędzie.
+
+Przy 10 µm zachowane są jedno CSRC, C1=100 pF, L1=18 nH, R1=49,9 Ω,
+własność pinów/sieci, styki elementów i PTH top–bottom. Końce CSRC:
+±0,35012 → ±0,35 mm; szerokość 0,8640064 → 0,86 mm. C1: współrzędne
+końców X −4,04101/−4,34099 → −4,04/−4,34 mm. Wartości elektryczne są
+kopiowane bez zaokrąglania. Boxy elementów używają istniejących poprzecznych
+komórek i pierwszej komórki powietrza; ich numeryczne krawędzie nie muszą
+pokrywać się z kratownicą geometrii. Oś Z jest identyczna jak w raw.
+
+emtest3: raw 57×50×35=99750 → 10 µm 60×49×35=102900 (+3,16%).
+Minima siatki: raw 350,12/385,800686/800 µm → 350/387,1875/800 µm.
+Minima współrzędnych geometrii po projekcji: 10/10/1600 µm.
+Przed projekcją: 1,735e-12/5,421e-14/1600 µm; pierwsze dwie liczby to
+numeryczne różnice współrzędnych krzywych i powierzchni, nie dokładność PCB.
+Kroki impulsu: 3483 → 3478; aktualizacje: 347429250 → 357886200.
+Zmiany: 563/577, max XY 6,710696 µm, max Z 0. Zachowano dokładną rotację
+ortogonalną i jeden zdeduplikowany PTH z kontaktami top–bottom.
+
+Żaden poprawny topologicznie przypadek nie przekracza progu +5% komórek.
+Wariant podstawowy emtest4 10 µm zmniejsza liczbę komórek o około 32,1%.
+To potwierdzenie architektury i audytów, nie zbieżności fizycznego solve.
+

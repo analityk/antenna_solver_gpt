@@ -1330,3 +1330,46 @@ Syntetyczna płytka 20×20 mm: q=100 µm daje 82×83×72=490032 komórki;
 q=10/1/0,1 µm daje 76×70×65=345800. Wszystkie audyty off_grid_line_count=0.
 Grubszy kwant może wymagać większego zagęszczenia dla zachowania gradingu.
 Migracja wyboru kotwic z geometrii i publicznego workflow pozostaje PCB-012C.
+
+## PCB-012B (zastępujący eksperyment tickowy) — geometria przed istniejącym mesherem
+
+Baza merytoryczna: 15c159d/PCB-012A. Zgodnie z nową decyzją wycofano
+integer-tick mesher z 9b72de4 i jego testy. Historia tego commitu pozostaje,
+ale aktywna infrastruktura nie zawiera alternatywnego algorytmu siatki.
+Rozdzielczość geometrii jest niezależna od rozdzielczości EM; nie narzuca
+wielokrotności ticków ani minimalnej wielkości komórki.
+
+Nowy odłączony kandydat: importowana geometria → dotychczasowa normalizacja
+raz → kwantyzacja/audyt PCB-012A → materializacja do zwykłego PcbGeometry
+w SI → istniejący make_gerber_mesh_anchor_plan/make_pcb_domain_mesh oraz
+audyt kontaktów portu i boxów elementów. Surowe dane i transformacja są
+oddzielnym provenance. Bez zmiany CLI, produkcyjnych przebiegów, polityki
+ekonomicznych kotwic, gradingu, PML, profili i bez XML/FDTD.
+
+Materializacja zachowuje wartości R/L/C i materiałów, conducting-sheet
+thickness oraz identyfikatory i hashe. QuantizedPcbDrill przechowuje
+rozdzielczość i źródłową średnicę jako dowód projekcji. Walidator sprawdza
+dokładną regułę PCB-012A, zamiast wymuszać sumę już skwantyzowanej średnicy
+i surowej galwanizacji. Nie zmienia to surowych PcbDrill ani ich serializacji,
+nie przywraca usuniętych cyfr i nie rozluźnia kontroli połączeń/kolizji.
+
+Diagnostyka rozdziela odstęp współrzędnych geometrii (z kategorią/właścicielem
+najbliższej pary) od minimalnej końcowej komórki FDTD. Nie czyni każdego
+wierzchołka krytyczną kotwicą. Formaty geometrii źródłowej nie zmieniły się;
+metadane dodatkowe istnieją tylko w odłączonym kandydacie.
+
+Eksperyment emtest4, preview 2 GHz, cutoff 1 GHz, sweep 1500–2500/10 MHz:
+raw 288120; geometry resolution 100 µm poprawnie FAIL (obie pełne powierzchnie
+kontaktu CSRC utracone); 10 µm 195615; 1 µm 288120; 0,1 µm 282240 komórek.
+Przy 10 µm zachowane CSRC, C1=100 pF, L1=18 nH, R1=49,9 Ω i PTH top–bottom;
+modelowana szerokość CSRC 0,86 mm, końce ±0,35 mm. Oś Z niezmieniona.
+emtest3: 99750 → 102900 (+3,16%), jeden PTH, te same kontakty i dokładna
+normalizacja ortogonalna. Brak przypadku PASS z regresją komórek >5%.
+Szczegółowe odstępy, koszty i powody FAIL: docs/pcb-grid.md.
+
+Sprawdzenia: 9 nowych testów jednostkowych i 1 integracyjny na emtest3/emtest4;
+26 testów powiązanych grid/drill/model. Pełny zestaw: 351 testów OK,
+3 pominięte natywne. Potwierdzono legalność niecałkowitych względem
+rozdzielczości geometrii linii FDTD oraz kroku EM mniejszego od tej skali.
+PASS dotyczy eksperymentu geometrii i kontaktów; brak publicznej aktywacji
+i brak nowego sprawdzenia fizycznej zbieżności.

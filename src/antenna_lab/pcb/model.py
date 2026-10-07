@@ -94,6 +94,17 @@ class PcbDrill:
     connected_layer_roles: tuple[str, ...] = ()
 
 
+@dataclass(frozen=True, kw_only=True)
+class QuantizedPcbDrill(PcbDrill):
+    """SI drill with projection provenance; legacy PcbDrill stays unchanged.
+
+    Radius/diameter are independently projected; plating remains the physical
+    input, not a value reconstructed to fit the new geometric dimensions.
+    """
+    geometry_resolution_nm: int
+    source_drill_diameter_m: float
+
+
 @dataclass(frozen=True)
 class PcbLumpedComponent:
     id: str
