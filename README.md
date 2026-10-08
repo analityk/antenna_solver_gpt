@@ -1,8 +1,10 @@
 # antenna_solver_gpt
 
-Lokalny program do parametrycznego modelowania anten. Pierwszy model to
-**Quados 8 przy dokładnie 1420 MHz**, z czterema połączonymi gałęziami
-i skończonym reflektorem. Silnik obliczeniowy: **openEMS** na Windows 11.
+Lokalny program do parametrycznego modelowania anten oraz struktur PCB.
+Pierwszy model antenowy to **Quados 8 przy dokładnie 1420 MHz**, z czterema
+połączonymi gałęziami i skończonym reflektorem. Pełny solver EM używa
+**openEMS** na Windows 11; dla obsługiwanego podzbioru PCB istnieje także
+oddzielny, jawnie przybliżony solver quasi-TEM bez FDTD.
 
 Dostępny jest także **klasyczny biquad z reflektorem**: konfiguracja
 `parameters/biquad_1420mhz.json`, edytor, obliczenia i raport. Parametry
@@ -23,6 +25,49 @@ Nie ma jeszcze zweryfikowanych wyników anteny, prądów ani pełnej animacji.
 i tworzy diagramy fazowe w raporcie; działa też z Quados 8 i własnymi wariantami.
 `report biquad_1420mhz.json --phase-step 15 --open` zmienia krok faz bez FDTD.
 Szczegóły i konwencje: [Diagramy pól E/H](docs/fields.md).
+
+
+## PCB — faktyczny stan
+
+Ścieżka PCB obsługuje import Gerber/stackup/netlist, rozdzielczość geometrii
+niezależną od siatki EM, top/bottom copper, PTH, idealne R/L/C, lumped port,
+profile openEMS `preview/design/verify` i pasywne pola E/H. Full-wave pozostaje
+ścieżką DESIGN/VERIFY; wyniki są nadal `unverified` do czasu osobnej kontroli
+zbieżności fizycznej.
+
+Od PCB-015A istnieje także **FAST / APPROX**:
+`antenna_lab.pcb.reduced_control`. Nie tworzy domeny 3-D, PML ani komórek Yee
+i nie importuje natywnego openEMS. Izolowane, jednoznaczne odcinki mikrostripu
+są liczone modelem Hammerstad–Jensen, a sieć częstotliwościowo z idealnymi
+R/L/C. Wynik jest jawnie oznaczony `reduced_quasi_tem / approximate`.
+Dokładny kontrakt: [docs/pcb-reduced.md](docs/pcb-reduced.md).
+
+Stan jest **PARTIAL**. Solver FAST nie ma jeszcze modelu par sprzężonych
+(coupled microstrip) i obecnie odrzuca każdą geometrię z drills/vias przed
+ekstrakcją. Lokalna serpentyna użytkownika dochodzi właśnie do tego ograniczenia:
+dwa jej PTH łączą dwie topowe wyspy z tą samą ciągłą płaszczyzną bottom ground,
+ale klasyfikacja takich PTH jako idealnych połączeń do węzła `ground` nie jest
+jeszcze zaimplementowana. Nie ma więc jeszcze wyniku FAST Z/S11 dla tej
+serpentyny i nie wolno go inferować z modelu linii izolowanych.
+
+PCB-015A usunęło wcześniejszą patologię walidatora polygonów. Na tej samej
+lokalnej serpentynie profilowane `prepare-only` spadło z około **687,8 s /
+3,36 mld wywołań** do **58,0 s / 122,2 mln wywołań**. Są to czasy pod
+`cProfile`, nie prognoza zwykłego wall-clock. Pozostały koszt przygotowania
+jest teraz głównie w wielokrotnym `compact_features()`; w pomiarze wykonano
+go 17 razy, a `make_pcb_domain_mesh()` nadal dwa razy.
+
+Najbliższe kroki i kolejność są utrzymywane w [todo.md](todo.md). Priorytetem
+jest najpierw obsługa PTH top→ciągły bottom ground w FAST, potem fizyczny model
+sprzężonych równoległych odcinków. Optymalizacja domeny i viewer pól full-wave
+pozostają ważne, ale są niżej niż doprowadzenie szybkiego modelu PCB do
+użyteczności na serpentynie.
+
+Przykład FAST dla obsługiwanego przypadku bez vias/sprzężeń:
+
+```bat
+.\.venv\Scripts\python.exe -m antenna_lab.pcb.reduced_control gerbs\realpcb_microstrip\test1.zip --geometry-resolution-um 10 --center-mhz 2000 --cutoff-mhz 1900 --sweep-start-mhz 1500 --sweep-stop-mhz 2500 --sweep-step-mhz 10
+```
 
 ## Pierwsze uruchomienie — CMD
 
