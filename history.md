@@ -1553,3 +1553,34 @@ budżetów ani nie wyłączono preflight, aby uzyskać zielony wynik. Skip: nati
 openEMS/CSXCAD, Windows UCRT i GUI Tk. Regresje cech, PCB-012E, emstest/emstest2,
 emtest3/emtest4 i test1 przechodzą w pełnym przebiegu. Zakres geometrii PASS;
 integracja całego zestawu PARTIAL, polityka budżetu pozostaje osobnym zadaniem.
+
+
+## PCB-012G — feature-aware economical copper meshing
+
+Zastąpiono promowanie wszystkich prostoliniowych granic kompaktowymi parami
+szerokości/szczelin i udokumentowaną regułą 1/3 metal–2/3 otoczenie. Konflikty
+z krytycznymi kotwicami używają audytowanej rozdzielonej reprezentacji, nigdy
+zmiany polygonu. Zachowano PCB-012F: q10 0,376/0,384→0,38, ale 0,25 i 0,38
+są rozróżnialne. Geometria, RLC, źródło, tolerancje, Z i profile bez zmian.
+Dokładne kryteria i źródła openEMS: docs/pcb-gerber.md.
+
+Serpentyna 12/144 wierzchołków: identyczne 93×95×30=265050 komórek (ratio1).
+Łuki 44/140 wierzchołków: identyczne 186×122×30=680760; 16 cech, 21/27
+wymaganych ograniczeń XY. Żaden wierzchołek nie jest bezpośrednio promowany.
+Test1 preview: 3971025→833850, design:4422210→1372280. Audyty cech,
+komponentów i portu PASS. Krytyczne wiercenia/źródło wymuszają minima10/30µm;
+cutoff1GHz nadal przekracza niezmienione budżety impulsu. Design cutoff1,9GHz:
+1463168 komórek, minimum48128 kroków; fake-native prepare PASS, rzeczywiste
+prepare blokuje brak openEMS. Nie wykonano FDTD ani porównania impedancji.
+
+**Weryfikacja:** 54 testy cech/siatki/komponentów PASS, 12 testów ZIP/wybranych
+kotwic PASS, dodatkowy fake-native prepare PASS; końcowe 10 testów cech PASS.
+Pełny unittest uruchomiono raz: 381 testów, 3 failures, 33 errors, 3 skipped.
+Wynik integracji PARTIAL: 28 niepowodzeń dotyczy wcześniejszego fail-closed audytu
+obwiedni (w tym test oczekujący późniejszego preflight), 7 niezmienionego
+budżetu impulsu; jeden test oczekuje starego rozmiaru siatki emtest3
+60×49×35 zamiast obecnego271×278×35. Nowy audyt bywa zbyt konserwatywny przy
+połączeniach padów/regionów: wewnętrzna obwiednia rozdziela połączony polygon.
+Nie wyłączono kontroli topologii, nie podniesiono budżetów ani nie zmieniono
+niepowiązanych oczekiwań testów. Test1, nowe serpentyny/łuki i komponenty PASS;
+cały adapter wymaga dalszej pracy przed uznaniem wydania za w pełni zgodne.

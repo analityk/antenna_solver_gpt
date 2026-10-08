@@ -319,4 +319,24 @@ class RealZipAcceptance(unittest.TestCase):
 
 
 
+    def test_design_wide_excitation_prepare_only_with_native_fakes(self):
+        from test_openems_pcb import XmlEngine
+        engine=XmlEngine();csx=ComponentCSX()
+        real=ROOT/'gerbs/realpcb_microstrip/test1.zip'
+        with TemporaryDirectory() as t, contextlib.redirect_stdout(io.StringIO()), patch(
+            'antenna_lab.solvers.openems.native_modules',return_value=(
+                SimpleNamespace(openEMS=lambda **kw:engine),SimpleNamespace(ContinuousStructure=lambda:csx))):
+            result=run_gerber_control(real,Path(t)/'prepared',prepare_only=True,quality='design',
+                **dict(BAND,excitation_cutoff_hz=1.9e9))
+            self.assertEqual(result['status'],'prepared')
+            self.assertEqual(result['copper_mesh_fidelity']['status'],'PASS')
+            self.assertEqual(result['termination_status'],'not_run')
+            self.assertLess(result['estimated_excitation_steps'],75000)
+            self.assertEqual(len(result['ideal_components']),1)
+            self.assertEqual(result['ideal_components'][0]['value_si'],49.9)
+            self.assertEqual([call[0] for call in engine.calls].count('Write2XML'),1)
+            self.assertNotIn('Run',[call[0] for call in engine.calls])
+            self.assertTrue((Path(t)/'prepared/native/model.xml').is_file())
+
+
 if __name__=='__main__':unittest.main()

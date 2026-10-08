@@ -67,9 +67,10 @@ class GerberQualityTests(unittest.TestCase):
                 vals=[v[axis] for v in self.g.outline.vertices_xy_m]
                 self.assertIn(min(vals),lines);self.assertIn(max(vals),lines)
             self.assertIn(0.,mesh.z_lines_m);self.assertIn(self.g.substrate.z_min_m,mesh.z_lines_m)
-            for copper in self.g.copper:
-                for axis,lines in enumerate((mesh.x_lines_m,mesh.y_lines_m)):
-                    for vertex in copper.vertices_xy_m:self.assertIn(vertex[axis],lines)
+            from antenna_lab.solvers.pcb_features import audit_copper_mesh
+            fidelity=audit_copper_mesh(self.g,mesh)
+            self.assertEqual(fidelity['status'],'PASS')
+            self.assertTrue(all(f['preserved'] for f in fidelity['features']))
             self.assertEqual(meta['suppressed_physical_feature_coordinates'],0)
             self.assertTrue(all(row['kind']=='bbox_midpoint' for row in meta['suppressed_noncritical_anchors']))
             if q!='verify':

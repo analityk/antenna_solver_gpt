@@ -1,8 +1,8 @@
 """Pure copper/mesh fidelity contract; never changes polygons or mesh lines.
 
-Rectilinear boundary runs (outer and hole rings) require exact normal mesh
-coordinates. Curves keep continuous CSXCAD geometry, ring extrema and a bounded
-set of support lines, not all tessellation vertices. Their final cell envelope
+Compacted widths and gaps use thirds or resolved subcell edge arrangements.
+Curves retain continuous CSXCAD geometry and feature-scale vicinity resolution,
+not a mesh plane for each tessellation vertex. Their final cell envelope
 must bracket the modeled topology: fully covered cells and intersected cells
 must both preserve regions/holes, with no possible inter-conductor contact.
 This conservative sufficient test may reject a usable mesh; it is not a native
@@ -37,30 +37,156 @@ def represented_coordinate(value, ordered, scale_m=0.):
 
 
 def copper_features(geometry):
+    """Merge continuous collinear runs; never turn vertex coordinates into lines."""
     records, curved = [], []
     for c in geometry.copper:
         for ri, ring in enumerate((c.vertices_xy_m, *c.holes_xy_m)):
             base = dict(copper_id=c.id, layer_role=c.layer_role, ring=ri)
-            oblique = False
-            for a,b in zip(ring, (*ring[1:], ring[0])):
-                if a == b:
-                    continue
-                if a[0] == b[0] or a[1] == b[1]:
-                    axis = 0 if a[0] == b[0] else 1
-                    records.append(dict(base, kind='physical_boundary_run', axis='xy'[axis],
-                        coordinate_m=a[axis], span_m=sorted((a[1-axis],b[1-axis]))))
-                else:
-                    oblique = True
+            groups={}; oblique=False
+            for a,b in zip(ring, (*ring[1:],ring[0])):
+                if a==b:continue
+                if a[0]==b[0] or a[1]==b[1]:
+                    axis=0 if a[0]==b[0] else 1
+                    groups.setdefault((axis,a[axis]),[]).append(sorted((a[1-axis],b[1-axis])))
+                else:oblique=True
+            for (axis,v),spans in sorted(groups.items()):
+                merged=[]
+                for lo,hi in sorted(spans):
+                    if merged and lo<=merged[-1][1]:merged[-1][1]=max(hi,merged[-1][1])
+                    else:merged.append([lo,hi])
+                records.extend(dict(base,kind='physical_boundary_run',axis='xy'[axis],
+                    coordinate_m=v,span_m=span) for span in merged)
             if oblique:
-                curved.append(dict(base, policy='cell_envelope_topology',
-                    bounds_m=[min(p[0] for p in ring),min(p[1] for p in ring),
-                              max(p[0] for p in ring),max(p[1] for p in ring)]))
-                for axis in range(2):
-                    lo,hi = min(p[axis] for p in ring),max(p[axis] for p in ring)
-                    for v in (lo,hi):
-                        records.append(dict(base,kind='physical_ring_extremum',axis='xy'[axis],coordinate_m=v))
-    return records, curved
+                curved.append(dict(base,policy='cell_envelope_topology',bounds_m=[
+                    min(p[0] for p in ring),min(p[1] for p in ring),
+                    max(p[0] for p in ring),max(p[1] for p in ring)]))
+    return records,curved
 
+
+def compact_features(geometry):
+    """Dimension pairs on actual cross-sections, including inter-region gaps.
+
+    Short stair-steps on polygonized curves are not independent thin traces.
+    A straight pair must persist along >= half its width (rectilinear owners)
+    or >= twice its width (curved owners). Remaining geometry is protected by
+    the continuous-polygon cell-envelope audit, never deleted from CSXCAD.
+    """
+    runs,curved=copper_features(geometry)
+    curved_ids={r['copper_id'] for r in curved}
+    shapes={c.id:copper_shape(c) for c in geometry.copper}
+    features={}
+    for layer in sorted({c.layer_role for c in geometry.copper}):
+        owners=[c.id for c in geometry.copper if c.layer_role==layer]
+        for axis in range(2):
+            edges=[r for r in runs if r['layer_role']==layer and r['axis']=='xy'[axis]]
+            ends=sorted({v for r in edges for v in r['span_m']})
+            for start,stop in zip(ends,ends[1:]):
+                position=(start+stop)/2
+                metal=sorted((a,b,owner) for owner in owners
+                    for kind,a,b in _section_intervals(shapes[owner],axis,position) if kind=='copper')
+                candidates=[('copper',a,b,(owner,)) for a,b,owner in metal]
+                candidates.extend(('clearance',left[1],right[0],(left[2],right[2]))
+                                  for left,right in zip(metal,metal[1:]) if left[1]<right[0])
+                for kind,a,b,ids in candidates:
+                    if b-a<=TOLERANCE_M:continue
+                    paired=[]
+                    for v,owner in ((a,ids[0]),(b,ids[-1])):
+                        paired.append([r for r in edges if r['copper_id']==owner
+                            and abs(r['coordinate_m']-v)<=TOLERANCE_M
+                            and r['span_m'][0]<position<r['span_m'][1]])
+                    if not all(paired):continue
+                    span=(max(paired[0][0]['span_m'][0],paired[1][0]['span_m'][0]),
+                          min(paired[0][0]['span_m'][1],paired[1][0]['span_m'][1]))
+                    factor=2 if any(owner in curved_ids for owner in ids) else .5
+                    if span[1]-span[0] < factor*(b-a)-TOLERANCE_M:continue
+                    key=(layer,'xy'[axis],kind,ids,a,b)
+                    if key not in features:
+                        features[key]=dict(feature_type=kind,kind=kind,owners=list(ids),
+                            copper_id=ids[0],layer_role=layer,axis='xy'[axis],
+                            modeled_boundaries_m=[a,b],modeled_width_m=b-a,
+                            section_position_m=position,spans_m=[])
+                    if list(span) not in features[key]['spans_m']:features[key]['spans_m'].append(list(span))
+    rows=[features[k] for k in sorted(features)]
+    for i,row in enumerate(rows):row['id']=f'feature_{i:04d}'
+    zones=[]
+    for c in geometry.copper:
+        shape=shapes[c.id]
+        widths=[r['modeled_width_m'] for r in rows if r['kind']=='copper' and c.id in r['owners']]
+        # Area/perimeter estimates only set candidate resolution; topology is
+        # separately audited. They cannot authorize loss of a neck or hole.
+        scale=min(widths) if widths else min(min(shape.bounds[2]-shape.bounds[0],shape.bounds[3]-shape.bounds[1]),
+                                           2*shape.area/shape.length)
+        for ri,ring in enumerate((c.vertices_xy_m,*c.holes_xy_m)):
+            if c.id not in curved_ids:continue
+            # Short runs around a bend belong to its vicinity, not vertex anchors.
+            points=[]
+            for a,b in zip(ring,(*ring[1:],ring[0])):
+                if a==b:continue
+                if (a[0]!=b[0] and a[1]!=b[1]) or hypot(b[0]-a[0],b[1]-a[1])<scale:
+                    points.extend((a,b))
+            if points:
+                zones.append(dict(copper_id=c.id,ring=ri,scale_m=scale,
+                    bounds_m=[min(p[0] for p in points),min(p[1] for p in points),
+                              max(p[0] for p in points),max(p[1] for p in points)]))
+    return rows,runs,curved,zones
+
+
+def feature_axis_plan(geometry,axis,critical,maximum):
+    """Economical hints with exact contact anchors taking unconditional priority.
+
+    Thirds: inside metal h/3, outside 2h/3. Prefer h=3W/5 for a strip,
+    3W/7 for a clearance: the three neighbouring cells then have equal widths.
+    Conflicting hints are not promoted. Such features instead require resolved
+    subcells (at most W/3); the final audit must prove the representation.
+    """
+    features,runs,curved,zones=compact_features(geometry)
+    selected=[f for f in features if f['axis']=='xy'[axis]]
+    lines=list(critical);pairs=[];decisions=[]
+    for feature in sorted(selected,key=lambda f:(f['modeled_width_m'],f['id'])):
+        a,b=feature['modeled_boundaries_m'];w=b-a
+        h=min(w*(3/5 if feature['kind']=='copper' else 3/7),maximum/1.5)
+        for edge,side in ((a,1),(b,-1)):
+            if feature['kind']=='clearance':side=-side
+            inside=edge+side*h/3;outside=edge-side*2*h/3
+            lo,hi=sorted((inside,outside))
+            equivalent=represented_coordinate(edge,sorted(lines),max(abs(v) for v in lines))
+            if equivalent is not None:
+                decisions.append(dict(feature_id=feature['id'],edge_m=edge,method='aligned_critical_or_existing'))
+                continue
+            # Entire edge cell and its immediate spacing must be compatible
+            # with already fixed global coordinates. Never move a contact.
+            if any(lo-h/3 < v < hi+h/3 for v in lines):
+                decisions.append(dict(feature_id=feature['id'],edge_m=edge,method='resolved_subcell_fallback'))
+                continue
+            lines.extend((lo,hi));lines.sort()
+            pairs.append((lo,hi))
+            decisions.append(dict(feature_id=feature['id'],edge_m=edge,method='thirds_hint',
+                                  metal_side=side,lines_m=[lo,hi]))
+    supports=[]
+    windows=[(f['modeled_width_m']/3,f['modeled_boundaries_m'][0]-f['modeled_width_m'],
+              f['modeled_boundaries_m'][1]+f['modeled_width_m'],f['id']) for f in selected]
+    windows.extend((z['scale_m']/3,z['bounds_m'][axis]-z['scale_m']/3,
+                    z['bounds_m'][axis+2]+z['scale_m']/3,'curve:'+z['copper_id']) for z in zones)
+    for step,lo,hi,owner in sorted(windows):
+        for value in (lo,hi):
+            if critical[0]<value<critical[-1] and all(abs(value-v)>=step/2 for v in lines):
+                lines.append(value);lines.sort();supports.append(dict(coordinate_m=value,owner=owner))
+    return tuple(lines),dict(features=features,compacted_runs=runs,curved_regions=curved,
+        resolution_window_supports=supports,
+        curved_zones=zones,edge_cells=pairs,edge_decisions=decisions)
+
+
+def feature_interval_limit(a,b,axis,maximum,plan):
+    for f in plan['features']:
+        if f['axis']!='xy'[axis]:continue
+        lo,hi=f['modeled_boundaries_m'];w=hi-lo
+        factor=(3/5 if f['kind']=='copper' else 3/7) if f['id'] in plan.get('thirds_feature_ids',()) else 1/3
+        if (b>lo and a<hi) or lo-w<(a+b)/2<hi+w:
+            maximum=min(maximum,w*factor)
+    for z in plan['curved_zones']:
+        lo,hi=z['bounds_m'][axis],z['bounds_m'][axis+2]
+        if b>lo and a<hi:maximum=min(maximum,z['scale_m']/3)
+    return maximum
 
 def _topology(shape):
     if shape.is_empty:
@@ -87,35 +213,6 @@ def _section_intervals(shape, axis, position):
     return intervals
 
 
-def _rectilinear_sections(geometry, axes, records, curved, source_geometry):
-    """Dimension evidence inside connected polygons, not just whole bboxes."""
-    scale=max(abs(v) for bound in geometry.bounds for v in bound[:2])
-    result=[];curved_ids={r['copper_id'] for r in curved}
-    raw={c.id:copper_shape(c) for c in source_geometry.copper} if source_geometry else {}
-    for c in geometry.copper:
-        if c.id in curved_ids:continue
-        shape=copper_shape(c)
-        for axis in range(2):
-            runs=[r for r in records if r['copper_id']==c.id and r['axis']=='xy'[axis]]
-            ends=sorted({v for r in runs for v in r['span_m']})
-            for start,stop in zip(ends,ends[1:]):
-                position=(start+stop)/2
-                intervals=_section_intervals(shape,axis,position)
-                source=_section_intervals(raw[c.id],axis,position) if c.id in raw else []
-                for i,(kind,a,b) in enumerate(intervals):
-                    represented=[represented_coordinate(v,axes[axis],scale) for v in (a,b)]
-                    if None in represented:
-                        raise ConfigurationError(f'PCB copper fidelity: {c.id} lost {kind} section boundaries {a!r}, {b!r}.')
-                    row=dict(copper_id=c.id,layer_role=c.layer_role,kind=kind,axis='xy'[axis],
-                        section_position_m=position,modeled_boundaries_m=[a,b],retained_boundaries_m=represented,
-                        modeled_width_m=b-a,solver_facing_width_m=represented[1]-represented[0],preserved=True)
-                    if len(source)==len(intervals) and source[i][0]==kind:
-                        row['source_width_m']=source[i][2]-source[i][1]
-                        row['source_boundaries_m']=list(source[i][1:])
-                    result.append(row)
-    return result
-
-
 def _cell_envelope(mask, xs, ys):
     """Union exact row runs, avoiding a general union of every individual cell."""
     rectangles=[]
@@ -133,36 +230,86 @@ def _cell_envelope(mask, xs, ys):
 
 
 def audit_copper_mesh(geometry, mesh, *, source_geometry=None):
-    """Exact orthogonal features; conservative inner/outer cell proof otherwise.
+    """Paired dimensions and edge-cell fractions plus a cell-envelope topology audit.
 
     Each record includes modeled and retained coordinates (metres), so internal
     strip/gap dimensions can be reconstructed without raw Gerbers. Source values
     remain in geometry.normalized_source.json, never used to derive mesh lines.
     """
-    records, curved = copper_features(geometry)
+    features,records,curved,zones=compact_features(geometry)
     scale=max(abs(v) for bound in geometry.bounds for v in bound[:2])
-    axes = (mesh.x_lines_m,mesh.y_lines_m)
-    report = dict(policy='modeled_copper_features_v2',status='PASS',
+    axes=(mesh.x_lines_m,mesh.y_lines_m)
+    report=dict(policy='feature_aware_copper_v3',status='PASS',features=[],boundaries=[],
+        sections=[],curved_regions=[],suppressed_physical_feature_coordinates=0,
         physical_feature_coordinate_count=len({(r['axis'],r['coordinate_m']) for r in records}),
-        suppressed_physical_feature_coordinates=0, boundaries=[], curved_regions=[],
-        note='Exact rectilinear boundaries; curved cell-envelope topology proof, not native occupancy or EM convergence.')
-    for r in records:
-        actual = represented_coordinate(r['coordinate_m'], axes['xy'.index(r['axis'])],scale)
-        present = actual is not None
-        report['boundaries'].append(dict(r,retained_mesh_coordinate_m=actual, preserved=present,
-            reason=('exact_line' if actual==r['coordinate_m'] else 'floating_point_boundary_equivalence') if present else 'missing_exact_line'))
-        if not present:
-            raise ConfigurationError(f"PCB copper fidelity: {r['copper_id']} ring {r['ring']} "
-                f"missing exact {r['axis']} physical boundary {r['coordinate_m']!r} m; "
-                "modeled geometry must not be simplified by the EM mesh.")
-    report['sections']=_rectilinear_sections(geometry,axes,records,curved,source_geometry)
-    if source_geometry is not None:
-        report['source_boundaries'] = copper_features(source_geometry)[0]
-    if not curved:
-        return report
-    # Audit every region on layers with a curved boundary, also ruling out
-    # contact with a neighbouring rectangular conductor in the outer envelope.
-    layers = {r['layer_role'] for r in curved}
+        note='Thirds/aligned/resolved subcell geometry audit; not an EM convergence certificate.')
+    raw={c.id:copper_shape(c) for c in source_geometry.copper} if source_geometry else {}
+    for feature in features:
+        row=dict(feature);axis='xy'.index(row['axis']);lines=axes[axis]
+        a,b=row['modeled_boundaries_m'];w=b-a;edge_rows=[]
+        for edge,side in ((a,1),(b,-1)):
+            if row['kind']=='clearance':side=-side
+            exact=represented_coordinate(edge,lines,scale)
+            if exact is not None:
+                edge_rows.append(dict(coordinate_m=edge,method='aligned',nearby_lines_m=[exact],reconstructed_edge_m=exact,
+                    preserved=True,reason='existing exact/contact mesh line'))
+                continue
+            index=bisect_left(lines,edge)
+            if index==0 or index==len(lines):
+                raise ConfigurationError(f"PCB feature {row['id']}: edge {edge} outside mesh.")
+            lo,hi=lines[index-1:index+1];cell=hi-lo
+            fraction=(hi-edge)/cell if side>0 else (edge-lo)/cell
+            thirds=abs(fraction-1/3)<=1e-9
+            resolved=cell<=w/2*(1+1e-10)
+            if not (thirds or resolved):
+                raise ConfigurationError(f"PCB feature {row['id']} {row['owners']}: unresolved {row['kind']} "
+                    f"width {w:g} m, edge {edge:g}, cell {cell:g}, metal fraction {fraction:g}.")
+            edge_rows.append(dict(coordinate_m=edge,method='thirds' if thirds else 'resolved_subcell',
+                nearby_lines_m=[lo,hi],cell_width_m=cell,metal_fraction=fraction,
+                target_metal_fraction=1/3,metal_side=side,
+                reconstructed_edge_m=hi-fraction*cell if side>0 else lo+fraction*cell,preserved=True,
+                reason='metal 1/3, air 2/3' if thirds else 'conflicting global constraints; cell <= half feature width'))
+        interior=[v for v in lines if a+TOLERANCE_M<v<b-TOLERANCE_M]
+        if len(interior)<2:
+            raise ConfigurationError(f"PCB feature {row['id']} {row['owners']}: {row['kind']} width {w:g} "
+                                     'requires at least two distinct interior mesh lines.')
+        largest=max(y-x for x,y in zip(interior,interior[1:]))
+        if largest>w*.6*(1+1e-10):
+            raise ConfigurationError(f"PCB feature {row['id']}: unresolved interior cell {largest:g} m for width {w:g} m.")
+        row.update(mesh_edges=edge_rows,interior_lines_m=interior,maximum_interior_cell_m=largest,preserved=True,
+            representation='continuous_polygon_with_audited_edge_cells',
+            solver_facing_width_m=edge_rows[1]['reconstructed_edge_m']-edge_rows[0]['reconstructed_edge_m'])
+        # The physical width is reconstructed from the subcell edge coordinates,
+        # not relabelled as a difference of nearest snapped grid coordinates.
+        if len(set(row['owners']))==1 and row['owners'][0] in raw:
+            intervals=_section_intervals(raw[row['owners'][0]],axis,row['section_position_m'])
+            source=min((r for r in intervals if r[0]==row['kind']),
+                       key=lambda r:abs(r[1]-a)+abs(r[2]-b),default=None)
+            if source:row.update(source_width_m=source[2]-source[1],source_boundaries_m=list(source[1:]))
+        report['features'].append(row);report['sections'].append(row)
+        report['boundaries'].extend(dict(e,copper_id=row['copper_id'],axis=row['axis']) for e in edge_rows)
+    report['metal_edge_representation_counts']={method:sum(e['method']==method for e in report['boundaries'])
+        for method in ('thirds','aligned','resolved_subcell')}
+    report['minimum_steps']={}
+    for axis,lines in zip('xy',axes):
+        i=min(range(len(lines)-1),key=lambda i:lines[i+1]-lines[i])
+        from .pcb_mesh import component_terminal_anchors
+        ai='xy'.index(axis);n,p=geometry.port.negative_xy_m,geometry.port.positive_xy_m
+        mid=(n[ai]+p[ai])/2
+        port_values=(n[0],mid,p[0]) if ai==0 else (mid-geometry.port.width_m/2,mid,mid+geometry.port.width_m/2)
+        critical=[dict(coordinate_m=v,owner='port') for v in port_values]
+        critical.extend(dict(coordinate_m=(d.x_m,d.y_m)[ai],owner='drill:'+d.id) for d in geometry.drills)
+        critical.extend(dict(coordinate_m=v,owner='component_contact') for v in component_terminal_anchors(geometry,ai))
+        nearest=sorted(critical,key=lambda r:(min(abs(r['coordinate_m']-v) for v in lines[i:i+2]),r['owner']))[:4]
+        report['minimum_steps'][axis]=dict(step_m=lines[i+1]-lines[i],bounds_m=list(lines[i:i+2]),
+            nearest_critical_constraints=nearest,
+            nearby_feature_ids=[f['id'] for f in features if f['axis']==axis and
+                f['modeled_boundaries_m'][0]-f['modeled_width_m']<=lines[i+1] and
+                f['modeled_boundaries_m'][1]+f['modeled_width_m']>=lines[i]])
+    if source_geometry is not None:report['source_boundaries']=copper_features(source_geometry)[0]
+    # Audit every region, including narrow necks and gaps not classified as
+    # long straight pairs. No inter-conductor contact in the outer envelope.
+    layers = {c.layer_role for c in geometry.copper}
     envelopes = []
     total = 0
     for c in geometry.copper:

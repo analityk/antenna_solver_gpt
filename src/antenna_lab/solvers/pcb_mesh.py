@@ -266,7 +266,7 @@ class PcbDomainMesh:
     """Complete coordinate domain; no solver objects or convergence claim.
 
     PML starts exclude absorber thickness. Selected required anchors are exact;
-    Gerber feature policy preserves modeled boundary runs and audits curves.
+    Gerber feature policy audits widths/gaps and curved cell envelopes.
     """
 
     x_lines_m: tuple[float, ...]
@@ -380,7 +380,12 @@ def make_pcb_domain_mesh(
     Cartesian cell array. Intermediate count estimates are lower bounds;
     all refinements only increase counts. No native solver is instantiated.
     """
-    plan = make_pcb_solver_anchor_plan(geometry, settings, port_edge_mode, gerber_quality=gerber_quality)
+    feature_plan=None
+    if gerber_quality is not None:
+        if port_edge_mode!='aligned':raise ConfigurationError('Gerber features require unchanged aligned port.')
+        plan,feature_plan=make_gerber_mesh_anchor_plan(geometry,settings,gerber_quality)
+    else:
+        plan=make_pcb_solver_anchor_plan(geometry,settings,port_edge_mode)
     policy = derive_pcb_physical_mesh_policy(geometry, settings)
     pml = policy.pml_cells
     if isinstance(pml, bool) or not isinstance(pml, int) or not 6 <= pml <= 20:
@@ -410,6 +415,11 @@ def make_pcb_domain_mesh(
                               plan.substrate_thickness_m / settings.min_substrate_cells_z)
             if axis < 2 and local_ranges[axis][0] <= a and b <= local_ranges[axis][1]:
                 maximum = min(maximum, local_steps[axis])
+            if axis<2 and feature_plan is not None:
+                from .pcb_features import feature_interval_limit
+                edge_cell=(a,b) in feature_plan['edge_cells']['xy'[axis]]
+                if not edge_cell:
+                    maximum=feature_interval_limit(a,b,axis,maximum,feature_plan)
             core_limits.append(maximum)
         axis_limits = (policy.max_air_step_m, *core_limits, policy.max_air_step_m)
         divisions = []
@@ -419,7 +429,9 @@ def make_pcb_domain_mesh(
             ratio = (b-a) / maximum
             if not isfinite(ratio) or ratio > policy.max_cells:
                 raise ConfigurationError("PCB domain: wymagany podział osi przekracza max_cells.")
-            count = ceil(ratio)
+            count = 1 if feature_plan is not None and ratio<=1+_DOMAIN_REL_TOL else ceil(ratio)
+            if feature_plan is not None and axis<2 and (a,b) in feature_plan['edge_cells']['xy'[axis]] and ratio<=1+_DOMAIN_REL_TOL:
+                count=1
             if port_edge_mode == 'thirds' and axis < 2:
                 edge = pcb_port_edge_policy(geometry, settings, port_edge_mode)
                 hints = edge['x_hints' if axis == 0 else 'y_hints']
@@ -522,7 +534,7 @@ def _audit_thirds_pads(geometry, edge):
 
 
 def make_pcb_solver_anchor_plan(geometry, settings, port_edge_mode='aligned', *, gerber_quality=None):
-    """Default aligned plan is unchanged; Gerber filtering is explicitly opt-in."""
+    """Default aligned plan is unchanged; Gerber feature meshing is opt-in."""
     from dataclasses import replace
     if gerber_quality is not None:
         if port_edge_mode != 'aligned':
@@ -569,67 +581,52 @@ def audit_pcb_port_edge_mesh(geometry, settings, mesh, port_edge_mode='aligned')
 
 
 def make_gerber_mesh_anchor_plan(geometry, settings, quality):
-    """Preserve modeled copper runs/clearances independently of wavelength.
-
-    Only nonphysical polygon bounding-box midpoints are omitted. Curved rings
-    use bounded support coordinates and must pass the final envelope audit.
-    Port/component critical coordinates are unchanged; only recorded machine
-    roundoff equivalences may share a line. No wavelength proximity filter.
-    """
+    """Compact physical features; fixed ports/components/drills remain exact."""
     from dataclasses import replace
-    from .pcb_features import copper_features, represented_coordinate
-    if quality not in ('preview', 'design', 'verify'):
+    from .pcb_features import feature_axis_plan
+    if quality not in ('preview','design','verify'):
         raise ConfigurationError('Unknown Gerber anchor quality.')
-    base = make_pcb_mesh_anchor_plan(geometry)
-    records, curved = copper_features(geometry)
-    n,p = geometry.port.negative_xy_m, geometry.port.positive_xy_m
-    mx,my = (n[0]+p[0])/2, (n[1]+p[1])/2
-    half = geometry.port.width_m/2
-    feed = ((n[0],mx,p[0]), (my-half,my,my+half))
-    bounds = geometry.bounds
-    axes, suppressed, roundoff = [], [], []
+    base=make_pcb_mesh_anchor_plan(geometry)
+    policy=derive_pcb_physical_mesh_policy(geometry,settings)
+    n,p=geometry.port.negative_xy_m,geometry.port.positive_xy_m
+    mx,my=(n[0]+p[0])/2,(n[1]+p[1])/2;half=geometry.port.width_m/2
+    feed=((n[0],mx,p[0]),(my-half,my,my+half))
+    axes=[];axis_meta=[];critical_axes=[]
     for axis in range(2):
-        board = [v[axis] for v in geometry.outline.vertices_xy_m]
-        physical = {r['coordinate_m'] for r in records if r['axis']=='xy'[axis]}
-        critical = sorted(set((*feed[axis], *component_terminal_anchors(geometry, axis),
-            *(p[axis] for p in base.drill_centres_xy_m), min(board), max(board), bounds[0][axis], bounds[1][axis])))
-        for value in sorted(physical):
-            actual=represented_coordinate(value,critical,max(abs(v) for bound in bounds for v in bound[:2]))
-            if actual is None:
-                critical.append(value);critical.sort()
-            elif actual != value:
-                roundoff.append(dict(axis='xy'[axis],modeled_coordinate_m=value,
-                    retained_coordinate_m=actual,reason='floating_point_boundary_equivalence'))
-        try:
-            retained = _merge((), critical)
-            # Bounded curve support: split existing intervals, never inject a
-            # fixed fractional coordinate next to an already nearby boundary.
-            # At least four intervals across a curved ring bbox; final topology
-            # audit decides whether this is sufficient. Not a global CAD grid.
-            support = []
-            for ring in curved:
-                lo,hi = ring['bounds_m'][axis],ring['bounds_m'][axis+2]
-                existing = [v for v in retained if lo <= v <= hi]
-                for a,b in zip(existing,existing[1:]):
-                    count = ceil((b-a)/((hi-lo)/4))
-                    support.extend(a+(b-a)*i/count for i in range(1,count))
-            retained = _merge(support, critical)
-        except ConfigurationError as exc:
-            raise ConfigurationError(f'PCB copper fidelity: {len(physical)} physical {"xy"[axis]} coordinates '
-                f'cannot be represented without merging distinct boundaries: {exc}') from exc
+        board=[v[axis] for v in geometry.outline.vertices_xy_m]
+        critical=_merge((),sorted(set((*feed[axis],*component_terminal_anchors(geometry,axis),
+            *(p[axis] for p in base.drill_centres_xy_m),min(board),max(board),
+            geometry.bounds[0][axis],geometry.bounds[1][axis]))))
+        lines,meta=feature_axis_plan(geometry,axis,critical,policy.max_substrate_xy_step_m)
+        axes.append(_merge((),lines));axis_meta.append(meta);critical_axes.append(critical)
+    meta=axis_meta[0]
+    suppressed=[]
+    for axis in range(2):
         for copper in geometry.copper:
-            values = [v[axis] for v in copper.vertices_xy_m]
-            midpoint = (min(values)+max(values))/2
-            if midpoint not in retained:
-                suppressed.append(dict(axis='xy'[axis],coordinate_m=midpoint,copper_id=copper.id,
+            vals=[p[axis] for p in copper.vertices_xy_m];mid=(min(vals)+max(vals))/2
+            if mid not in axes[axis]:
+                suppressed.append(dict(axis='xy'[axis],coordinate_m=mid,copper_id=copper.id,
                     kind='bbox_midpoint',reason='nonphysical_midpoint_omitted'))
-        axes.append(retained)
-    return replace(base,x_required_m=axes[0],y_required_m=axes[1]), dict(
-        name='modeled_copper_features_v2',quality=quality,drill_centres_xy_m=base.drill_centres_xy_m,
-        physical_boundary_roundoff_equivalences=roundoff,
-        copper_midpoints=False,suppressed_noncritical_anchors=suppressed,
-        retained_physical_feature_coordinates={a:sorted({represented_coordinate(r['coordinate_m'],axes[i],
-            max(abs(v) for bound in bounds for v in bound[:2])) for r in records if r['axis']==a}) for i,a in enumerate('xy')},
-        suppressed_physical_feature_coordinates=0,physical_boundary_runs=records,
-        curved_ring_policy=curved,
-        component_terminal_anchors_m={a:component_terminal_anchors(geometry,i) for i,a in enumerate('xy')})
+    segment_count=sum(a!=b and (a[0]==b[0] or a[1]==b[1]) for c in geometry.copper
+        for ring in (c.vertices_xy_m,*c.holes_xy_m) for a,b in zip(ring,(*ring[1:],ring[0])))
+    return replace(base,x_required_m=axes[0],y_required_m=axes[1]),dict(
+        name='feature_aware_copper_v3',quality=quality,
+        drill_centres_xy_m=base.drill_centres_xy_m,
+        component_terminal_anchors_m={a:component_terminal_anchors(geometry,i) for i,a in enumerate('xy')},
+        critical_anchors_m=dict(zip('xy',critical_axes)),
+        features=meta['features'],compacted_runs=meta['compacted_runs'],curved_zones=meta['curved_zones'],
+        thirds_feature_ids=sorted({f['id'] for f in meta['features']
+            if sum(d['feature_id']==f['id'] and d['method']=='thirds_hint'
+                   for m in axis_meta for d in m['edge_decisions'])==2}),
+        resolution_window_supports={a:m['resolution_window_supports'] for a,m in zip('xy',axis_meta)},
+        edge_cells={a:m['edge_cells'] for a,m in zip('xy',axis_meta)},
+        edge_decisions={a:m['edge_decisions'] for a,m in zip('xy',axis_meta)},
+        physical_feature_count=len(meta['features']),
+        source_vertex_count=sum(len(r) for c in geometry.copper for r in (c.vertices_xy_m,*c.holes_xy_m)),
+        compacted_run_count=len(meta['compacted_runs']),
+        suppressed_physical_feature_coordinates=0,
+        redundant_collinear_segment_count=segment_count-len(meta['compacted_runs']),
+        direct_vertex_anchor_count=0,copper_midpoints=False,
+        suppressed_noncritical_anchors=suppressed,
+        numerical_vertex_policy='No vertex promotion; paired widths, gaps and continuous-polygon topology audit',
+    )

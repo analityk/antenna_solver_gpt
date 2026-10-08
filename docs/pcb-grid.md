@@ -176,8 +176,9 @@ Diagnostyka `geometry_and_mesh` dla każdej osi rozdziela:
 
 Zbiór diagnostyczny geometrii zawiera m.in. wierzchołki, styki, środki/extrema
 wierceń i interfejsy. **Nie oznacza** uczynienia wszystkich wierzchołków
-kotwicami siatki. Od PCB-012F chronione są współrzędne prostoliniowych
-granic miedzi/otworów; szczegóły: docs/pcb-gerber.md, modeled_copper_features_v2. Nie zaliczamy numerycznych środków bbox, powietrza i PML do źródłowej
+kotwicami siatki. PCB-012G chroni szerokości miedzi/otworów przez kompaktowe cechy i audyt
+reprezentacji brzegów, bez wymogu linii na każdej granicy; szczegóły:
+docs/pcb-gerber.md, feature_aware_copper_v3. Nie zaliczamy numerycznych środków bbox, powietrza i PML do źródłowej
 geometrii. Pochodne powierzchnie portu są raportowane bez dodatkowego
 zaokrąglania; przy nieparzystej szerokości tickowej mogą mieć połówkowe
 położenie — diagnostyka nie ukrywa tego przez zmianę modelu.
@@ -245,7 +246,8 @@ może zmienić zaokrąglenie granic. Nie zaokrąglamy ponownie modelu w mesherze
 
 To dwa niezależne parametry: wierność CAD i rozdzielczość długości fali FDTD.
 Nie przywrócono siatki integer-tick ani globalnych komórek 10 µm. Między
-chronionymi granicami są dowolne linie float. Prostokątne cechy mają dokładny
-audyt granic i szerokości; krzywe mają jawny konserwatywny audyt obwiedni.
+krytycznymi kotwicami są dowolne linie float. Od PCB-012G granica miedzi może
+leżeć wewnątrz komórki (reguła thirds lub audytowana reprezentacja subkomórkowa).
+Szerokości pozostają jawnie audytowane; krzywe mają konserwatywny audyt obwiedni.
 Jeśli audyt lub limit kosztu nie pozwala reprezentować modelu, przygotowanie
 zatrzymuje się przed native. Nie podmienia go na tańszą geometrię.
