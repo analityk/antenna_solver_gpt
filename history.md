@@ -1737,3 +1737,26 @@ pairwise coupled microstrip. Model sprzężenia (C/C0→L albo udokumentowane
 even/odd + stamp wieloportowy) nie został jeszcze zaimplementowany. Nie istnieje
 jeszcze wynik FAST Z/S11 dla realnej serpentyny.
 
+## 2026-10-08 — PCB-016A: domyślny Fit PCB w viewerze pól XY
+
+**Powód:** zapisane pole XY było poprawne, ale raport skalował canvas do pełnego
+extentu dumpu (na lokalnym przykładzie około x=-41,62…39,18 mm,
+y=-49,98…30,82 mm), przez co właściwa płytka zajmowała małą część ramki.
+
+**Zmiana:** `src/antenna_lab/visualization/pcb_fields.py` wylicza dla widoku XY
+bbox z geometrycznych overlayów całej PCB i dodaje 6% marginesu. Browser payload
+próbkuje maksymalnie 80×80 punktów już wewnątrz tego zakresu zamiast na całym
+airboxie. Statyczne diagramy fazowe używają tego samego cropu. Widoki XZ/YZ
+zachowują na razie dotychczasowy pełny extent.
+
+**Wpływ na fizykę i wyniki:** brak. Nie zmieniono field dumpu, NPZ, mesh,
+openEMS, PML ani FDTD. To wyłącznie viewport prezentacji, więc istniejące
+ukończone przebiegi z zapisanymi polami można ponownie wyrenderować bez solve.
+
+**Sprawdzenie:** dodano test, że payload XY raportuje `fit_pcb_6_percent_margin`,
+obejmuje cały board outline, jest węższy od full field extentu i że statyczne
+osie również są przycięte. Nie uruchamiano natywnego FDTD.
+
+**Ograniczenia:** nie dodano jeszcze przełącznika Full field extent, nie
+zmniejszono samego obszaru DFT/dumpu i nie zmieniono pionowych przekrojów.
+
