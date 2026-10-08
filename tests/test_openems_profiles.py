@@ -43,10 +43,11 @@ class ProfilesTests(unittest.TestCase):
     def test_missing_invalid_schema_unknown_keys_and_profile(self):
         with self.assertRaises(ConfigurationError):load_profiles('/missing/profile.toml')
         with self.assertRaises(ConfigurationError):resolve_profile('unknown')
+        with self.assertRaises(ConfigurationError):resolve_profile([])
         with TemporaryDirectory() as d:
             path=Path(d)/'p.toml';text=DEFAULT_CONFIG.read_text()
             for bad in (text.replace('schema_version = 1','schema_version = 2'),
-                        text+'\nmisspelled = 1\n', text.replace('max_cells = 20000000','max_cells = true'),
+                        text+'\nmisspelled = 1\n', text.replace('default_profile = "design"','default_profile = []'), text.replace('max_cells = 20000000','max_cells = true'),
                         text.replace('time_step_factor = 1.0','time_step_factor = nan')):
                 path.write_text(bad)
                 with self.subTest(bad=bad[:40]),self.assertRaises(ConfigurationError):load_profiles(path)

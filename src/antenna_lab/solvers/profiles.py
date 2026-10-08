@@ -27,7 +27,7 @@ def load_profiles(path=DEFAULT_CONFIG):
         raise ConfigurationError(f'openEMS profiles {path}: {exc}') from exc
     if set(data) != {'schema_version', 'default_profile', 'interaction', 'profiles'} or type(data['schema_version']) is not int or data['schema_version'] != 1:
         raise ConfigurationError('openEMS profiles: expected schema_version=1 and known top-level keys.')
-    if not isinstance(data['profiles'], dict) or set(data['profiles']) != {'preview', 'design', 'verify'} or data['default_profile'] not in data['profiles']:
+    if not isinstance(data['profiles'], dict) or set(data['profiles']) != {'preview', 'design', 'verify'} or not isinstance(data['default_profile'], str) or data['default_profile'] not in data['profiles']:
         raise ConfigurationError('openEMS profiles: require preview/design/verify and a valid default_profile.')
     interaction = data['interaction']
     if not isinstance(interaction, dict) or set(interaction) != {'confirm_before_fdtd', 'noninteractive_requires_yes'} or any(type(v) is not bool for v in interaction.values()):
@@ -90,7 +90,7 @@ def resolve_profile(name=None, *, config_path=DEFAULT_CONFIG, experiment=None,
                     field_frequency_hz=None, no_fields=False):
     data, provenance = load_profiles(config_path)
     name = data['default_profile'] if name is None else name
-    if name not in data['profiles']:
+    if not isinstance(name, str) or name not in data['profiles']:
         raise ConfigurationError(f'Unknown openEMS profile: {name}.')
     values = dict(data['profiles'][name]); band = dict(experiment or {})
     fields_hz = field_frequency_hz
@@ -126,4 +126,6 @@ def resolve_profile(name=None, *, config_path=DEFAULT_CONFIG, experiment=None,
     return ResolvedProfile(name, settings, fields_hz,
         dict(provenance, name=name, resolved_settings=resolved,
              cli_overrides=dict(cli_overrides or {}), interactive_overrides=dict(interactive_overrides or {}),
-             confirmation_mode='library_api', interaction=dict(data['interaction'])), dict(data['interaction']))
+             confirmation_mode='library_api', interaction=dict(data['interaction']),
+             experiment_arguments=dict(experiment or {}),
+             field_arguments=dict(frequency_hz=field_frequency_hz, no_fields=no_fields)), dict(data['interaction']))

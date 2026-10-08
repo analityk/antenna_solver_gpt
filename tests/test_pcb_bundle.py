@@ -142,7 +142,7 @@ class BundleTests(unittest.TestCase):
                 SimpleNamespace(openEMS=lambda **kw:engine),SimpleNamespace(ContinuousStructure=CSX))),\
              patch('antenna_lab.visualization.report.generate_report',side_effect=RuntimeError('report unavailable')),\
              contextlib.redirect_stdout(io.StringIO()),contextlib.redirect_stderr(io.StringIO()):
-            result=gerber_control.run_gerber_control(self.bundle,out,quality='preview')
+            result=gerber_control.run_gerber_control(self.bundle,out,quality='preview',field_frequency_hz=())
         self.assertEqual(result['status'],'completed');self.assertEqual(result['termination_status'],'completed_before_limit')
         self.assertTrue((out/'impedance.csv').exists());self.assertIn('report unavailable',result['warnings'][0])
         self.assertEqual(json.loads((out/'summary.json').read_text()),result)

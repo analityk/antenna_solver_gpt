@@ -188,7 +188,7 @@ M02*''')
     def test_single_run_pipeline_native_fakes_normal_policy_and_output(self):
         out=self.root/'result'
         with self.native_fakes(),patch.object(runner,'normalize_port_orientation',wraps=normalize_port_orientation) as norm:
-            result=runner.run_gerber_control(self.config_path,out)
+            result=runner.run_gerber_control(self.config_path,out,field_frequency_hz=())
         norm.assert_called_once()
         self.assertEqual(result['validation_status'],'unverified')
         self.assertEqual(result['status'],'completed')
@@ -198,7 +198,7 @@ M02*''')
         self.assertEqual(make_control_settings(),make_synthetic_control_case()[1])
         calls=[c for c in self.engine.calls if c[0]=='Run']
         self.assertEqual(len(calls),1)
-        self.assertEqual(calls[0][2],dict(cleanup=False,numThreads=0,dump_statistics=True))
+        self.assertEqual(calls[0][2],dict(cleanup=False,numThreads=0,dump_statistics=True,engine="fastest",verbose=0,disable_dumps=False,exact_endcriteria=False))
         for file in ('summary.json','impedance.csv','geometry.json','geometry.source.json','import.json','native/model.xml'):
             self.assertTrue((out/file).is_file(),file)
         self.assertEqual(result,json.loads((out/'summary.json').read_text()))
@@ -211,7 +211,7 @@ M02*''')
     def test_prepare_only_has_xml_without_any_run_or_calcport(self):
         out=self.root/'prepare'
         with self.native_fakes():
-            result=runner.run_gerber_control(self.config_path,out,prepare_only=True,
+            result=runner.run_gerber_control(self.config_path,out,prepare_only=True,field_frequency_hz=(),
                 excitation_center_hz=2.45e9,excitation_cutoff_hz=.4e9,result_frequency_hz=(2.2e9,2.45e9,2.7e9))
         self.assertEqual(result['status'],'prepared')
         self.assertFalse(any(c[0]=='Run' for c in self.engine.calls))

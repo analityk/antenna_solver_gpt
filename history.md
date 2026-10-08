@@ -1606,3 +1606,18 @@ Zaktualizowano wyłącznie oczekiwania związane z nowymi profilami: duży NrTS,
 jawne opt-out pól w testach bez dumpów, opcjonalne runtime=None w starej konfiguracji.
 Real ZIP nadal sprawdza zbyt mały, teraz jawnie nadpisany NrTS. Drugi checkpoint
 publikowany przed jedynym pełnym unittest. Brak natywnego FDTD.
+
+PCB-013A — weryfikacja końcowa: drugi checkpoint 449bdb73 opublikowano przed
+pełnym unittest. Pełny zestaw uruchomiono dokładnie raz: 397 testów,
+14 failures, 33 errors, 3 skipped. Wykrył regresję rozszerzenia run_options
+w syntetycznych diagnostykach oraz stare atrapy bez dumpów przy nowych polach ON.
+Przywrócono dokładnie dawny zapis run_options dla runtime=None; testy bez pól
+używają teraz jawnego opt-out, zaś osobne testy sprawdzają domyślne E/H.
+Po poprawkach: 41/41 testów celowanych PASS (16 profili, edge_convergence,
+refined_sensitivity i cztery dotknięte integracje Gerber/report).
+Nie powtarzano całego zestawu. Historyczne odmowy audytu obwiedni PCB-012G
+oraz stara oczekiwana wielkość siatki emtest3 pozostają poza zakresem.
+Zakres PCB-013A PASS na atrapach; całe repozytorium PARTIAL, native Windows
+nie sprawdzono. Żaden natywny Run ani solve/convergence nie został uruchomiony.
+Końcowy commit publikuje także te wyniki. Żadne outcomes ani niepowiązane
+pliki użytkownika nie są dodawane do commita.

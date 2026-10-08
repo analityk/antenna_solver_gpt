@@ -24,6 +24,8 @@ class OpenEMSRuntime:
 
 
 def validate_runtime(runtime):
+    if not isinstance(runtime, OpenEMSRuntime):
+        raise ConfigurationError("runtime: expected OpenEMSRuntime settings.")
     for key in ('max_time_s', 'time_step_s', 'time_step_factor'):
         value = getattr(runtime, key)
         if isinstance(value, bool) or not isinstance(value, (int, float)) or not isfinite(value) or value < 0:

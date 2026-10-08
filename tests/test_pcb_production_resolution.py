@@ -118,7 +118,7 @@ class ProductionResolutionTests(unittest.TestCase):
     def test_offline_report_resolution_and_modeled_width(self):
         out=self.root/'report'
         with self.native():
-            control.run_gerber_control(self.fixture.config_path,out,quality='preview')
+            control.run_gerber_control(self.fixture.config_path,out,quality='preview',field_frequency_hz=())
         for p in (self.fixture.top,self.fixture.outline):p.unlink()
         with patch('antenna_lab.solvers.openems.native_modules',side_effect=AssertionError('no native')):
             report=generate_report(out,self.root/'offline.html')

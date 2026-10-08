@@ -364,7 +364,8 @@ def run_pcb_fdtd(engine, csx, port, domain_mesh: PcbDomainMesh,
         result['field_port_reference'] = field_reference
     if statistics is not None:
         result['native_statistics'] = statistics
-    if statistics is not None or settings.runtime is not None:
+        result['run_options'] = dict(exact_endcriteria=exact_endcriteria, dump_statistics=dump_statistics)
+    if settings.runtime is not None:
         result['run_options'] = dict(options, numThreads=settings.threads)
     return result
 
