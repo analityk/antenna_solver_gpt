@@ -2,15 +2,14 @@
 
 import argparse
 from dataclasses import asdict
-from datetime import datetime, timezone
 from hashlib import sha256
 from importlib.metadata import version
 import json
 from pathlib import Path
 import sys
-from tempfile import mkdtemp
 
 from antenna_lab.core.config import ConfigurationError
+from antenna_lab.core.catalog import variant_slug
 from antenna_lab.solvers.openems_pcb import prepare_pcb_xml_model, read_pcb_native_statistics
 from antenna_lab.solvers.pcb_mesh import make_pcb_domain_mesh, make_gerber_mesh_anchor_plan
 from .config import load_pcb_config
@@ -31,6 +30,28 @@ GEOMETRY_POLICY = "Geometry resolution applies before EM meshing; FDTD mesh rema
 
 def _write_json(path, value):
     path.write_text(json.dumps(value, indent=2, allow_nan=False)+'\n', encoding='utf-8')
+
+
+def _default_output_dir(config_path, root=Path('outcomes/pcb_gerber')):
+    """Create <input-name>_<series> without timestamps or random suffixes."""
+    source=Path(config_path)
+    name=source.name if source.is_dir() else source.stem
+    prefix=variant_slug(name) or 'pcb'
+    root=Path(root);root.mkdir(parents=True,exist_ok=True)
+    used=[]
+    marker=prefix+'_'
+    for path in root.iterdir():
+        if not path.is_dir() or not path.name.startswith(marker):continue
+        suffix=path.name[len(marker):]
+        if suffix.isdigit():used.append(int(suffix))
+    number=max(used,default=0)+1
+    while True:
+        candidate=root/f'{prefix}_{number:03d}'
+        try:
+            candidate.mkdir()
+            return candidate
+        except FileExistsError:
+            number+=1
 
 
 def run_gerber_control(config_path, output_dir, *, prepare_only=False, quality=None, sweep_request=None, pcb_config=None, field_frequency_hz=None, geometry_resolution_um=10, resolved_profile=None, **frequency_settings):
@@ -307,9 +328,7 @@ def main(argv=None):
             sweep_options = {}
         output = args.output
         if output is None:
-            root = Path('outcomes/pcb_gerber')
-            root.mkdir(parents=True, exist_ok=True)
-            output = Path(mkdtemp(prefix=datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ_'), dir=root))
+            output = _default_output_dir(args.config)
         result = run_gerber_control(args.config, output, prepare_only=args.prepare_only, quality=profile.name, geometry_resolution_um=args.geometry_resolution_um, **sweep_options, pcb_config=args.pcb_config, resolved_profile=profile)
         print(f"Status: {result['status']}; validation_status: unverified\n{output.resolve()/'summary.json'}")
         if not args.prepare_only:
