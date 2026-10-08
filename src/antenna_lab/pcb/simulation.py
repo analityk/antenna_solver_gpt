@@ -36,10 +36,21 @@ class PcbSimulationSettings:
 def validate_pcb_simulation_config(value: dict) -> dict:
     """Validate without mutation; 0.8 is the project's excitation quality margin."""
     validate_schema(value, "pcb-simulation.schema.json")
-    frequencies = value["result_frequency_hz"]
+    validate_frequency_band(value['result_frequency_hz'], value['excitation']['center_hz'],
+                            value['excitation']['cutoff_hz'])
+    mesh = value["mesh"]
+    if mesh["growth_ratio_target"] > mesh["growth_ratio_limit"]:
+        raise ConfigurationError("mesh: growth_ratio_target nie może przekraczać growth_ratio_limit.")
+    return value
+
+
+def validate_frequency_band(frequencies, center, cutoff):
+    """Shared result-band policy; FAST uses it without FDTD/profile settings."""
+    if (not frequencies or any(isinstance(v,bool) or not isinstance(v,(int,float))
+        or not isfinite(v) or v<=0 for v in (*frequencies,center,cutoff))):
+        raise ConfigurationError('Frequency band requires positive finite numeric values.')
     if any(a >= b for a, b in zip(frequencies, frequencies[1:])):
         raise ConfigurationError("result_frequency_hz: wymagany porządek ściśle rosnący.")
-    center, cutoff = value["excitation"]["center_hz"], value["excitation"]["cutoff_hz"]
     if cutoff >= center:
         raise ConfigurationError("excitation.cutoff_hz musi być mniejsze od center_hz.")
     if not isfinite(center + cutoff):
@@ -47,10 +58,6 @@ def validate_pcb_simulation_config(value: dict) -> dict:
     low, high = center - .8 * cutoff, center + .8 * cutoff
     if any(not low <= f <= high for f in frequencies):
         raise ConfigurationError("result_frequency_hz: wymagany zakres center_hz ± 0.8 * cutoff_hz.")
-    mesh = value["mesh"]
-    if mesh["growth_ratio_target"] > mesh["growth_ratio_limit"]:
-        raise ConfigurationError("mesh: growth_ratio_target nie może przekraczać growth_ratio_limit.")
-    return value
 
 
 def load_pcb_simulation_settings(path) -> PcbSimulationSettings:

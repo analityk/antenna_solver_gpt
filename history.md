@@ -1634,3 +1634,24 @@ przeglądu odległych par, nie czas wykonania. Brak benchmarków i FDTD.
 Testy: validation+transform 29/29 PASS; szerszy zestaw 36 testów ma dwa
 wcześniejsze błędy audytu obwiedni meshera w test_pcb_clearances, pozostałe
 34 PASS. Kontrole otworów w tym zestawie przechodzą; błędów meshera nie zmieniano.
+
+## PCB-015A2 — oddzielny FAST / APPROX (checkpoint izolowanej linii)
+
+Dodano jawny solver reduced_quasi_tem z importem ZIP/katalogu, istniejącą
+normalizacją/projekcją oraz compact_features. Odtworzenie grafu musi dowieść
+pokrycia całej miedzi; niejednoznaczna geometria jest odrzucana. Linia
+Hammerstad–Jensen (zero thickness/quasi-static), sieć nodalna z dokładnymi
+równaniami TL i idealnymi R/L/C. CSV Z/S11/SWR, graf i provenance JSON.
+Wspólne argumenty częstotliwości wydzielono bez zależności od adaptera;
+walidacja pasma jest współdzielona. Nie zmieniono profili/full-wave/siatki.
+
+Zakres PARTIAL: sprzężenia par są wykrywane i blokują solve (nie są po cichu
+pomijane); łuki, niejednoznaczne pady, ground slots i vias również fail closed.
+Linie bezstratne; promieniowanie, dyspersja i pasożyty nie są modelowane.
+Dokładny kontrakt, metoda, ograniczenia i komenda: docs/pcb-reduced.md.
+Testy to tożsamości linii open/short/load/match, faza, kierunek zmian w/h/er,
+stampy RLC/różnicowe, graf straight/L/U, brak native/meshera/promptu i zapis
+strict JSON/CSV. Brak natywnego FDTD, benchmarków, nowych zależności.
+Checkpoint jest publikowany przed jedynym pełnym unittest.
+Celowany zestaw przed publikacją: 76/76 PASS (reduced, simulation, validation,
+transform, control, gerber_sweep). Fizyczna trafność pozostaje approximate.

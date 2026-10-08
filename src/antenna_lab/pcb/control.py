@@ -9,6 +9,7 @@ import sys
 from tempfile import mkdtemp
 
 from antenna_lab.core.config import ConfigurationError
+from antenna_lab.pcb.frequency import add_frequency_arguments, frequency_arguments_hz
 from antenna_lab.pcb.model import BoardOutline, CopperPolygon, PcbGeometry, PcbPort, Substrate
 from antenna_lab.pcb.simulation import PcbSimulationSettings, validate_pcb_simulation_settings
 from antenna_lab.pcb.transform import normalize_port_orientation
@@ -110,21 +111,6 @@ def run_control_model(geometry: PcbGeometry, settings: PcbSimulationSettings, ou
             metadata['fields']['frequency_hz'], result['field_port_reference'], output)
     return write_pcb_port_results(result, output)
 
-
-def add_frequency_arguments(parser):
-    parser.add_argument('--center-mhz', type=float, default=1420.)
-    parser.add_argument('--cutoff-mhz', type=float, default=200.)
-    parser.add_argument('--frequencies-mhz', type=float, nargs='+', default=[1300., 1420., 1500.])
-    parser.add_argument('--loss-reference-mhz', type=float)
-
-
-def frequency_arguments_hz(args):
-    # MHz exists only at this command-line boundary; all downstream values are Hz.
-    return dict(excitation_center_hz=args.center_mhz*1e6,
-                excitation_cutoff_hz=args.cutoff_mhz*1e6,
-                result_frequency_hz=tuple(f*1e6 for f in args.frequencies_mhz),
-                loss_reference_frequency_hz=(args.center_mhz if args.loss_reference_mhz is None
-                                             else args.loss_reference_mhz)*1e6)
 
 
 def main(argv=None) -> int:
