@@ -153,6 +153,8 @@ def run_gerber_control(config_path, output_dir, *, prepare_only=False, quality='
         diagnostics['suppressed_noncritical_anchors'] = anchor_metadata.pop('suppressed_noncritical_anchors')
         diagnostics['mesh_anchor_policy'] = anchor_metadata
         mesh = make_pcb_domain_mesh(geometry, settings, gerber_quality=quality)
+        from antenna_lab.solvers.pcb_features import audit_copper_mesh
+        diagnostics['copper_mesh_fidelity'] = audit_copper_mesh(geometry, mesh, source_geometry=normalized_source)
         resolve_pcb_lumped_port(geometry, mesh, settings, gerber_quality=quality)
         from antenna_lab.solvers.pcb_components import resolve_component_boxes
         diagnostics['ideal_components'] = [asdict(c) for c in resolve_component_boxes(

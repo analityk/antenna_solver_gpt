@@ -184,7 +184,8 @@ class ComponentTests(unittest.TestCase):
             axis='xy'.index(c.axis);self.assertEqual(c.gap_start_xy_m[1-axis],c.gap_stop_xy_m[1-axis])
 
     def test_mesh_values_no_z_refinement_exact_faces_and_frozen_install(self):
-        cfg,source,g,t,s,meta=self.loaded();before=g.as_dict()
+        cfg,source,g,t,s,meta=self.loaded()
+        g,_,_=apply_geometry_resolution(g,PcbGrid());before=g.as_dict()
         mesh=make_pcb_domain_mesh(g,s,gerber_quality='preview');axes=(mesh.x_lines_m,mesh.y_lines_m,mesh.z_lines_m)
         changed=replace(g,components=tuple(replace(c,value_si=c.value_si*10) for c in g.components))
         self.assertEqual(mesh,make_pcb_domain_mesh(changed,s,gerber_quality='preview'))
@@ -258,6 +259,7 @@ class ComponentTests(unittest.TestCase):
 
     def test_contact_audit_keeps_collision_and_ownership_protections(self):
         _,_,g,_,s,_=self.loaded()
+        g,_,_=apply_geometry_resolution(g,PcbGrid())
         c=next(c for c in g.components if c.id=='R1')
         g=replace(g,components=(c,))
         mesh=make_pcb_domain_mesh(g,s,gerber_quality='preview')
@@ -293,7 +295,8 @@ class ComponentTests(unittest.TestCase):
                 resolve_component_boxes(invalid,axes)
 
     def test_box_rejects_no_transverse_cell_copper_intrusion_and_missing_faces(self):
-        _,_,g,_,s,_=self.loaded();mesh=make_pcb_domain_mesh(g,s,gerber_quality='preview')
+        _,_,g,_,s,_=self.loaded()
+        g,_,_=apply_geometry_resolution(g,PcbGrid());mesh=make_pcb_domain_mesh(g,s,gerber_quality='preview')
         axes=(mesh.x_lines_m,mesh.y_lines_m,mesh.z_lines_m)
         c=g.components[0];axis='xy'.index(c.axis)
         damaged=list(axes);damaged[axis]=tuple(v for v in axes[axis] if v!=c.gap_start_xy_m[axis])
@@ -317,7 +320,8 @@ class ComponentTests(unittest.TestCase):
         self.assertFalse(any(name.endswith('CSRC') for name,_,_ in csx.lumped))
         field=json.loads((out/'fields/metadata.json').read_text());self.assertIn('8',field['mask_bits'])
         self.assertEqual(len(field['component_regions']),3)
-        _,_,g,_,s,_=self.loaded();mesh=make_pcb_domain_mesh(g,s,gerber_quality='preview')
+        _,_,g,_,s,_=self.loaded()
+        g,_,_=apply_geometry_resolution(g,PcbGrid());mesh=make_pcb_domain_mesh(g,s,gerber_quality='preview')
         axes=(mesh.x_lines_m,mesh.y_lines_m,mesh.z_lines_m);spec=resolve_component_boxes(g,axes)[0]
         centre=(np.asarray(spec.start_m)+spec.stop_m)/2
         mask=pcb_sample_mask(tuple([v] for v in centre),axes,g).item();self.assertTrue(mask&8)

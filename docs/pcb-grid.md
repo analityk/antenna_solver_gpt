@@ -176,8 +176,8 @@ Diagnostyka `geometry_and_mesh` dla każdej osi rozdziela:
 
 Zbiór diagnostyczny geometrii zawiera m.in. wierzchołki, styki, środki/extrema
 wierceń i interfejsy. **Nie oznacza** uczynienia wszystkich wierzchołków
-kotwicami siatki. Odfiltrowane kotwice miedzi i wymagane linie są zapisane
-osobno. Nie zaliczamy numerycznych środków bbox, powietrza i PML do źródłowej
+kotwicami siatki. Od PCB-012F chronione są współrzędne prostoliniowych
+granic miedzi/otworów; szczegóły: docs/pcb-gerber.md, modeled_copper_features_v2. Nie zaliczamy numerycznych środków bbox, powietrza i PML do źródłowej
 geometrii. Pochodne powierzchnie portu są raportowane bez dodatkowego
 zaokrąglania; przy nieparzystej szerokości tickowej mogą mieć połówkowe
 położenie — diagnostyka nie ukrywa tego przez zmianę modelu.
@@ -232,3 +232,20 @@ ortogonalną i jeden zdeduplikowany PTH z kontaktami top–bottom.
 Wariant podstawowy emtest4 10 µm zmniejsza liczbę komórek o około 32,1%.
 To potwierdzenie architektury i audytów, nie zbieżności fizycznego solve.
 
+
+
+## PCB-012F: modelowana geometria jest nadrzędna wobec optymalizacji siatki
+
+Rozdzielczość geometrii najpierw kwantyzuje fizyczny model. Siatka EM nie może
+potem usuwać szerokości przewodników ani szczelin, które tę projekcję przetrwały.
+Przykład przy 10 µm: 0,376 → 0,38 mm i 0,384 → 0,38 mm; równocześnie
+0,25 → 0,25 mm i 0,38 → 0,38 mm muszą pozostać rozróżnialne. Testy używają
+stałego środka, z granicami projektowanymi niezależnie; inne położenie środka
+może zmienić zaokrąglenie granic. Nie zaokrąglamy ponownie modelu w mesherze.
+
+To dwa niezależne parametry: wierność CAD i rozdzielczość długości fali FDTD.
+Nie przywrócono siatki integer-tick ani globalnych komórek 10 µm. Między
+chronionymi granicami są dowolne linie float. Prostokątne cechy mają dokładny
+audyt granic i szerokości; krzywe mają jawny konserwatywny audyt obwiedni.
+Jeśli audyt lub limit kosztu nie pozwala reprezentować modelu, przygotowanie
+zatrzymuje się przed native. Nie podmienia go na tańszą geometrię.

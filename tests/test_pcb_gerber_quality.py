@@ -44,12 +44,15 @@ class GerberQualityTests(unittest.TestCase):
         self.assertEqual(gerber_quality_settings(),gerber_quality_settings('design'))
         with self.assertRaises(ConfigurationError):gerber_quality_settings('bad')
 
-    def test_critical_exact_close_edges_suppressed_deterministic_no_mutation(self):
+    def test_critical_and_physical_close_edges_preserved_deterministic_no_mutation(self):
         # Two harmless off-feed islands staggered by 25 um, well inside the board.
         for i,dy in enumerate((0.,25e-6)):
             self.g.copper.append(CopperPolygon(f'island_{i}',
                 ((-.009+i*.002,.008+dy),(-.008+i*.002,.008+dy),
                  (-.008+i*.002,.009+dy),(-.009+i*.002,.009+dy)),0.))
+        from antenna_lab.pcb.geometry_resolution import apply_geometry_resolution
+        from antenna_lab.pcb.grid import PcbGrid
+        self.g,_,_=apply_geometry_resolution(self.g,PcbGrid())
         before=self.g.as_dict()
         n,p=self.g.port.negative_xy_m,self.g.port.positive_xy_m
         my=(n[1]+p[1])/2;half=self.g.port.width_m/2
@@ -64,9 +67,11 @@ class GerberQualityTests(unittest.TestCase):
                 vals=[v[axis] for v in self.g.outline.vertices_xy_m]
                 self.assertIn(min(vals),lines);self.assertIn(max(vals),lines)
             self.assertIn(0.,mesh.z_lines_m);self.assertIn(self.g.substrate.z_min_m,mesh.z_lines_m)
-            self.assertGreater(min(b-a for a,b in zip(mesh.y_lines_m,mesh.y_lines_m[1:])),50e-6)
-            self.assertTrue(any(row['kind'].startswith('edge') and row['reason']=='below_half_local_resolution'
-                                for row in meta['suppressed_noncritical_anchors']))
+            for copper in self.g.copper:
+                for axis,lines in enumerate((mesh.x_lines_m,mesh.y_lines_m)):
+                    for vertex in copper.vertices_xy_m:self.assertIn(vertex[axis],lines)
+            self.assertEqual(meta['suppressed_physical_feature_coordinates'],0)
+            self.assertTrue(all(row['kind']=='bbox_midpoint' for row in meta['suppressed_noncritical_anchors']))
             if q!='verify':
                 self.assertFalse(meta['copper_midpoints'])
             resolve_pcb_lumped_port(self.g,mesh,s,gerber_quality=q)

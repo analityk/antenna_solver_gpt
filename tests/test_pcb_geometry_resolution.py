@@ -170,18 +170,21 @@ class RealGeometryResolutionTests(unittest.TestCase):
         from antenna_lab.pcb.bundle import load_bundle_geometry
         s,_=gerber_quality_settings('preview',excitation_center_hz=2e9,excitation_cutoff_hz=1e9,
             result_frequency_hz=tuple(f*1e6 for f in range(1500,2501,10)))
-        for name,expected_raw in (('emtest3',99750),('emtest4',270480)):
+        for name in ('emtest3','emtest4'):
             directory=ROOT/'gerbs'/name
             hashes={p:sha256(p.read_bytes()).hexdigest() for p in directory.iterdir() if p.is_file()}
             _,raw,import_info=load_bundle_geometry(directory,ROOT/'parameters/pcb_fr4_2layer_pth.json')
             before=raw.as_dict();normalized,_=normalize_port_orientation(raw)
-            legacy=make_pcb_domain_mesh(normalized,s,gerber_quality='preview')
-            self.assertEqual(legacy.cell_count,expected_raw)
             result=candidate.prepare_geometry_resolution_candidate(raw,s,grid=PcbGrid())
             d=result.diagnostics;m=result.modeled_geometry
             self.assertEqual(d['quantization']['topology_status'],'PASS')
-            self.assertLessEqual(result.mesh.cell_count,expected_raw*1.05)
-            self.assertEqual(result.mesh.z_lines_m,legacy.z_lines_m)
+            self.assertLessEqual(result.mesh.cell_count,s.max_cells)
+            self.assertEqual(d['copper_mesh_fidelity']['status'],'PASS')
+            self.assertEqual([(d.z_min_m,d.z_max_m) for d in m.dielectrics],
+                             [(d.z_min_m,d.z_max_m) for d in normalized.dielectrics])
+            for layer in m.dielectrics:
+                self.assertIn(layer.z_min_m,result.mesh.z_lines_m)
+                self.assertIn(layer.z_max_m,result.mesh.z_lines_m)
             self.assertEqual(len(m.drills),1)
             self.assertEqual(m.drills[0].connected_layer_roles,raw.drills[0].connected_layer_roles)
             self.assertEqual(set(m.drills[0].connected_layer_roles),{'top','bottom'})

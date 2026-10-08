@@ -173,12 +173,17 @@ class ClearanceTests(unittest.TestCase):
             self.assertEqual(winner(source_point+np.array([.001,0])),'air')
             self.assertEqual(metadata['geometry']['copper_composition'][0]['final_hole_count'],1)
         self.assertEqual(results[0],results[1])
-        # A hole in an existing conductor adds no mesh anchors itself.
+        # PCB-012F: a physical clearance must contribute XY constraints; Z stays fixed.
         config,base,_=load_bundle_geometry(self.bundle(clear=False),self.config())
         plain,_=normalize_port_orientation(base)
         config,cut,_=load_bundle_geometry(self.bundle(clear=True),self.config())
         cut,_=normalize_port_orientation(cut)
-        self.assertEqual(make_pcb_domain_mesh(plain,s,gerber_quality='preview'),make_pcb_domain_mesh(cut,s,gerber_quality='preview'))
+        plain_mesh=make_pcb_domain_mesh(plain,s,gerber_quality='preview')
+        cut_mesh=make_pcb_domain_mesh(cut,s,gerber_quality='preview')
+        self.assertNotEqual((plain_mesh.x_lines_m,plain_mesh.y_lines_m),(cut_mesh.x_lines_m,cut_mesh.y_lines_m))
+        self.assertEqual(plain_mesh.z_lines_m,cut_mesh.z_lines_m)
+        from antenna_lab.solvers.pcb_features import audit_copper_mesh
+        self.assertEqual(audit_copper_mesh(cut,cut_mesh)['status'],'PASS')
 
     def test_multilayer_independence_mask_and_clearance_grid_audit(self):
         bundle=self.bundle(clear=False)

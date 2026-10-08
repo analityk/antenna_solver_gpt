@@ -156,9 +156,12 @@ def prepare_geometry_resolution_candidate(source: PcbGeometry, settings, *, grid
     modeled,quantized,audit=apply_geometry_resolution(normalized,grid)
     plan,anchor_metadata=make_gerber_mesh_anchor_plan(modeled,settings,quality)
     mesh=make_pcb_domain_mesh(modeled,settings,gerber_quality=quality)
+    from antenna_lab.solvers.pcb_features import audit_copper_mesh
+    fidelity=audit_copper_mesh(modeled,mesh,source_geometry=normalized)
     port=resolve_pcb_lumped_port(modeled,mesh,settings,gerber_quality=quality)
     components=resolve_component_boxes(modeled,(mesh.x_lines_m,mesh.y_lines_m,mesh.z_lines_m))
     diagnostics=dict(
+        copper_mesh_fidelity=fidelity,
         geometry_resolution_um=grid.quantum_um,
         normalization=asdict(transform),source_geometry=source.as_dict(),
         normalized_source_geometry=normalized.as_dict(),quantization=audit,

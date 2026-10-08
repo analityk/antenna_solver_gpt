@@ -131,6 +131,9 @@ class BundleTests(unittest.TestCase):
             self.assertAlmostEqual(m['feed_detection']['gap_m'],gap*1e-3,places=12)
             self.assertEqual(m['feed_detection']['axis'],axis);self.assertEqual(len(g.copper),count)
             g,_=normalize_port_orientation(g);s,_=gerber_quality_settings('preview')
+            from antenna_lab.pcb.geometry_resolution import apply_geometry_resolution
+            from antenna_lab.pcb.grid import PcbGrid
+            g,_,_=apply_geometry_resolution(g,PcbGrid())
             resolve_pcb_lumped_port(g,make_pcb_domain_mesh(g,s,gerber_quality='preview'),s,gerber_quality='preview')
 
     def test_cli_folder_physical_config_and_best_effort_report(self):

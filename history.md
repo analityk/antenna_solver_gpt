@@ -1486,3 +1486,70 @@ potwierdzają zbieżności ani dokładności fizycznej modelu.
 
 **Wynik testów:** komponenty/ZIP 21 testów OK; pełny unittest 370 testów OK,
 3 pominięte (natywne openEMS/CSXCAD, Windows UCRT, GUI Tk). Bez FDTD.
+
+## 2026-10-08 — PCB-012F: zachowanie modelowanej miedzi w siatce EM
+
+**Powód:** filtr ekonomiczny usuwał fizyczne krawędzie miedzi na podstawie
+odstępu zależnego od długości fali. Samo zachowanie polygonu CSXCAD nie
+zapewniało reprezentacji jego szerokości w siatce.
+
+**Zmiana:** modeled_copper_features_v2 wyznacza współrzędne normalne odcinków
+poziomych/pionowych wszystkich obrysów i otworów. Chroni także wewnętrzną
+szerokość przewężenia w polygonie połączonym z dużymi padami. Usunięto filtr
+below_half_local_resolution. Pominąć można tylko numeryczny środek bbox;
+nie zmieniono polygonów, projekcji, materiałów, źródła ani wartości RLC.
+Nie przywrócono siatki tickowej; grading/podział nadal używa float.
+Kotwice portu/komponentów/wierceń i polityka Z pozostają niezmienione.
+
+**Audyt:** nowy czysto pythonowy pcb_features.py sprawdza końcowe granice
+oraz przekroje prostokątne (szerokości źródłowe/modelowane/reprezentowane).
+Krzywe mają chronione extrema i ograniczone wsparcie przedziałów bbox,
+nie każdy wierzchołek aproksymacji. Obwiednie pełnych/przeciętych komórek
+muszą zachować obszary, otwory, ich własność i brak zwarć między przewodnikami.
+Niepowodzenie lub budżet miliona komórek audytu kończy przygotowanie przed
+native. To konserwatywny test topologii, nie natywne zajęcie Yee ani zbieżność.
+Reszty po translacji raw można utożsamić wyłącznie w granicy 8 ULP skali płytki,
+nie większej od istniejącej tolerancji geometrii; każda równoważność jest
+raportowana. Nie zmieniono _merge ani tolerancji portu. Projektowane granice
+regresji szerokości są zachowane dokładnie, bez równoważności float.
+
+**Metadane:** summary.copper_mesh_fidelity, modelowane i zachowane granice,
+przekroje, źródłowe granice przy dostępnej geometrii raw, audyt krzywych,
+liczniki fizycznych współrzędnych oraz przyczyny pominięcia środków bbox.
+Audyt w make_pcb_domain_mesh obowiązuje również ścieżkę adaptera natywnego.
+Błąd max_cells nie powoduje upraszczania miedzi.
+
+**Regresje bez FDTD:** ten sam środek/stackup, q=10 µm: 0,376/0,384 mm →
+0,38 mm; 0,25/0,38 mm → różne 0,25/0,38 mm. Potwierdzono granice i zmierzone
+szerokości w siatce dla przewężenia połączonego z padami oraz otworu/szczeliny,
+we wszystkich profilach. Wartości RLC nie wpływają na siatkę, Z się nie
+zagęszcza. Zachowano audyty PCB-012E. Testy raw kosztu nie wymagają już
+starego zaniżonego rozmiaru siatki ani limitu 105% tego rozmiaru.
+
+**Rzeczywisty test1 ZIP, 10 µm:** import, normalizacja, projekcja, siatka,
+audyt miedzi i R1 PASS. Zachowane 16 X + 12 Y fizycznych współrzędnych,
+zero stłumionych. Preview: (333,265,45)=3971025 (poprzednio 463680),
+min XYZ 4,0722/4,1667/100 µm, impuls minimum 295026 kroków,
+1171555621650 aktualizacji. Design: (345,221,58)=4422210 (poprzednio 716184),
+min XYZ 4,0722/8,3333/66,6667 µm, minimum 235091 kroków,
+1039621771110 aktualizacji. max_cells nieprzekroczone. Budżety impulsu
+50000/75000 pozostają przekroczone, bez zmiany profili/EndCriteria/wymuszenia.
+Dane nie stanowią porównania A/B wyników elektromagnetycznych.
+
+**Koszt audytu:** obwiednie są składane z dokładnych poziomych pasów komórek,
+nie z osobnego wielokąta każdej komórki; zbiór punktów pozostaje identyczny.
+Dotychczasowy limit miliona komórek audytu i kryteria topologii nie są osłabione.
+**Testy celowane:** 61 testów cech/siatki/komponentów/ZIP PASS; po końcowej
+optymalizacji audytu dodatkowe 7 testów (6 cech + rzeczywiste emtest3/emtest4)
+PASS. emstest/emstest2 import/projekcja/kontakt PASS. Brak natywnego FDTD.
+
+**Pełny unittest (końcowy stan):** 376 testów, 2 failures, 17 errors, 3 skipped.
+Wszystkie 19 niepowodzeń dotyczy wcześniejszego zatrzymania przez niezmieniony
+preflight impulsu: 17 testów fake-run/report/fields/prepare oczekuje przejścia
+zbyt małego budżetu; dwa oczekują późniejszego błędu termination lub grid mismatch.
+Dotyczy modułów test_pcb_bundle, clearances, copper, drills, fields, gerber,
+gerber_quality, gerber_sweep, production_resolution i report. Nie zwiększono
+budżetów ani nie wyłączono preflight, aby uzyskać zielony wynik. Skip: native
+openEMS/CSXCAD, Windows UCRT i GUI Tk. Regresje cech, PCB-012E, emstest/emstest2,
+emtest3/emtest4 i test1 przechodzą w pełnym przebiegu. Zakres geometrii PASS;
+integracja całego zestawu PARTIAL, polityka budżetu pozostaje osobnym zadaniem.

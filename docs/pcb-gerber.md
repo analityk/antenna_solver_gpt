@@ -193,29 +193,54 @@ To profile numeryczne, nie certyfikaty dokładności. Miedź CSXCAD, wymiary
 portu, laminat i żądane częstotliwości pozostają identyczne.
 Wybór profilu nie uruchamia macierzy ani dodatkowych przebiegów.
 
-### Kotwice ekonomicznej siatki
+### Wierność geometrii miedzi — PCB-012F
 
-Polityka `gerber_economical_v1` zachowuje dokładnie granice płytki i zewnętrzne
-granice materiałów, końce i środek portu X, krawędzie i środek portu Y oraz
-oba interfejsy laminatu, w tym literalne z=0. Nie przesuwa żadnego poligonu.
+Polityka `modeled_copper_features_v2` zastępuje `gerber_economical_v1`.
+Geometria po normalizacji i projekcji jest modelem fizycznym. Mesher nie
+usuwa jej granic z powodu bliskości względem długości fali. Zachowuje dokładnie
+normalne współrzędne wszystkich poziomych/pionowych odcinków obrysu i otworów,
+także przewężenia wewnątrz przewodnika połączonego z dużym padem. Zachowuje
+również dotychczasowe kotwice portu, komponentów, wierceń i interfejsów Z.
+Środki bbox są numeryczne i mogą być pominięte; nie są fizycznymi krawędziami.
 
-Najpierw zachowuje krytyczne współrzędne. Następnie rozpatruje minimum i
-maksimum bounding box każdej wyspy miedzi w kolejności współrzędnych/ID.
-W `verify` na końcu rozpatruje także środki bounding box; preview/design
-je pomijają. Kandydat zostaje usunięty, jeżeli odległość od dowolnej już
-zachowanej kotwicy jest mniejsza niż 0,5 razy mniejsza z rozdzielczości
-lokalnych obu kotwic. Lokalna rozdzielczość to krok XY laminatu poza zakresem
-portu, a wewnątrz zakresu portu — minimum tego kroku i kroku portu danej osi.
-Równość z progiem jest dopuszczalna. Takie same reguły ochrony obowiązują
-wszystkie profile; krytycznych kotwic nigdy nie usuwa się dla oszczędności.
+Przy geometrii 10 µm szerokości 0,376 i 0,384 mm mogą dać wspólne 0,38 mm,
+ale 0,25 i 0,38 mm pozostają różne. Projekcja dotyczy współrzędnych granic:
+wynik zależy także od położenia środka względem siatki geometrii. Testy używają
+tego samego środka i dowodzą podanych szerokości oraz analogicznych szczelin.
+Nie powstaje globalna krata FDTD 10 µm. Podział/grading dodaje linie float,
+a rozdzielczość długości fali nadal ogranicza maksymalny krok między cechami.
 
-`summary.json` zapisuje `mesh_anchor_policy` i listę
-`suppressed_noncritical_anchors`: oś, współrzędną SI, ID miedzi, rodzaj,
-powód, a dla konfliktu także sąsiada, odległość i próg. Współrzędne
-identyczne z zachowanymi liniami nie są raportowane jako usunięte.
-Usunięcie kotwicy nie oznacza usunięcia krawędzi fizycznej. Dodatkowy audyt
-poligonów nie pozwala, aby rzadka siatka ukryła miedź wewnątrz szczeliny
-portu (z dotychczasową tolerancją geometryczną 1e-10 m).
+Krzywe/ukośne odcinki pozostają ciągłymi modelowanymi polygonami w CSXCAD.
+Ich extrema są chronione. Pomocniczy podział już istniejących przedziałów
+daje co najmniej cztery przedziały przez bbox zakrzywionego pierścienia;
+nie dodaje wszystkich wierzchołków aproksymacji. Końcowy konserwatywny audyt
+porównuje pełne komórki wewnątrz miedzi i komórki przecinające miedź. Obie
+obwiednie muszą zachować liczbę obszarów/otworów i własność każdego otworu;
+obwiednie różnych przewodników tej samej warstwy nie mogą się stykać.
+Brak dowodu oznacza błąd przed native, nie uproszczenie polygonu. Budżet audytu
+krzywych: maksymalnie milion badanych komórek XY. To wystarczający,
+konserwatywny test topologii; nie odtwarza natywnego zajęcia Yee i nie dowodzi
+zbieżności elektromagnetycznej. Raportuje też górne ograniczenie rozmiaru
+komórki przy granicy. Tolerancja boolowska pozostaje dotychczasowa.
+
+`summary.json` zapisuje `mesh_anchor_policy` oraz `copper_mesh_fidelity`:
+chronione współrzędne, odcinki i extrema, granice zachowane w siatce,
+prostokątne przekroje z szerokością źródłową/modelowaną/siatkową (gdy jest
+porównywalna), obwiednie krzywych i status. `suppressed_noncritical_anchors`
+zawiera wyłącznie pominięte numeryczne środki bbox, nigdy fizyczne krawędzie
+odrzucone progiem `below_half_local_resolution`. Licznik stłumionych fizycznych
+współrzędnych wynosi zero. Audyt jest wykonywany też przez mesher używany
+przez adapter natywny, a nie tylko przez CLI.
+
+Jeżeli cechy wymagają zbyt wielu komórek lub są numerycznie nierozdzielalne,
+przygotowanie kończy się jawnym błędem. Kosztowna geometria nie jest po cichu
+zastępowana innym modelem elektrycznym. Wyłącznie reszty arytmetyki float po translacji (do 8 ULP skali płytki,
+ograniczone dotychczasową tolerancją geometrii) mogą współdzielić linię;
+każda taka równoważność jest zapisana jako physical_boundary_roundoff_equivalences.
+Nie zmienia to polygonów ani tolerancji krytycznych portu/wierceń; nie jest
+filtrem długości fali. Produkcja używa modelu po projekcji. W regresjach
+szerokości/otworów projektowane granice są zachowane dokładnie, bez aliasów. Wierność geometrii nie oznacza jeszcze
+zweryfikowanej impedancji.
 
 ### Kontrola kosztu i zakończenia
 
@@ -571,10 +596,9 @@ clearance wygrywa ze swoim przewodnikiem macierzystym, ale nie kasuje
 przywróconej wyspy. Głębokość zagnieżdżenia liczona jest tylko na tej samej
 warstwie i Z. Wszystkie priorytety są zapisane w preparation.geometry.copper_clearances.
 
-Ani otwory, ani fizyczna grubość conducting sheet nie dodają linii siatki.
-Po ich instalacji wykonywany jest dokładny audyt zamrożonych osi i jednostki.
-Zmiana obrysu lub rozłączenie miedzi przez clear może zmienić dotychczasowe
-kotwice bounding-box przewodników; nie jest to dodatkowe zagęszczanie otworów.
+Grubość conducting sheet nie dodaje linii Z. Od PCB-012F granice otworów
+mogą wymagać dodatkowych linii XY tak samo jak zewnętrzne granice miedzi.
+Po instalacji nadal wykonywany jest dokładny audyt zamrożonych osi i jednostki.
 Nie wprowadzono siatki o grubości miedzi ani dodatkowych przebiegów FDTD.
 
 geometry.json przechowuje wszystkie pierścienie, role i Z. Dane
@@ -897,3 +921,20 @@ set "CSXCAD_INSTALL_PATH=C:\dev\openems\openEMS"
   --sweep-step-mhz 10 ^
   --prepare-only
 ```
+
+
+### Test1 po PCB-012F (bez FDTD)
+
+10 µm, center 2 GHz, cutoff 1 GHz, wyniki 1,5–2,5 GHz co 10 MHz:
+
+| Profil | Siatka | Komórki: PCB-012E → PCB-012F | Minimum XYZ [µm] | Minimum kroków impulsu |
+| --- | --- | ---: | --- | ---: |
+| preview | 333×265×45 | 463680 → 3971025 | 4,0722 / 4,1667 / 100 | 295026 |
+| design | 345×221×58 | 716184 → 4422210 | 4,0722 / 8,3333 / 66,6667 | 235091 |
+
+Zachowano 16 fizycznych współrzędnych X i 12 Y, pominięto 0. Audyt miedzi
+oraz kontakt R1: PASS. Pomijane są tylko środki bbox. Limitu max_cells nie
+przekroczono. Budżety impulsu 50000/75000 są nadal przekroczone; nie zmieniono
+profili ani czasu zakończenia. Przyrost kosztu wynika z zachowania cech miedzi
+i gradingu, nie globalnej kraty geometrii. Liczby wcześniejszych sekcji opisują
+poprzednie polityki meshera i nie są oczekiwaniem dla PCB-012F.

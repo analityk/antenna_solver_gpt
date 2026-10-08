@@ -310,6 +310,10 @@ class RealZipAcceptance(unittest.TestCase):
                     with self.assertRaisesRegex(ConfigurationError,'excitation needs at least'):
                         run_gerber_control(copied,family/quality,prepare_only=True,quality=quality,**BAND)
                 native.assert_not_called()
+                saved=json.loads((family/quality/'summary.json').read_text())
+                self.assertEqual(saved['copper_mesh_fidelity']['status'],'PASS')
+                self.assertEqual(saved['copper_mesh_fidelity']['suppressed_physical_feature_coordinates'],0)
+                self.assertTrue(saved['copper_mesh_fidelity']['source_boundaries'])
                 self.assertIn('Cost indicator:',output.getvalue())
                 self.assertNotIn('no legal existing transverse cell',output.getvalue())
 
