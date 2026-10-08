@@ -169,7 +169,7 @@ class ZipInputTests(unittest.TestCase):
              patch('antenna_lab.solvers.openems.native_modules',return_value=(
                  SimpleNamespace(openEMS=lambda **kw:engine),SimpleNamespace(ContinuousStructure=lambda:csx))),\
              contextlib.redirect_stdout(io.StringIO()):
-            result=run_gerber_control(self.zip,out,prepare_only=True,quality='preview',**BAND)
+            result=run_gerber_control(self.zip,out,prepare_only=True,quality='preview',field_frequency_hz=(),**BAND)
         self.assertEqual(result['status'],'prepared');self.assertFalse(any(c[0]=='Run' for c in engine.calls))
         info=result['import']['experiment_input'];self.assertEqual(info['netlist']['scope'],'parent')
         self.assertEqual(info['gerber_archive']['sha256'],sha256(self.zip.read_bytes()).hexdigest())
@@ -281,12 +281,14 @@ class RealZipAcceptance(unittest.TestCase):
                 self.assertTrue(all(set(d.connected_layer_roles)=={'top','bottom'} for d in modeled.drills))
                 specs=resolve_component_boxes(modeled,(mesh.x_lines_m,mesh.y_lines_m,mesh.z_lines_m))
                 self.assertEqual([(c.id,c.value_si) for c in specs],[('R1',49.9)])
-                # Downstream excitation budget remains an independent guard.
+                # Default NrTS no longer truncates excitation; explicit small ceiling still fails.
+                require_excitation_fits(cost,s)
+                from dataclasses import replace
                 with self.assertRaisesRegex(ConfigurationError,'excitation needs at least'):
-                    require_excitation_fits(cost,s)
+                    require_excitation_fits(cost,replace(s,max_timesteps=50000))
             self.assertEqual(results[0],results[1]);self.assertEqual(results[0],results[2])
             # Both production profiles must get beyond component resolution.
-            # The known excitation budget failure must occur before native work.
+            # An explicitly reduced safety ceiling must fail before native work.
             for quality in ('preview','design'):
                 s,_=gerber_quality_settings(quality,**BAND)
                 normalized,_=normalize_port_orientation(local)
@@ -308,7 +310,9 @@ class RealZipAcceptance(unittest.TestCase):
                 output=io.StringIO()
                 with patch('antenna_lab.solvers.openems.native_modules') as native,contextlib.redirect_stdout(output):
                     with self.assertRaisesRegex(ConfigurationError,'excitation needs at least'):
-                        run_gerber_control(copied,family/quality,prepare_only=True,quality=quality,**BAND)
+                        from antenna_lab.solvers.profiles import resolve_profile
+                        profile=resolve_profile(quality,experiment=BAND,no_fields=True,cli_overrides={'max_timesteps':50000})
+                        run_gerber_control(copied,family/quality,prepare_only=True,resolved_profile=profile)
                 native.assert_not_called()
                 saved=json.loads((family/quality/'summary.json').read_text())
                 self.assertEqual(saved['copper_mesh_fidelity']['status'],'PASS')
@@ -327,7 +331,7 @@ class RealZipAcceptance(unittest.TestCase):
             'antenna_lab.solvers.openems.native_modules',return_value=(
                 SimpleNamespace(openEMS=lambda **kw:engine),SimpleNamespace(ContinuousStructure=lambda:csx))):
             result=run_gerber_control(real,Path(t)/'prepared',prepare_only=True,quality='design',
-                **dict(BAND,excitation_cutoff_hz=1.9e9))
+                field_frequency_hz=(),**dict(BAND,excitation_cutoff_hz=1.9e9))
             self.assertEqual(result['status'],'prepared')
             self.assertEqual(result['copper_mesh_fidelity']['status'],'PASS')
             self.assertEqual(result['termination_status'],'not_run')

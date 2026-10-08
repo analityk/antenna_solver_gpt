@@ -202,8 +202,9 @@ def prepare_pcb_native_model(geometry: PcbGeometry, settings: PcbSimulationSetti
     geometry_metadata = install_pcb_geometry(csx, geometry, domain_mesh, settings, copper_config=copper_config, port_edge_mode=port_edge_mode, **({'gerber_quality': gerber_quality} if gerber_quality is not None else {}))
     port, spec, port_metadata = install_pcb_lumped_port(engine, csx, geometry, domain_mesh, settings, port_edge_mode=port_edge_mode, **({'gerber_quality': gerber_quality} if gerber_quality is not None else {}))
     metadata = {'geometry': geometry_metadata, 'port': port_metadata,
-                'engine': {'max_timesteps': settings.max_timesteps, 'end_criteria': settings.end_criteria,
-                           'native_constructor': engine_options}}
+                'engine': {'max_timesteps': settings.max_timesteps, 'end_criteria': settings.end_criteria}}
+    if settings.runtime is not None:
+        metadata['engine']['native_constructor'] = engine_options
     return engine, csx, port, domain_mesh, spec, metadata
 
 
@@ -221,13 +222,16 @@ def configure_pcb_fdtd(engine, csx, domain_mesh: PcbDomainMesh,
     boundaries = list(native_boundaries(settings))
     engine.SetBoundaryCond(list(boundaries))
     _audit_port_grid(csx, domain_mesh, context='after SetBoundaryCond')
-    return {'excitation': {'type': 'gaussian', 'center_hz': settings.excitation_center_hz,
+    metadata = {'excitation': {'type': 'gaussian', 'center_hz': settings.excitation_center_hz,
                            'cutoff_hz': settings.excitation_cutoff_hz,
                            'mesh_design_frequency_hz': settings.excitation_center_hz+settings.excitation_cutoff_hz},
             'boundary_conditions': {'order': ['x_min','x_max','y_min','y_max','z_min','z_max'],
-                                    'values': boundaries, 'pml_cells': count,
-                                    'active_pml_faces': [b.startswith('PML_') for b in boundaries],
-                                    'non_pml_extension': 'unchanged mesh extension is ordinary space; boundary is at outer face'}}
+                                    'values': boundaries, 'pml_cells': count}}
+    if settings.runtime is not None:
+        metadata['boundary_conditions'].update(
+            active_pml_faces=[b.startswith('PML_') for b in boundaries],
+            non_pml_extension='unchanged mesh extension is ordinary space; boundary is at outer face')
+    return metadata
 
 
 def write_pcb_xml(engine, csx, domain_mesh: PcbDomainMesh, xml_path) -> dict:

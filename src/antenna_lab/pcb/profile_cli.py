@@ -10,7 +10,7 @@ def print_profile(profile):
     print(f"\nopenEMS profile: {profile.name}\nsource: {profile.metadata['config_path']}")
     groups = {
         'MESH': MESH_KEYS,
-        'DOMAIN / BC (x-/x+/y-/y+/z-/z+)': ('air_padding_wavelengths', 'pml_cells', 'native_boundary_conditions'),
+        'DOMAIN / BC (x-/x+/y-/y+/z-/z+)': ('air_padding_wavelengths', 'pml_cells', 'boundary_conditions', 'native_boundary_conditions'),
         'TIME / CONVERGENCE': ('end_criteria', 'max_timesteps', 'max_time_s', 'time_step_s',
                                'time_step_factor', 'time_step_method', 'oversampling', 'exact_endcriteria'),
         'EXPERIMENT (Hz / ohm)': ('excitation_center_hz', 'excitation_cutoff_hz', 'result_frequency_hz',

@@ -42,7 +42,7 @@ class SweepTests(unittest.TestCase):
                               (sweep,sweep_frequencies_hz(1260,1580,5))):
             with patch.object(control,'run_gerber_control',return_value={'status':'prepared'}) as run,contextlib.redirect_stdout(io.StringIO()):
                 self.assertEqual(control.main(common+args),0)
-                self.assertEqual(run.call_args.kwargs['result_frequency_hz'],expected)
+                self.assertEqual(run.call_args.kwargs['resolved_profile'].settings.result_frequency_hz,expected)
         for args in (sweep+['--frequencies-mhz','1300','1420','1500'],sweep[:-2],
                      ['--sweep-start-mhz','1000','--sweep-stop-mhz','1580','--sweep-step-mhz','5']):
             with patch.object(control,'run_gerber_control') as run,contextlib.redirect_stderr(io.StringIO()):
@@ -80,7 +80,7 @@ class SweepTests(unittest.TestCase):
             with patch('antenna_lab.solvers.openems.native_modules',return_value=(
                     SimpleNamespace(openEMS=lambda **kw:engine),SimpleNamespace(ContinuousStructure=lambda:csx))),contextlib.redirect_stdout(io.StringIO()) as console:
                 result=control.run_gerber_control(fixture.config_path,out,quality=quality,
-                    result_frequency_hz=frequencies,sweep_request=(1260,1580,5))
+                    result_frequency_hz=frequencies,sweep_request=(1260,1580,5),field_frequency_hz=())
             self.assertEqual(len([c for c in engine.calls if c[0]=='Run']),1)
             self.assertEqual(len(engine.port.calls),1)
             self.assertEqual(tuple(engine.port.calls[0][1]),frequencies)

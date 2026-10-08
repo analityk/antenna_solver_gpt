@@ -30,9 +30,9 @@ class GerberQualityTests(unittest.TestCase):
         self.g,_=normalize_port_orientation(load_pcb_geometry(self.fixture.config))
 
     def test_exact_profiles_and_frequency_identity(self):
-        expected=((10,2,2,2,.1,6,1e-3,50000,False),
-                  (15,3,2,2,.15,6,1e-4,75000,False),
-                  (20,4,4,4,.25,8,1e-5,120000,True))
+        expected=((10,2,2,2,.1,6,1e-3,1000000000,False),
+                  (15,3,2,2,.15,6,1e-4,1000000000,False),
+                  (20,4,4,4,.25,8,1e-5,1000000000,True))
         for q,values in zip(('preview','design','verify'),expected):
             s,exact=gerber_quality_settings(q,excitation_center_hz=2.45e9,excitation_cutoff_hz=.4e9,
                 result_frequency_hz=(2.2e9,2.45e9,2.7e9),loss_reference_frequency_hz=2.4e9)
@@ -100,7 +100,7 @@ class GerberQualityTests(unittest.TestCase):
             with patch('antenna_lab.solvers.openems.native_modules',return_value=(
                 SimpleNamespace(openEMS=lambda **kw:engine),SimpleNamespace(ContinuousStructure=lambda:csx))),\
                     contextlib.redirect_stdout(io.StringIO()) as console:
-                result=control.run_gerber_control(self.fixture.config_path,out,quality=q)
+                result=control.run_gerber_control(self.fixture.config_path,out,quality=q,field_frequency_hz=())
             self.assertEqual(result['quality_profile'],q)
             self.assertEqual(result['actual_iterations'],12345)
             self.assertEqual(result['termination_status'],'completed_before_limit')
@@ -110,7 +110,7 @@ class GerberQualityTests(unittest.TestCase):
             self.assertIn('Estimated excitation:',console.getvalue())
             self.assertTrue(result['suppressed_noncritical_anchors'])
             run=next(c for c in engine.calls if c[0]=='Run')
-            expected=dict(cleanup=False,numThreads=0,dump_statistics=True)
+            expected=dict(cleanup=False,numThreads=0,dump_statistics=True,engine="fastest",verbose=0,disable_dumps=False,exact_endcriteria=q=="verify")
             if q=='verify':expected['exact_endcriteria']=True
             self.assertEqual(run[2],expected)
             costs.append(result['estimated_cell_updates'])
@@ -124,11 +124,11 @@ class GerberQualityTests(unittest.TestCase):
         self.assertTrue(all(m==materials[0] for m in materials))
 
     def test_unfittable_excitation_stops_before_loading_native(self):
-        s,exact=gerber_quality_settings('design')
-        with patch.object(control,'gerber_quality_settings',return_value=(replace(s,max_timesteps=1),exact)),\
-                patch('antenna_lab.solvers.openems.native_modules') as native,contextlib.redirect_stdout(io.StringIO()):
+        from antenna_lab.solvers.profiles import resolve_profile
+        profile=resolve_profile('design',no_fields=True,cli_overrides={'max_timesteps':1})
+        with patch('antenna_lab.solvers.openems.native_modules') as native,contextlib.redirect_stdout(io.StringIO()):
             with self.assertRaisesRegex(ConfigurationError,'excitation needs at least'):
-                control.run_gerber_control(self.fixture.config_path,self.fixture.root/'cost_fail')
+                control.run_gerber_control(self.fixture.config_path,self.fixture.root/'cost_fail',resolved_profile=profile)
             native.assert_not_called()
         summary=json.loads((self.fixture.root/'cost_fail/summary.json').read_text())
         self.assertEqual(summary['status'],'failed')
@@ -144,7 +144,7 @@ class GerberQualityTests(unittest.TestCase):
                 SimpleNamespace(openEMS=lambda **kw:engine),SimpleNamespace(ContinuousStructure=CSX))),\
                     contextlib.redirect_stdout(io.StringIO()):
                 with self.assertRaisesRegex(ConfigurationError,'temporal termination'):
-                    control.run_gerber_control(self.fixture.config_path,out,quality=q)
+                    control.run_gerber_control(self.fixture.config_path,out,quality=q,field_frequency_hz=())
             self.assertEqual(engine.port.calls,[])
             self.assertFalse((out/'impedance.csv').exists())
             summary=json.loads((out/'summary.json').read_text())

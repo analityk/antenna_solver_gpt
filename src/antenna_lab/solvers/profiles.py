@@ -126,4 +126,4 @@ def resolve_profile(name=None, *, config_path=DEFAULT_CONFIG, experiment=None,
     return ResolvedProfile(name, settings, fields_hz,
         dict(provenance, name=name, resolved_settings=resolved,
              cli_overrides=dict(cli_overrides or {}), interactive_overrides=dict(interactive_overrides or {}),
-             confirmation_mode='library_api'), dict(data['interaction']))
+             confirmation_mode='library_api', interaction=dict(data['interaction'])), dict(data['interaction']))

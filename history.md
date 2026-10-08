@@ -1596,3 +1596,13 @@ oraz raport offline. Nie zmieniono geometrii, meshera PCB-012G, parametrów
 fizycznych ani diagnostyk syntetycznych. Przy wyłączeniu statystyk zakończenie
 pozostaje niepotwierdzone. Checkpoint publikowany przed pełnym unittest.
 Testy profilów używają wyłącznie atrap native; nie wykonano FDTD.
+
+PCB-013A: pierwszy checkpoint opublikowano jako 6e0195b9 na origin/main.
+Celowane testy po dopięciu integracji: 82/82 PASS (profiles, openems_pcb,
+pcb_control, pcb_simulation, gerber_quality, gerber_sweep, pcb_zip).
+Testy obejmują jeden fake Run z domyślnymi E/H, zapis profilu i faz15°,
+wyłączone statystyki bez twierdzenia completed oraz odmowę CalcPort po MaxTime.
+Zaktualizowano wyłącznie oczekiwania związane z nowymi profilami: duży NrTS,
+jawne opt-out pól w testach bez dumpów, opcjonalne runtime=None w starej konfiguracji.
+Real ZIP nadal sprawdza zbyt mały, teraz jawnie nadpisany NrTS. Drugi checkpoint
+publikowany przed jedynym pełnym unittest. Brak natywnego FDTD.

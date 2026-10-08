@@ -37,7 +37,7 @@ def settings(value=None):
 class PcbSimulationTests(unittest.TestCase):
     def test_all_fields_bom_determinism_frozen(self):
         expected = dict(
-            air_padding_wavelengths=.25, pml_cells=8,
+            air_padding_wavelengths=.25, pml_cells=8, runtime=None,
             schema_version=1, result_frequency_hz=(1.3e9, 1.42e9, 1.5e9),
             excitation_center_hz=1.42e9, excitation_cutoff_hz=.2e9,
             reference_impedance_ohm=50, cells_per_wavelength=20,

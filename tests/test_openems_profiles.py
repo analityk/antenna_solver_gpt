@@ -185,5 +185,60 @@ class ProfilesTests(unittest.TestCase):
                 render_html(data);self.assertEqual(fields.call_args.args[3],15)
                 render_html(data,phase_step=30);self.assertEqual(fields.call_args.args[3],30)
 
+    def test_default_fields_single_fake_solve_saved_metadata_and_report_phase(self):
+        from test_pcb_gerber import GerberTests
+        from test_pcb_fields import FieldCSX, FieldEngine
+        fixture=GerberTests();fixture.setUp();self.addCleanup(fixture.doCleanups)
+        csx=FieldCSX();engine=FieldEngine(csx)
+        out=fixture.root/'profile_run'
+        with patch('antenna_lab.solvers.openems.native_modules',return_value=(
+                SimpleNamespace(openEMS=lambda **kw:engine),SimpleNamespace(ContinuousStructure=lambda:csx))), \
+                patch('antenna_lab.visualization.report.generate_report',return_value=out/'report.html') as report, \
+                patch('builtins.input',side_effect=AssertionError('API must not prompt')), \
+                contextlib.redirect_stdout(io.StringIO()):
+            result=gerber_control.run_gerber_control(fixture.config_path,out,quality='preview')
+        self.assertEqual(result['status'],'completed')
+        self.assertEqual(result['openems_profile']['resolved_settings']['max_timesteps'],10**9)
+        self.assertEqual(result['openems_profile']['confirmation_mode'],'library_api')
+        self.assertEqual(result['fields']['frequency_hz'],[1.42e9])
+        self.assertEqual(len([c for c in engine.calls if c[0]=='Run']),1)
+        self.assertEqual(len(engine.port.calls),1)
+        self.assertEqual(report.call_args.kwargs['phase_step'],15)
+        self.assertEqual(result,json.loads((out/'summary.json').read_text()))
+        self.assertEqual(len(csx.dumps),6)
+        self.assertTrue(all(d['frequency']==[1.42e9] for d in csx.dumps))
+        from antenna_lab.visualization.report import _pcb_metadata
+        html=_pcb_metadata(dict(summary=result,root=out,geometry=json.loads((out/'geometry.json').read_text()),warnings=[]))
+        self.assertIn(result['openems_profile']['config_sha256'],html)
+        self.assertIn('1000000000',html)
+
+    def test_no_statistics_not_claimed_completed_and_max_time_cannot_fake_convergence(self):
+        from test_pcb_gerber import GerberTests
+        fixture=GerberTests();fixture.setUp();self.addCleanup(fixture.doCleanups)
+        out=fixture.root/'no_stats';engine=RunEngine();csx=CSX()
+        profile=resolve_profile('preview',no_fields=True,cli_overrides={'dump_statistics':False})
+        with patch('antenna_lab.solvers.openems.native_modules',return_value=(
+                SimpleNamespace(openEMS=lambda **kw:engine),SimpleNamespace(ContinuousStructure=lambda:csx))), \
+                patch('antenna_lab.visualization.report.generate_report',return_value=out/'report.html'), \
+                contextlib.redirect_stdout(io.StringIO()):
+            result=gerber_control.run_gerber_control(fixture.config_path,out,resolved_profile=profile)
+        self.assertEqual(result['status'],'finished_unverified')
+        self.assertEqual(result['termination_status'],'not_established_statistics_disabled')
+        self.assertIsNone(result['actual_iterations'])
+        self.assertFalse(result['run_options']['dump_statistics'])
+        # Recorded physical duration at/near MaxTime must stop before CalcPort.
+        g,_=make_synthetic_control_case()
+        settings=resolve_profile(no_fields=True,cli_overrides={'max_time_s':2e-8}).settings
+        mesh=make_pcb_domain_mesh(g,settings);port=Port()
+        lines=dict(zip('xyz',(mesh.x_lines_m,mesh.y_lines_m,mesh.z_lines_m)))
+        csx=SimpleNamespace(GetGrid=lambda:SimpleNamespace(GetDeltaUnit=lambda:1.,GetLines=lambda a:lines[a]))
+        with TemporaryDirectory() as d:
+            (Path(d)/'model.xml').write_text('<model/>')
+            with patch('antenna_lab.solvers.openems_pcb.read_pcb_native_statistics',return_value={
+                    'number_of_iterations':20000,'fdtd_timestep_s':1e-12,'total_numerical_time_s':2e-8}):
+                with self.assertRaisesRegex(ConfigurationError,'MaxTime'):
+                    run_pcb_fdtd(RunEngine(),csx,port,mesh,settings,d)
+        self.assertEqual(port.calls,[])
+
 
 if __name__=='__main__':unittest.main()
