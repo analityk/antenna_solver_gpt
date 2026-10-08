@@ -1677,3 +1677,63 @@ PCB-015A — końcowa weryfikacja i trwałość:
   w zakresie opisanej aproksymacji, bez kalibracji full-wave/promieniowania/strat.
 Nie uruchomiono FDTD, benchmarków ani sweeps zbieżności. Zmiany publikowane
 wyłącznie w jawnych plikach zadania; outcomes/źródła użytkownika nietknięte.
+
+## 2026-10-08 — PCB-015A: szybka walidacja i pierwszy solver reduced quasi-TEM
+
+**Powód:** pełny FDTD był zbyt ciężki do codziennych iteracji PCB, a dodatkowo
+samo przygotowanie serpentyny trwało minuty przed startem solvera. Celem FAST
+jest Z/S11/rezonanse i lokalne sprzężenia linii; pełny openEMS pozostaje
+DESIGN/VERIFY. Użytkownik akceptuje, że promieniowanie rzędu około 1% nie jest
+celem szybkiego modelu, bez deklarowania gwarantowanego 1% błędu.
+
+**PCB-015A1:** commit
+`017dfe1254fa173747f7d1a6535eec35979b779a` zastąpił pełny kwadratowy scan
+samoprzecięć polygonu w Pythonie walidacją GEOS/Shapely + lokalnym STRtree.
+Nie dodano repair/snappingu; geometria nadal fail closed.
+
+Lokalne `cProfile` tej samej serpentyny przed zmianą:
+3 364 506 592 wywołań i 687,776 s. Po zmianie:
+122 243 799 wywołań i 58,034 s. Jest to około 27,5× mniej wywołań i 11,9×
+krótszy przebieg profilowany. To pomiar instrumentowany, nie prognoza zwykłego
+wall-clock.
+
+Po usunięciu starego bottlenecku dominują:
+`compact_features()` (17 wywołań, ~31,3 s cumulative),
+`make_gerber_mesh_anchor_plan()` (7, ~27,3 s) oraz
+`make_pcb_domain_mesh()` wykonywany nadal dwa razy (~25,0 s cumulative).
+Czasy cumulative nakładają się.
+
+**PCB-015A2/A3:** commity
+`5b1695af2596baae301b284c8bd70886c5857b85` i
+`0ac8f3b0a92dc9c9926ae3d59a14642698c215de` dodały osobny solver
+`reduced_quasi_tem`. Obsługiwane izolowane odcinki wykorzystują
+Hammerstad–Jensen, sieć częstotliwościową TL oraz idealne R/L/C. Solver nie
+importuje openEMS, nie buduje 3-D domeny/PML/Yee i zapisuje wynik jako
+`approximate`. Sprzężenia par są wykrywane i blokują solve zamiast być
+pomijane.
+
+Celowane testy: 76/76 PASS; końcowe reduced: 17/17 PASS. Jedyny pełny unittest:
+414 testów, 2 failures, 27 errors, 3 skipped; niepowodzenia były istniejącymi
+downstream odmowami audytu siatki/starym oczekiwaniem emtest3, nie nowymi testami
+reduced. W PCB-015A nie uruchomiono natywnego FDTD.
+
+**Lokalna weryfikacja serpentyny po publikacji:** `test_spirala.zip` użytkownika
+nie jest śledzonym fixture repo, ale lokalny run reduced zatrzymał się na
+`Reduced v1: drills/via paths unsupported (not silently omitted).`
+Inspekcja zapisanego `geometry.json` wykazała dokładnie dwa plated PTH:
+pierwszy łączy `top:copper_0002` z `bottom:copper_0001`, drugi
+`top:copper_0003` z tym samym `bottom:copper_0001`. Oba mają
+`connected_layer_roles=['top','bottom']`. Bottom conductor jest ciągłą
+płaszczyzną ground.
+
+**Wniosek:** obecny blanket rejection wszystkich drills jest zbyt konserwatywny
+dla FAST. Następny krok PCB-015B powinien wspierać tylko fizycznie udowodniony
+PTH top→continuous-bottom-ground jako idealne połączenie do sieciowego
+`ground`, z jawnym pominięciem indukcyjności via i barrel loss. Signal vias,
+inner-layer vias, NPTH i kontakty niejednoznaczne nadal mają fail closed.
+
+Po przejściu tej bariery oczekiwanym następnym blockerem serpentyny jest
+pairwise coupled microstrip. Model sprzężenia (C/C0→L albo udokumentowane
+even/odd + stamp wieloportowy) nie został jeszcze zaimplementowany. Nie istnieje
+jeszcze wynik FAST Z/S11 dla realnej serpentyny.
+
