@@ -59,9 +59,10 @@ go 17 razy, a `make_pcb_domain_mesh()` nadal dwa razy.
 
 Najbliższe kroki i kolejność są utrzymywane w [todo.md](todo.md). Priorytetem
 jest najpierw obsługa PTH top→ciągły bottom ground w FAST, potem fizyczny model
-sprzężonych równoległych odcinków. Optymalizacja domeny i viewer pól full-wave
-pozostają ważne, ale są niżej niż doprowadzenie szybkiego modelu PCB do
-użyteczności na serpentynie.
+sprzężonych równoległych odcinków. Viewer pól full-wave ma już domyślny
+**Fit PCB** dla widoku XY (bbox PCB + 6% marginesu) i można nim przerysować
+stare zapisane pola bez ponownego FDTD. Optymalizacja domeny, dump extentu oraz
+pionowe przekroje pól pozostają otwarte.
 
 Przykład FAST dla obsługiwanego przypadku bez vias/sprzężeń:
 
