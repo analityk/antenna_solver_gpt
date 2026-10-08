@@ -82,18 +82,66 @@ def _indices(count, maximum):
     return np.unique(np.linspace(0,count-1,min(count,maximum),dtype=int))
 
 
-def _spaced_indices(values, maximum):
-    targets=np.linspace(values[0],values[-1],min(len(values),maximum))
-    return np.unique(np.argmin(abs(np.asarray(values)[None,:]-targets[:,None]),axis=1))
+def _display_bounds(view, paths, margin_fraction=.06):
+    """Default browser/static viewport: fit the whole PCB in XY, not the FDTD airbox.
+
+    Overlay paths contain the board outline and modeled PCB geometry. Cropping is
+    presentation-only: saved field arrays, dump extent, mesh and FDTD are untouched.
+    Non-XY diagnostic planes keep their existing full field extent for now.
+    """
+    full_u=(float(view['u'][0]),float(view['u'][-1]))
+    full_v=(float(view['v'][0]),float(view['v'][-1]))
+    if view.get('horizontal')!='x' or view.get('vertical')!='y':
+        return full_u,full_v,'full_field_extent'
+    points=[]
+    for path in paths:
+        values=np.asarray(path.get('points',()),dtype=float)
+        if values.ndim==2 and values.shape[1]==2 and len(values):
+            values=values[np.isfinite(values).all(axis=1)]
+            if len(values):points.append(values)
+    if not points:
+        return full_u,full_v,'full_field_extent'
+    values=np.vstack(points)
+    lo_u,lo_v=np.min(values,axis=0);hi_u,hi_v=np.max(values,axis=0)
+    span_u,span_v=hi_u-lo_u,hi_v-lo_v
+    if not (span_u>0 and span_v>0):
+        return full_u,full_v,'full_field_extent'
+    u=(max(full_u[0],float(lo_u-span_u*margin_fraction)),
+       min(full_u[1],float(hi_u+span_u*margin_fraction)))
+    v=(max(full_v[0],float(lo_v-span_v*margin_fraction)),
+       min(full_v[1],float(hi_v+span_v*margin_fraction)))
+    if not (u[0]<u[1] and v[0]<v[1]):
+        return full_u,full_v,'full_field_extent'
+    return u,v,'fit_pcb_6_percent_margin'
+
+
+def _bounded_indices(values, bounds, maximum):
+    values=np.asarray(values)
+    if len(values)<=1:return np.arange(len(values),dtype=int)
+    lo=max(0,int(np.searchsorted(values,bounds[0],side='right'))-1)
+    hi=min(len(values)-1,int(np.searchsorted(values,bounds[1],side='left')))
+    if hi<=lo:return _indices(len(values),maximum)
+    candidates=np.arange(lo,hi+1,dtype=int)
+    if len(candidates)<=maximum:return candidates
+    return candidates[_indices(len(candidates),maximum)]
+
+
+def _spaced_indices(values, maximum, bounds=None):
+    values=np.asarray(values)
+    candidates=np.arange(len(values)) if bounds is None else _bounded_indices(values,bounds,len(values))
+    selected=values[candidates]
+    targets=np.linspace(selected[0],selected[-1],min(len(selected),maximum))
+    return candidates[np.unique(np.argmin(abs(selected[None,:]-targets[:,None]),axis=1))]
 
 
 def pcb_phase_figure(view, paths, plane, phases=(0,90,180,270)):
     fig=Figure(figsize=(11,3.2*len(phases)));axes=fig.subplots(len(phases),2,squeeze=False)
+    u_bounds,v_bounds,_=_display_bounds(view,paths)
     norms=[SymLogNorm(linthresh=limit*.025,vmin=-limit,vmax=limit,base=10)
            for limit in (view['e_limit'],view['h_limit'])]
     labels=[f"E{view['horizontal']} [V/m per 1 V port] + E vectors",
             f"H{view['h_component']} [A/m per 1 V port]"]
-    iy,ix=_spaced_indices(view['v'],16),_spaced_indices(view['u'],20)
+    iy,ix=_spaced_indices(view['v'],16,v_bounds),_spaced_indices(view['u'],20,u_bounds)
     from matplotlib import colormaps
     cmap=colormaps['RdBu_r'].copy();cmap.set_bad('#b4bac2')
     u,v=np.meshgrid(view['u'][ix],view['v'][iy])
@@ -108,7 +156,7 @@ def pcb_phase_figure(view, paths, plane, phases=(0,90,180,270)):
                           width=.003,color='#171717')
             for path in paths:
                 points=np.asarray(path['points']);ax.plot(points[:,0],points[:,1],color=path['color'],lw=.7)
-            ax.set(xlim=(view['u'][0],view['u'][-1]),ylim=(view['v'][0],view['v'][-1]),
+            ax.set(xlim=u_bounds,ylim=v_bounds,
                 xlabel=view['horizontal']+' [mm]',ylabel=view['vertical']+' [mm]',
                 title=f"{phase}° · {phase/360/view['frequency_hz']*1e9:.4g} ns · {labels[col]}")
             ax.set_aspect('equal',adjustable='box')
@@ -127,7 +175,9 @@ def pcb_phase_figure(view, paths, plane, phases=(0,90,180,270)):
 
 def viewer_payload(view,paths,phases):
     # At most 80×80 for browser display; full complex NPZ stays untouched.
-    iy,ix=_indices(len(view['v']),80),_indices(len(view['u']),80)
+    # XY defaults to PCB bbox + 6% margin so the board fills the useful frame.
+    u_bounds,v_bounds,display_extent=_display_bounds(view,paths)
+    iy=_bounded_indices(view['v'],v_bounds,80);ix=_bounded_indices(view['u'],u_bounds,80)
     def parts(values):
         values=values[np.ix_(iy,ix)]
         return [np.where(np.isfinite(a),a,None).tolist() for a in (values.real,values.imag)]
@@ -136,7 +186,10 @@ def viewer_payload(view,paths,phases):
         e_limit=view['e_limit'],h_limit=view['h_limit'],vector_limit=view['vector_limit'],
         frequency_hz=view['frequency_hz'],horizontal=view['horizontal'],vertical=view['vertical'],
         h_component=view['h_component'],paths=paths,phases=phases,
-        display_sampling='deterministic index subset, at most 80 per axis; NPZ unchanged')
+        display_extent=display_extent,
+        full_field_extent_mm=dict(u=[float(view['u'][0]),float(view['u'][-1])],
+                                  v=[float(view['v'][0]),float(view['v'][-1])]),
+        display_sampling='deterministic subset inside display extent, at most 80 per axis; NPZ unchanged')
 
 
 PLAYBACK_JS = r"""
@@ -184,7 +237,7 @@ def pcb_field_section(data, metadata, figure_image, plots_path, phase_step):
     phases=list(range(0,360,phase_step or 30))
     body='<section class="panel"><h2>Pola E/H — przebieg jednego okresu</h2>'
     body+='<p>Stan harmoniczny Re(F·exp(+j·faza)); faza 0° = dodatnie maksimum napięcia portu. Odniesienie 1∠0 V portu, nie moc przyjęta. E: V/m per 1 V port; H: A/m per 1 V port. Strzałki pokazują chwilowy wektor E w przekroju; kolory podpisaną składową. Stałe symetryczne skale symlog we wszystkich fazach. Szary: konserwatywna maska geometrii miedzi/portu/elementów idealnych i halo jednej lokalnej komórki, nie natywna zajętość Yee. Laminat nie jest maskowany.</p>'
-    body+='<p>Odtwarzanie nie uruchamia FDTD. Płaszczyzny pochodzą z istniejącej siatki, poza PML. Widok przeglądarki jest próbkowany najwyżej 80×80, strzałki dodatkowo rozrzedzone; zapis NPZ zachowuje wszystkie próbki i składowe.</p>'
+    body+='<p>Odtwarzanie nie uruchamia FDTD. Płaszczyzny pochodzą z istniejącej siatki, poza PML. Widok XY domyślnie kadruje do całej PCB z 6% marginesem; jest to wyłącznie viewport prezentacji, bez zmiany dumpu, siatki ani FDTD. Widok przeglądarki jest próbkowany najwyżej 80×80 wewnątrz pokazywanego zakresu, strzałki dodatkowo rozrzedzone; zapis NPZ zachowuje wszystkie próbki i składowe.</p>'
     for plane in metadata['planes']:
         if plane['name'] not in PCB_VIEWS:raise ValueError('Nieznana płaszczyzna PCB E/H.')
         fields=load_plane(data['root']/'fields'/(plane['name']+'.npz'),plane,metadata['frequency_hz'])
