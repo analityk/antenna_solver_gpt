@@ -1621,3 +1621,16 @@ Zakres PCB-013A PASS na atrapach; całe repozytorium PARTIAL, native Windows
 nie sprawdzono. Żaden natywny Run ani solve/convergence nie został uruchomiony.
 Końcowy commit publikuje także te wyniki. Żadne outcomes ani niepowiązane
 pliki użytkownika nie są dodawane do commita.
+
+
+## PCB-015A1 — koszt walidacji polygonów
+
+Usunięto pełną kwadratową pętlę par krawędzi Pythona. GEOS sprawdza
+poprawność bez naprawiania geometrii; STRtree ogranicza stare testy tolerancji
+bliskich krawędzi do przestrzennych sąsiadów. Zachowano liniowe kontrole
+liczb, krawędzi, pola i sąsiednich cofnięć. Bez zmiany tolerancji, formatu,
+źródłowych współrzędnych lub fizyki. Test strukturalny kontroluje brak
+przeglądu odległych par, nie czas wykonania. Brak benchmarków i FDTD.
+Testy: validation+transform 29/29 PASS; szerszy zestaw 36 testów ma dwa
+wcześniejsze błędy audytu obwiedni meshera w test_pcb_clearances, pozostałe
+34 PASS. Kontrole otworów w tym zestawie przechodzą; błędów meshera nie zmieniano.

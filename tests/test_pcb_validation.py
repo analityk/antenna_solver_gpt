@@ -92,6 +92,27 @@ class PcbValidationTests(unittest.TestCase):
             geometry.outline = BoardOutline(vertices)
             self.assert_invalid(geometry, "outline")
 
+    def test_nonadjacent_near_contact_keeps_distance_tolerance(self):
+        from antenna_lab.pcb.validation import _polygon
+        # A narrow open notch is GEOS-valid but unresolved at the old tolerance.
+        for gap, valid in ((TOLERANCE_M / 2, False), (TOLERANCE_M * 4, True)):
+            ring = ((0.,0.),(.01,0.),(.01,.01),(.005+gap,.01),
+                    (.005+gap,.002),(.005,.002),(.005,.01),(0.,.01))
+            if valid:
+                _polygon(ring, "notch")
+            else:
+                with self.assertRaises(ConfigurationError):
+                    _polygon(ring, "notch")
+
+    def test_polygon_validation_does_not_scan_distant_edge_pairs(self):
+        from math import cos, sin, pi
+        from unittest.mock import patch
+        from antenna_lab.pcb import validation
+        ring = tuple((.01*cos(2*pi*i/256), .01*sin(2*pi*i/256)) for i in range(256))
+        with patch.object(validation, "_intersect", wraps=validation._intersect) as intersect:
+            validation._polygon(ring, "ring")
+        self.assertEqual(intersect.call_count, 0)
+
     def test_nonfinite_values(self):
         for value in (float("nan"), float("inf"), -float("inf")):
             for field in ("z_min_m", "z_max_m", "epsilon_r", "loss_tangent"):

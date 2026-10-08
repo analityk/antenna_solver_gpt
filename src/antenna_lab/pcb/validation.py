@@ -71,11 +71,23 @@ def _polygon(vertices, label):
     twice_area = sum(_cross(points[0], a, b) for a, b in edges)
     _require(isfinite(twice_area) and abs(twice_area) > TOLERANCE_M * sum(lengths),
              f"{label}: zerowe lub numerycznie zdegenerowane pole.")
+    # GEOS rejects true intersections without the quadratic Python edge scan.
+    # No repair, snapping or geometry replacement is performed.
+    from shapely.geometry import LineString, Polygon
+    from shapely.strtree import STRtree
+    _require(Polygon(points).is_valid,
+             f"{label}: obrys musi być prosty, bez samoprzecięć.")
+    # Retain the historical tolerance for near contacts. Spatial queries visit
+    # only neighbouring edges, not every pair of edges in a large CAD ring.
+    segments = [LineString(edge) for edge in edges]
+    tree = STRtree(segments)
     for i, (a, b) in enumerate(edges):
         c = points[(i + 2) % len(points)]
         _require(not (_on_segment(c, a, b) or _on_segment(a, b, c)),
                  f"{label}: nakładające się sąsiednie krawędzie.")
-        for j in range(i + 1, len(edges)):
+        for j in tree.query(segments[i], predicate="dwithin", distance=2 * TOLERANCE_M):
+            if j <= i:
+                continue
             if j == i + 1 or (i == 0 and j == len(edges) - 1):
                 continue
             _require(not _intersect(a, b, *edges[j]),
