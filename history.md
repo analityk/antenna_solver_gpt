@@ -1655,3 +1655,25 @@ strict JSON/CSV. Brak natywnego FDTD, benchmarków, nowych zależności.
 Checkpoint jest publikowany przed jedynym pełnym unittest.
 Celowany zestaw przed publikacją: 76/76 PASS (reduced, simulation, validation,
 transform, control, gerber_sweep). Fizyczna trafność pozostaje approximate.
+
+PCB-015A — końcowa weryfikacja i trwałość:
+- A1 opublikowano jako 017dfe1254fa173747f7d1a6535eec35979b779a.
+- A2 opublikowano jako 5b1695af2596baae301b284c8bd70886c5857b85 przed pełną suite.
+- Pełny unittest uruchomiono RAZ: 414 testów, 2 failures, 27 errors, 3 skipped.
+  Wszystkie 27 errors to istniejące odmowy PCB copper fidelity. Jeden failure
+  oczekuje późniejszego błędu preflight zamiast tej odmowy, drugi oczekuje
+  starego emtest3 60×49×35 zamiast 271×278×35. Brak niepowodzeń nowych testów.
+  Nie zmieniano niepowiązanych testów ani nie osłabiano audytu full-wave.
+- Końcowo źródło i RLC korzystają z istniejącego audit_physical_feed; wykrywane
+  są też nakładające się obszary komponentów/źródła. Nie ma słabszego testu
+  samej powierzchni w reduced. Nieobsługiwane łuki odrzucamy przed przekrojami.
+- 17 testów reduced po tej poprawce PASS, w tym rzeczywiste minimalne pliki
+  GTL/GBL/GKO -> Gerbonara -> normalizacja/projekcja -> graf -> CSV, bez native.
+- Dostępny realpcb_microstrip/test1.zip: import/projekcja PASS, FAST odmowa
+  z powodu wierceń/vias (zgodna z jawnym ograniczeniem). test_spirala.zip
+  nie istnieje w śledzonym stanie repozytorium. Nie ma wyniku Z dla serpentyny.
+- Całość PARTIAL: brak macierzy/modalnego modelu sprzężeń par, nieobsługiwane
+  pady/łuki/vias wymagają osobnego rozszerzenia. Izolowane linie PASS wyłącznie
+  w zakresie opisanej aproksymacji, bez kalibracji full-wave/promieniowania/strat.
+Nie uruchomiono FDTD, benchmarków ani sweeps zbieżności. Zmiany publikowane
+wyłącznie w jawnych plikach zadania; outcomes/źródła użytkownika nietknięte.

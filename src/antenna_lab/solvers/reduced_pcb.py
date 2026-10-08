@@ -7,7 +7,7 @@ Bends are ideal junctions. Radiation, loss, dispersion, pad/bend/end parasitics
 are omitted, not estimated. Parallel separated runs require a coupling model
 and are explicitly rejected by solve_reduced_model in this first checkpoint.
 """
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from math import exp, hypot, isfinite, log, log10, pi, sqrt
 
 import numpy as np
@@ -16,8 +16,9 @@ from shapely.geometry import LineString, Point, Polygon, box
 
 from antenna_lab.core.config import ConfigurationError
 from antenna_lab.pcb.regions import copper_shape
+from antenna_lab.pcb.model import PcbPort
 from antenna_lab.pcb.validation import TOLERANCE_M, _contains_copper, validate_pcb_geometry
-from .pcb_features import compact_features
+from .pcb_features import compact_features, copper_features
 
 C0 = 299792458.0
 Z_VACUUM = 376.730313668
@@ -91,9 +92,11 @@ def extract_trace_sections(geometry):
     complete supplied copper without creating metal. Branches/ambiguity fail.
     A U/meander may extract successfully but solving requires coupling support.
     """
-    features,_,curved,_=compact_features(geometry)
+    # Reject unsupported curves before the more expensive cross-section scan.
+    _,curved=copper_features(geometry)
     if any(r['layer_role']=='top' for r in curved):
         raise ConfigurationError('Reduced extraction: curved/oblique top copper unsupported; no guessed centerline.')
+    features,_,_,_=compact_features(geometry)
     shapes={c.id:copper_shape(c) for c in geometry.top_copper}
     candidates=[]
     for f in features:
@@ -232,22 +235,26 @@ def build_reduced_model(geometry):
                  any(s.owner==owners[0].id and q in (s.start_xy_m,s.stop_xy_m) for s in sections)]
         if len(matches)!=1:raise ConfigurationError(f'{label}: terminal must coincide with one physical trace centerline end/junction; no guessed lead length.')
         return nodes[matches[0]]
+    contact_surfaces=[]
     def contact(a,b,width,label):
+        # Reuse the full physical source audit for R/L/C too: no weaker
+        # area-only gap test or endpoint-only ownership in the reduced path.
+        from antenna_lab.pcb.bundle import audit_physical_feed
+        if hypot(b[0]-a[0],b[1]-a[1])<=TOLERANCE_M:
+            raise ConfigurationError(f'{label}: collapsed contact gap.')
+        audit_physical_feed(replace(geometry,port=PcbPort(label,a,b,width)))
+        na,nb=terminal(a,label),terminal(b,label)
         axis=0 if abs(a[1]-b[1])<=TOLERANCE_M else 1;t=1-axis
-        if abs(a[t]-b[t])>TOLERANCE_M or abs(a[axis]-b[axis])<=TOLERANCE_M:
-            raise ConfigurationError(f'{label}: unresolved contact axis/gap.')
+        if abs(a[t]-b[t])>TOLERANCE_M:
+            raise ConfigurationError(f'{label}: nonorthogonal contact.')
         mid=(a[t]+b[t])/2;lo,hi=sorted((a[axis],b[axis]));half=width/2
         def xy(u,v):return (u,v) if axis==0 else (v,u)
         surface=Polygon([xy(lo,mid-half),xy(hi,mid-half),xy(hi,mid+half),xy(lo,mid+half)])
-        for c in geometry.top_copper:
-            if surface.intersection(copper_shape(c)).area > TOLERANCE_M*surface.length:
-                raise ConfigurationError(f'{label}: copper in physical gap.')
-        for p in (a,b):
-            owner=next(c for c in geometry.top_copper if _contains_copper(p,c))
-            face=LineString((xy(p[axis],mid-half),xy(p[axis],mid+half)))
-            if face.difference(copper_shape(owner).buffer(TOLERANCE_M)).length>TOLERANCE_M:
-                raise ConfigurationError(f'{label}: incomplete transverse contact.')
-        return terminal(a,label),terminal(b,label)
+        for other_label,other in contact_surfaces:
+            if surface.intersection(other).area>TOLERANCE_M**2:
+                raise ConfigurationError(f'{label}: contact overlaps source/component {other_label}.')
+        contact_surfaces.append((label,surface))
+        return na,nb
     n,p=geometry.port.negative_xy_m,geometry.port.positive_xy_m
     source=contact(n,p,geometry.port.width_m,geometry.port.id)
     components=[]

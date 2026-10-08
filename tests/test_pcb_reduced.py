@@ -176,6 +176,42 @@ class ReducedTests(unittest.TestCase):
         check = "import antenna_lab.pcb.reduced_control; import sys; assert not any(n in sys.modules for n in ('openEMS','CSXCAD','antenna_lab.solvers.openems_pcb','antenna_lab.solvers.openems'))"
         subprocess.run([sys.executable,'-c',check],check=True,env=os.environ.copy())
 
+    def test_real_gerbonara_folder_to_csv_no_native(self):
+        from antenna_lab.pcb.reduced_control import run_reduced
+        from hashlib import sha256
+        header='%FSLAX46Y46*%\n%MOMM*%\n%ADD10C,0.1*%\nD10*\nG01*\n'
+        def region(x0,y0,x1,y1):
+            pts=[(x0,y0),(x1,y0),(x1,y1),(x0,y1),(x0,y0)]
+            return 'G36*\n'+''.join(f'X{int(x*1e6)}Y{int(y*1e6)}D{2 if i==0 else 1:02}*\n'
+                                   for i,(x,y) in enumerate(pts))+'G37*\n'
+        with TemporaryDirectory() as tmp:
+            root=Path(tmp);inp=root/'gerbers';inp.mkdir()
+            (inp/'board.GTL').write_text(header+region(9.5,19.5,19.5,20.5)+region(20.5,19.5,30.5,20.5)+'M02*')
+            (inp/'board.GBL').write_text(header+region(0,0,40,40)+'M02*')
+            outline=region(0,0,40,40).replace('G36*\n','').replace('G37*\n','')
+            (inp/'board.GKO').write_text(header+outline+'M02*')
+            physical=root/'physical.json'
+            physical.write_text(json.dumps(dict(schema_version=2,stackup=[
+                dict(type='copper',role='top',model='pec',thickness_um=35,conductivity_s_m=58e6),
+                dict(type='dielectric',name='core',thickness_mm=1,epsilon_r=4.3,loss_tangent=0),
+                dict(type='copper',role='bottom',model='pec',thickness_um=35,conductivity_s_m=58e6)],
+                port=dict(mode='explicit',layer='top',negative_mm=[19.5,20],positive_mm=[20.5,20],width_mm=1))))
+            before={p.name:sha256(p.read_bytes()).hexdigest() for p in inp.iterdir()}
+            with patch('antenna_lab.solvers.pcb_mesh.make_pcb_domain_mesh',side_effect=AssertionError('no FDTD mesh')):
+                result=run_reduced(inp,root/'out',pcb_config=physical)
+            self.assertEqual(result['status'],'completed')
+            self.assertEqual(before,{p.name:sha256(p.read_bytes()).hexdigest() for p in inp.iterdir()})
+            self.assertEqual(len(result['provenance']['discovered_files']),3)
+            self.assertTrue((root/'out'/'impedance.csv').exists())
+
+    def test_physical_gap_intrusion_is_not_hidden_by_network(self):
+        g=case()
+        # Endpoint inside its own copper is legal at the geometry layer but
+        # the finite port face would then enclose metal. Reuse the physical audit.
+        g.port=replace(g.port,negative_xy_m=(-.0006,0))
+        with self.assertRaisesRegex(ConfigurationError,'gap contains copper'):
+            build_reduced_model(g)
+
     def test_cli_unsupported_saves_failure_not_impedance(self):
         from antenna_lab.pcb.reduced_control import run_reduced
         with TemporaryDirectory() as tmp:
