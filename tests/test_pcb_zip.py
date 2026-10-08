@@ -279,20 +279,40 @@ class RealZipAcceptance(unittest.TestCase):
                 self.assertEqual([(c.id,c.value_si) for c in modeled.components],[('R1',49.9)])
                 self.assertEqual(len(modeled.drills),2)
                 self.assertTrue(all(set(d.connected_layer_roles)=={'top','bottom'} for d in modeled.drills))
-                # Existing preview limitations, identical for directory and ZIP. Never bypass them.
-                with self.assertRaisesRegex(ConfigurationError,'R1: no legal existing transverse cell'):
-                    resolve_component_boxes(modeled,(mesh.x_lines_m,mesh.y_lines_m,mesh.z_lines_m))
+                specs=resolve_component_boxes(modeled,(mesh.x_lines_m,mesh.y_lines_m,mesh.z_lines_m))
+                self.assertEqual([(c.id,c.value_si) for c in specs],[('R1',49.9)])
+                # Downstream excitation budget remains an independent guard.
                 with self.assertRaisesRegex(ConfigurationError,'excitation needs at least'):
                     require_excitation_fits(cost,s)
             self.assertEqual(results[0],results[1]);self.assertEqual(results[0],results[2])
-            self.assertEqual(results[0][2].shape_cells,(92,86,45))
-            self.assertEqual(results[0][2].cell_count,356040)
-            self.assertEqual(results[0][3]['estimated_excitation_steps'],90937)
-            self.assertEqual(results[0][3]['estimated_cell_updates'],32377209480)
-            with patch('antenna_lab.solvers.openems.native_modules') as native,contextlib.redirect_stdout(io.StringIO()):
-                with self.assertRaisesRegex(ConfigurationError,'R1: no legal existing transverse cell'):
-                    run_gerber_control(copied,family/'run',prepare_only=True,quality='preview',**BAND)
-            native.assert_not_called()
+            # Both production profiles must get beyond component resolution.
+            # The known excitation budget failure must occur before native work.
+            for quality in ('preview','design'):
+                s,_=gerber_quality_settings(quality,**BAND)
+                normalized,_=normalize_port_orientation(local)
+                modeled,_,_=apply_geometry_resolution(normalized,PcbGrid())
+                before=modeled.as_dict()
+                mesh=make_pcb_domain_mesh(modeled,s,gerber_quality=quality)
+                specs=resolve_component_boxes(modeled,(mesh.x_lines_m,mesh.y_lines_m,mesh.z_lines_m))
+                self.assertEqual([(c.id,c.kind,c.value_si) for c in specs],[('R1','R',49.9)])
+                self.assertEqual(modeled.as_dict(),before)
+                c=modeled.components[0];spec=specs[0]
+                self.assertGreaterEqual(spec.start_m[1],min(p[1] for p in c.contact_window_xy_m))
+                self.assertLessEqual(spec.stop_m[1],max(p[1] for p in c.contact_window_xy_m))
+                # The previous sparse transverse mesh is still rightly rejected.
+                lo=min(p[1] for p in c.contact_window_xy_m)
+                hi=max(p[1] for p in c.contact_window_xy_m)
+                damaged=tuple(y for y in mesh.y_lines_m if not lo<=y<=hi)
+                with self.assertRaisesRegex(ConfigurationError,'explicit EM mesh-contact policy'):
+                    resolve_component_boxes(modeled,(mesh.x_lines_m,damaged,mesh.z_lines_m))
+                output=io.StringIO()
+                with patch('antenna_lab.solvers.openems.native_modules') as native,contextlib.redirect_stdout(output):
+                    with self.assertRaisesRegex(ConfigurationError,'excitation needs at least'):
+                        run_gerber_control(copied,family/quality,prepare_only=True,quality=quality,**BAND)
+                native.assert_not_called()
+                self.assertIn('Cost indicator:',output.getvalue())
+                self.assertNotIn('no legal existing transverse cell',output.getvalue())
+
 
 
 if __name__=='__main__':unittest.main()

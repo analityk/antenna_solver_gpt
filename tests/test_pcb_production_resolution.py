@@ -136,7 +136,7 @@ class ProductionBundleAcceptance(unittest.TestCase):
             root=Path(directory)
             for name,shape,count,updates in (
                 ('emtest3',(60,49,35),102900,357886200),
-                ('emtest4',(69,81,35),195615,5955694290)):
+                ('emtest4',(69,89,35),214935,6543911010)):
                 bundle=ROOT/'gerbs'/name
                 hashes={p:sha256(p.read_bytes()).hexdigest() for p in bundle.iterdir() if p.is_file()}
                 csx=ComponentCSX();engine=RunEngine();out=root/name

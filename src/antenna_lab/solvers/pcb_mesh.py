@@ -31,9 +31,19 @@ class PcbMeshAnchorPlan:
 
 
 def component_terminal_anchors(geometry, axis):
-    """Only longitudinal contact faces; no package/transverse/Z refinement."""
-    return tuple(v[axis] for c in geometry.components if c.axis == 'xy'[axis]
-                 for v in (c.gap_start_xy_m, c.gap_stop_xy_m))
+    """Critical modeled contact bounds, before any subdivision or grading.
+
+    Longitudinal gap faces and transverse window edges are EM mesh requirements,
+    not a geometry-resolution grid. Electrical values and Z are irrelevant.
+    """
+    anchors = []
+    for component in geometry.components:
+        if component.axis == 'xy'[axis]:
+            anchors.extend((component.gap_start_xy_m[axis], component.gap_stop_xy_m[axis]))
+        else:
+            values = [point[axis] for point in component.contact_window_xy_m]
+            anchors.extend((min(values), max(values)))
+    return tuple(anchors)
 
 
 def _merge(values, critical=()):

@@ -76,7 +76,7 @@ def resolve_component_boxes(geometry, axes):
             candidates.append((b-a,abs((a+b)-(lo+hi)),a,b,region))
         if not candidates:
             raise ConfigurationError(f'{c.id}: no legal existing transverse cell with full terminal contact and empty gap; '
-                                     'choose an explicitly finer quality/resolution or revise pad geometry (no hidden refinement).')
+                                     'review copper/pad contacts or the explicit EM mesh-contact policy, not CAD geometry resolution (no hidden refinement).')
         _,_,a,b,region=min(candidates,key=lambda v:v[:3])
         lower=xy(low,a)+(0.,);upper=xy(high,b)+(height,)
         result.append(PcbComponentSpec(c.id,c.kind,c.value_si,c.axis,lower,upper))

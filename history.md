@@ -1450,3 +1450,39 @@ Pełny zestaw: 368 testów, OK, 3 pominięte (openEMS/CSXCAD, Windows UCRT, Tk).
 Końcowy zestaw wejść ZIP i konfiguracji: 22 testy, OK. Warunek pełnej
 akceptacji rzeczywistego prepare-only nie jest spełniony, więc nie utworzono
 commitu; przygotowano łatkę do przeglądu bez zmian polityki solvera.
+
+## 2026-10-08 — PCB-012E: deterministyczne kontakty komponentów w siatce
+
+**Powód:** R1 w test1 ZIP nie miał pełnej komórki poprzecznej wewnątrz okna
+kontaktu. Sama poprawna geometria nie gwarantowała jej w oszczędnej siatce.
+
+**Zmiana:** wspólna polityka kotwic komponentów zachowuje krytycznie końce
+przerwy i poprzeczne min/max modelowanego okna kontaktu, przed podziałem oraz
+gradingiem. Filtr Gerber ich nie usuwa. To wymaganie siatki EM, nie zmiana
+rozdzielczości CAD ani nowa krata FDTD. Nie dodano kotwic Z. Wartości RLC,
+geometria, źródło, import ZIP i profile pozostają bez zmian. Resolver zachowuje
+wszystkie audyty i wskazuje teraz styki/politykę EM zamiast drobniejszego CAD.
+Metadane component_terminal_anchors_m obejmują także poprzeczne granice.
+
+**Akceptacja test1 bez FDTD:** lokalne stackup/ENET, geometria 10 µm;
+R1=49,9 Ω przechodzi końcowy audyt w preview i design. Preview:
+(92,112,45)=463680, minimum 90937 kroków / 42165668160 aktualizacji;
+design: (98,126,58)=716184, 91442 kroków / 65489297328 aktualizacji.
+Oba produkcyjne prepare-only dochodzą do preflight kosztu i zatrzymują się
+przed native na istniejącym limicie impulsu (50000 / 75000). Zgodnie z zakresem
+nie jest to wada PCB-012E ani powód do zmiany budżetu. XML/FDTD nie wykonano.
+
+**Wpływ na odtwarzalność:** dodatkowe wymagania XY mogą zmienić grading i koszt;
+preview test1 wcześniej 356040 komórek nie pozwalało zainstalować R1.
+Regresja emtest4: raw 288120 → 270480; model 10 µm 195615 → 214935
+(69,89,35), Z bez zmian. Uaktualniono tylko odpowiednie oczekiwania testów.
+emtest3 bez komponentów pozostaje (60,49,35)=102900.
+
+**Sprawdzenia:** kotwice X/Y we wszystkich profilach, pełne styki i okno,
+niezmienność od wartości RLC i brak nowego Z, uszkodzona siatka, niejednoznaczna
+miedź, przerwa oraz kolizje źródła/komponentów/wierceń. Zachowano testy ZIP,
+syntetyczne atrapy native oraz rzeczywiste preview/design. Wyniki testów nie
+potwierdzają zbieżności ani dokładności fizycznej modelu.
+
+**Wynik testów:** komponenty/ZIP 21 testów OK; pełny unittest 370 testów OK,
+3 pominięte (natywne openEMS/CSXCAD, Windows UCRT, GUI Tk). Bez FDTD.

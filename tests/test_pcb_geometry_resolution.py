@@ -170,7 +170,7 @@ class RealGeometryResolutionTests(unittest.TestCase):
         from antenna_lab.pcb.bundle import load_bundle_geometry
         s,_=gerber_quality_settings('preview',excitation_center_hz=2e9,excitation_cutoff_hz=1e9,
             result_frequency_hz=tuple(f*1e6 for f in range(1500,2501,10)))
-        for name,expected_raw in (('emtest3',99750),('emtest4',288120)):
+        for name,expected_raw in (('emtest3',99750),('emtest4',270480)):
             directory=ROOT/'gerbs'/name
             hashes={p:sha256(p.read_bytes()).hexdigest() for p in directory.iterdir() if p.is_file()}
             _,raw,import_info=load_bundle_geometry(directory,ROOT/'parameters/pcb_fr4_2layer_pth.json')

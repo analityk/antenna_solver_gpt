@@ -77,8 +77,8 @@ rozbieżność blokuje Run. Przebiegi mają oddzielne katalogi, brak współdzie
 cache geometrii/siatki/wyników; nie jest potrzebna nowa warstwa cache.
 
 Akceptacja bez FDTD przy powyższych częstotliwościach:
-emtest4 raw 288120 → **195615 (69×81×35)**, impuls 30446 kroków,
-5955694290 aktualizacji komórek; emtest3 raw 99750 → **102900 (60×49×35)**.
+po PCB-012E emtest4 raw 270480 → **214935 (69×89×35)**, impuls 30446 kroków,
+6543911010 aktualizacji komórek; emtest3 raw 99750 → **102900 (60×49×35)**.
 Z, kontakty PTH, źródło i RLC zachowane. To test kontraktu, nie zbieżności.
 
 Source CAD precision is not simulation accuracy.
@@ -759,10 +759,17 @@ niejednoznaczny pin, dolna warstwa, THT lub ukośna para kończą import błęde
 Wpisy PAD nieobecne w ENET są ignorowane. Przerwę wyznacza końcowy obraz
 miedzi po union/clear, nie krawędź apertury ani wymiar obudowy.
 
-Każdy element dodaje tylko dwie krytyczne podłużne kotwice styków.
-Najmniejszy legalny istniejący przedział poprzeczny musi mieścić się w obu
-padach i mieć pełny kontakt oraz pustą przerwę. Brak takiej komórki oznacza
-jawny błąd, nie ukryte zagęszczenie. R/C/L używają `AddLumpedElement`,
+Każdy idealny R/C/L dodaje przed podziałem i gradingiem dwie krytyczne
+podłużne kotwice styków oraz dwie poprzeczne granice modelowanego okna kontaktu.
+Dla osi X są to X końców przerwy i min/max Y okna; dla osi Y odwrotnie.
+Oszczędny filtr Gerber nie usuwa tych kotwic. Są wymaganiem siatki EM,
+a nie zmianą rozdzielczości geometrii ani regularną kratą FDTD.
+Podział/grading może dodać między nimi kolejne linie float.
+Najmniejszy legalny istniejący przedział poprzeczny nadal musi mieścić się w obu
+padach i mieć pełny kontakt oraz pustą przerwę. Końcowy audyt nadal odrzuca
+niejednoznaczną miedź i kolizje ze źródłem, innym komponentem lub wierceniem.
+Brak legalnej komórki wymaga sprawdzenia styków/padów lub jawnej polityki
+siatki EM, nie wybierania drobniejszej rozdzielczości CAD. R/C/L używają `AddLumpedElement`,
 `LEtype=1`, `caps=True` i boxa od z=0 do pierwszej istniejącej linii powietrza.
 PEC end caps zapewniają kontakt z płaskimi padami; nie są modelem wyprowadzeń
 obudowy. Nie powstają nowe kotwice Z. Zmiana wartości R/C/L nie zmienia siatki.
@@ -856,18 +863,25 @@ usunięto tylko kopię `gerbs/realpcb_microstrip/test1/`.
 Stack: 35 µm Cu / 0,2 mm dielektryka, epsilon=4,5, tanδ=0 / 35 µm Cu.
 Jeden CSRC, R1=49,9 Ω, dwa zdeduplikowane PTH top–bottom; topologia przy
 10 µm PASS. Dla preview, center 2000 MHz, cutoff 1000 MHz, sweep
-1500–2500 MHz co 10 MHz: siatka (92,86,45)=356040, minima XYZ
-10/30/100 µm, impuls minimum 90937 kroków, 32377209480 aktualizacji komórek.
+1500–2500 MHz co 10 MHz, po PCB-012E:
 
-**Ten rzeczywisty wariant nie przechodzi obecnego prepare-only preview.**
-Dotychczasowy resolver R1 nie znajduje istniejącej komórki poprzecznej
-mieszczącej się w jego oknie kontaktu. Ponadto impuls przekracza limit
-preview 50000 kroków. Obie blokady występują także przy imporcie katalogowym.
-Nie zmieniono meshera, reguł styków ani profilu, żeby je ukryć. Wymagają
-osobnej decyzji dotyczącej polityki obliczeń. Natywne XML/FDTD nie zostało
-uruchomione dla tego wariantu.
+| Profil | Siatka | Komórki | Minimum XYZ [µm] | Minimum kroków impulsu | Aktualizacje komórek |
+| --- | --- | ---: | --- | ---: | ---: |
+| preview | 92×112×45 | 463680 | 10 / 30 / 100 | 90937 | 42165668160 |
+| design | 98×126×58 | 716184 | 10 / 30 / 66,67 | 91442 | 65489297328 |
 
-Polecenie diagnostyczne Windows (aktualnie kończy się opisanym błędem R1):
+R1 przechodzi końcowy audyt styków w obu profilach przy geometrii 10 µm.
+Dodatkowe granice okna kontaktu zmieniają siatkę XY; nie zmieniają geometrii,
+wartości RLC, źródła ani osi Z. Wcześniejsze preview miało 356040 komórek,
+ale nie pozwalało zainstalować R1.
+
+**Prepare-only dochodzi do kosztu, po czym nadal odrzuca budżet impulsu:**
+90937 > 50000 dla preview i 91442 > 75000 dla design. Jest to osobne
+ograniczenie, poza naprawą kontaktów PCB-012E. Nie zmieniono profili ani
+limitów kroków. Nie wykonano natywnego XML/FDTD dla tego wariantu.
+
+Polecenie diagnostyczne Windows (zatrzymuje się na opisanym limicie impulsu;
+analogicznie dla `--quality design`):
 
 ```bat
 set "PY=.\.venv\Scripts\python.exe"

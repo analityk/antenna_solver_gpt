@@ -17,9 +17,15 @@ from antenna_lab.pcb.components import (ideal_value, read_netlist, read_placemen
     discover_component_sources, terminal_gap, IDEAL_NOTE)
 from antenna_lab.pcb.gerber_control import run_gerber_control
 from antenna_lab.pcb.gerber_quality import gerber_quality_settings
-from antenna_lab.pcb.model import CopperPolygon
+from antenna_lab.pcb.model import CopperPolygon, PcbDrill
+from antenna_lab.pcb.regions import copper_shape
+from antenna_lab.pcb.validation import TOLERANCE_M
+from antenna_lab.pcb.geometry_resolution import apply_geometry_resolution
+from antenna_lab.pcb.grid import PcbGrid
+from shapely.geometry import LineString, Point
 from antenna_lab.pcb.transform import normalize_port_orientation, inverse_transform_geometry
-from antenna_lab.solvers.pcb_mesh import make_pcb_domain_mesh, make_gerber_mesh_anchor_plan
+from antenna_lab.solvers.pcb_mesh import (make_pcb_domain_mesh, make_gerber_mesh_anchor_plan,
+    make_pcb_mesh_anchor_plan)
 from antenna_lab.solvers.pcb_components import resolve_component_boxes
 from antenna_lab.solvers.openems_pcb import install_pcb_geometry, prepare_pcb_xml_model
 from antenna_lab.solvers.pcb_fields import pcb_sample_mask
@@ -200,6 +206,91 @@ class ComponentTests(unittest.TestCase):
         self.assertEqual(len(metadata['ideal_components']),3)
         csx=ComponentCSX();csx.component_mutation=True
         with self.assertRaisesRegex(ConfigurationError,'grid audit'):install_pcb_geometry(csx,g,mesh,s,copper_config=cfg,gerber_quality='preview')
+
+    def test_modeled_xy_contact_bounds_are_critical_in_every_policy(self):
+        _,_,g,_,_,_=self.loaded()
+        g,_,_=apply_geometry_resolution(g,PcbGrid())
+        # Narrow windows strictly inside the physical pads: copper bounding boxes
+        # alone cannot supply these transverse anchors (X and Y components).
+        components=[]
+        for c in g.components:
+            trans=1-'xy'.index(c.axis);centre=c.gap_start_xy_m[trans]
+            window=tuple(tuple(centre + (-.00037 if p[i]<centre else .00037)
+                               if i==trans else p[i] for i in range(2))
+                         for p in c.contact_window_xy_m)
+            components.append(replace(c,contact_window_xy_m=window))
+        g=replace(g,components=tuple(components));before=g.as_dict()
+        self.assertEqual({c.axis for c in g.components},{'x','y'})
+        for quality in ('preview','design','verify'):
+            settings,_=gerber_quality_settings(quality,**BAND)
+            plan,meta=make_gerber_mesh_anchor_plan(g,settings,quality)
+            ordinary=make_pcb_mesh_anchor_plan(g)
+            mesh=make_pcb_domain_mesh(g,settings,gerber_quality=quality)
+            axes=(mesh.x_lines_m,mesh.y_lines_m,mesh.z_lines_m)
+            specs=resolve_component_boxes(g,axes)
+            for c,spec in zip(g.components,specs):
+                axis='xy'.index(c.axis);trans=1-axis
+                lo=min(p[trans] for p in c.contact_window_xy_m)
+                hi=max(p[trans] for p in c.contact_window_xy_m)
+                for i,values in ((axis,(c.gap_start_xy_m[axis],c.gap_stop_xy_m[axis])),(trans,(lo,hi))):
+                    for value in values:
+                        self.assertIn(value,(plan.x_required_m,plan.y_required_m)[i])
+                        self.assertIn(value,(ordinary.x_required_m,ordinary.y_required_m)[i])
+                        self.assertIn(value,meta['component_terminal_anchors_m']['xy'[i]])
+                        self.assertIn(value,axes[i])
+                        self.assertFalse(any(r['axis']=='xy'[i] and r['coordinate_m']==value
+                                             for r in meta['suppressed_noncritical_anchors']))
+                self.assertGreaterEqual(spec.start_m[trans],lo)
+                self.assertLessEqual(spec.stop_m[trans],hi)
+                for pin,terminal in ((c.pin1_xy_m,c.gap_start_xy_m),(c.pin2_xy_m,c.gap_stop_xy_m)):
+                    owner=[copper_shape(p) for p in g.top_copper
+                           if copper_shape(p).buffer(TOLERANCE_M).covers(Point(pin))]
+                    self.assertEqual(len(owner),1)
+                    a=list(spec.start_m[:2]);b=list(spec.stop_m[:2])
+                    a[axis]=b[axis]=terminal[axis]
+                    self.assertTrue(owner[0].buffer(TOLERANCE_M).covers(LineString((a,b))))
+            changed=replace(g,components=tuple(replace(c,value_si={'R':100.,'C':1e-9,'L':100e-9}[c.kind])
+                                               for c in g.components))
+            self.assertEqual(mesh,make_pcb_domain_mesh(changed,settings,gerber_quality=quality))
+            without=make_pcb_domain_mesh(replace(g,components=()),settings,gerber_quality=quality)
+            self.assertEqual(mesh.z_lines_m,without.z_lines_m)
+        self.assertEqual(g.as_dict(),before)
+
+    def test_contact_audit_keeps_collision_and_ownership_protections(self):
+        _,_,g,_,s,_=self.loaded()
+        c=next(c for c in g.components if c.id=='R1')
+        g=replace(g,components=(c,))
+        mesh=make_pcb_domain_mesh(g,s,gerber_quality='preview')
+        axes=(mesh.x_lines_m,mesh.y_lines_m,mesh.z_lines_m)
+        spec,=resolve_component_boxes(g,axes)
+        x0,y0=spec.start_m[:2];x1,y1=spec.stop_m[:2]
+        # Exactly one candidate cell, so collisions cannot be evaded by choosing
+        # another row in the same pad. No production mesh is altered.
+        c=replace(c,contact_window_xy_m=((x0,y0),(x1,y0),(x1,y1),(x0,y1)))
+        g=replace(g,components=(c,))
+        owner=next(p for p in g.top_copper if copper_shape(p).covers(Point(c.pin1_xy_m)))
+        mx,my=(x0+x1)/2,(y0+y1)/2
+        intruder=CopperPolygon('intruder',((mx-.00001,y0),(mx+.00001,y0),
+                                         (mx+.00001,y1),(mx-.00001,y1)),0.)
+        drill=PcbDrill('hole',mx,my,.0001,False,'NPTH','1','0'*64)
+        cases={
+            'ambiguous ownership':replace(g,copper=g.copper+[replace(owner,id='duplicate')]),
+            'missing ownership':replace(g,copper=[p for p in g.copper if p.id!=owner.id]),
+            'gap intrusion':replace(g,copper=g.copper+[intruder]),
+            'source overlap':replace(g,port=replace(g.port,negative_xy_m=(x0,my),positive_xy_m=(x1,my),width_m=y1-y0)),
+            'component overlap':replace(g,components=(c,replace(c,id='R2'))),
+            'drill overlap':replace(g,drills=(drill,)),
+            'wrong layer':replace(g,components=(replace(c,layer='bottom'),)),
+            'invalid value':replace(g,components=(replace(c,value_si=0.),)),
+        }
+        # Partial pad contact: keep the pin and gap centre, but remove the
+        # transverse ends of its contact face. Endpoint ownership still passes.
+        centre=c.pin1_xy_m[1]
+        narrow=replace(owner,vertices_xy_m=tuple((x,centre+(y-centre)*.001) for x,y in owner.vertices_xy_m))
+        cases['incomplete face']=replace(g,copper=[narrow if p.id==owner.id else p for p in g.copper])
+        for reason,invalid in cases.items():
+            with self.subTest(reason=reason),self.assertRaises(ConfigurationError):
+                resolve_component_boxes(invalid,axes)
 
     def test_box_rejects_no_transverse_cell_copper_intrusion_and_missing_faces(self):
         _,_,g,_,s,_=self.loaded();mesh=make_pcb_domain_mesh(g,s,gerber_quality='preview')
