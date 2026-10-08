@@ -70,6 +70,12 @@ Przykład FAST dla obsługiwanego przypadku bez vias/sprzężeń:
 .\.venv\Scripts\python.exe -m antenna_lab.pcb.reduced_control gerbs\realpcb_microstrip\test1.zip --geometry-resolution-um 10 --center-mhz 2000 --cutoff-mhz 1900 --sweep-start-mhz 1500 --sweep-stop-mhz 2500 --sweep-step-mhz 10
 ```
 
+Nowe automatyczne katalogi full-wave PCB mają czytelne nazwy:
+`<nazwa-wejścia>_<NNN>`, np. `test_spirala_001`,
+`test_spirala_002`. Numeracja jest osobna dla każdej nazwy wejścia; jawne
+`--output` nadal ma pierwszeństwo. Starsze katalogi timestamp/random nie są
+przemianowywane automatycznie.
+
 ## Pierwsze uruchomienie — CMD
 
 W istniejącej kopii użytkownika, z już zainstalowanym openEMS:
