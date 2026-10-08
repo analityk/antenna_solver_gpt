@@ -120,3 +120,25 @@ Instrukcje użytkownika mają pierwszeństwo. Dokumentacja dla użytkownika jest
 po polsku, nazwy w kodzie po angielsku. Zachowuj istniejące zmiany użytkownika.
 Nie twórz autonomicznie nowych agentów ani rozbudowanych procesów pracy.
 W katalogach z własnym `AGENTS.md` obowiązują również instrukcje lokalne.
+
+## Trwałość pracy agenta i Git
+
+Te zasady są obowiązkowe dla każdego zadania modyfikującego repozytorium, chyba że użytkownik jawnie nakaże inaczej.
+
+- Status testów PASS/PARTIAL/FAIL, brak zależności natywnych, błędy integracyjne i dług techniczny nie są bramką dla commitowania ani publikacji.
+- Przed rozpoczęciem istotnej pracy sprawdź, czy istnieje działający kanał zapisu do docelowego repozytorium GitHub. Preferuj zwykły `git push`. Jeśli powłoka nie ma poświadczeń, ale dostępna integracja GitHub potrafi zapisywać, użyj jej.
+- Jeżeli nie ma żadnego działającego kanału zapisu do GitHuba, zatrzymaj zadanie przed kosztowną/istotną implementacją i poproś o dostęp. Nie wykonuj długiej pracy, która pozostanie wyłącznie w efemerycznym środowisku agenta.
+- Każdą znaczącą zmianę kodu, testów lub dokumentacji commituj także wtedy, gdy zadanie kończy się PARTIAL albo FAIL.
+- Każdy commit z pracą agenta publikuj do `origin/main`, chyba że bieżące polecenie użytkownika jawnie wskazuje inną gałąź.
+- Gdy istnieje już znacząca praca, zrób commit i push checkpointu przed drogim pełnym zestawem testów. Kolejne poprawki commituj i pushuj osobno. Trwałość pracy ma pierwszeństwo przed idealnie czystą historią.
+- Nie wstrzymuj pushu z powodu nieudanego końcowego testu. Raportuj osobno stan testów i stan publikacji.
+- Plik patch nie jest normalnym sposobem przekazania pracy. Używaj go wyłącznie awaryjnie po wyczerpaniu uwierzytelnionych sposobów publikacji i tylko gdy użytkownik zaakceptuje taki fallback.
+- Nie używaj `git add -A`, `git add .` ani `git commit -am`. Stage'uj wyłącznie jawne pliki należące do zadania.
+- Nie dodawaj przypadkowo `outcomes/`, lokalnych backupów parametrów, archiwów ZIP, plików `*.patch` ani innych niepowiązanych plików użytkownika.
+- Nie wykonuj `reset --hard`, `clean`, usuwania ani nadpisywania niepowiązanej pracy użytkownika.
+- W raporcie końcowym zawsze podaj opublikowany SHA, gałąź, wynik pushu, faktycznie uruchomione testy i znane ograniczenia.
+
+Pełny zestaw testów na docelowym Windows uruchamiaj poleceniem:
+`.\.venv\Scripts\python.exe -X utf8 -m unittest discover -s tests -v`.
+Projekt używa `unittest`; nie instaluj pytest tylko po to, aby uruchomić testy.
+
