@@ -3,6 +3,8 @@ import contextlib
 import io
 import json
 from types import SimpleNamespace
+from tempfile import TemporaryDirectory
+from pathlib import Path
 import unittest
 from unittest.mock import patch
 
@@ -19,6 +21,20 @@ import test_pcb_gerber as fixtures
 
 
 class SweepTests(unittest.TestCase):
+    def test_default_output_name_uses_input_stem_and_monotonic_series(self):
+        with TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            first=control._default_output_dir(Path('test_spirala.zip'),root)
+            second=control._default_output_dir(Path('test_spirala.zip'),root)
+            (root/'test_spirala_007').mkdir()
+            eighth=control._default_output_dir(Path('test_spirala.zip'),root)
+            other=control._default_output_dir(Path('inna płytka.zip'),root)
+            self.assertEqual(first.name,'test_spirala_001')
+            self.assertEqual(second.name,'test_spirala_002')
+            self.assertEqual(eighth.name,'test_spirala_008')
+            self.assertEqual(other.name,'inna_plytka_001')
+            self.assertTrue(all(p.is_dir() for p in (first,second,eighth,other)))
+
     def test_regular_inclusive_deterministic_and_nondivisible(self):
         values=sweep_frequencies_hz(1260,1580,5)
         self.assertEqual(values,tuple(1260e6+i*5e6 for i in range(65)))
