@@ -3,6 +3,108 @@
 Stan planu: do wykonania po zakończeniu bieżącej pracy nad wydajnością.
 Dokument ma być planem kolejnych zmian, nie deklaracją że zostały wykonane.
 
+## Zmiana kierunku: najpierw model zredukowany, nie tańszy pełny FDTD
+
+Po profilowaniu `prepare-only` i analizie celu projektowego priorytet zmienia się.
+
+Użytkownika interesuje przede wszystkim impedancja, rezonanse i sprzężenia linii
+mikropaskowej. Strata około 1% mocy przez promieniowanie nie jest istotna dla
+szybkiego modelu projektowego. Pełny 3D FDTD pozostaje narzędziem weryfikacyjnym,
+a nie domyślnym silnikiem każdej iteracji.
+
+Nie implementować "sparse FDTD" przez pomijanie komórek o małym chwilowym polu.
+W FDTD nie jest to bezpieczne kryterium lokalne: pole propaguje się między komórkami.
+Zamiast tego zredukować liczbę niewiadomych fizycznie: napięcia/prądy i dominujące
+mody quasi-TEM wzdłuż ścieżek oraz ich lokalne sprzężenia.
+
+### Priorytet 0A — naprawić koszt przygotowania modelu
+
+Profil `cProfile` dla serpentyny pokazał patologiczny koszt walidacji:
+
+- około 3,36 mld wywołań funkcji Python,
+- `validate_pcb_geometry`: około 630 s cumulative, 21 wywołań,
+- `_intersect`: około 130 mln wywołań,
+- `_on_segment`: około 523 mln wywołań,
+- `_cross`: około 783 mln wywołań,
+- `make_pcb_domain_mesh`: wykonywany dwa razy w jednej ścieżce prepare/run.
+
+Liczby 3,36 mld dotyczą wywołań funkcji walidatora, NIE komórek FDTD.
+
+Naprawa ma zachować fail-closed semantics, ale usunąć ręczny O(N²) test
+samoprzecięć polygonu. Użyć GEOS/Shapely do sprawdzenia poprawności polygonu,
+bez `make_valid`, `buffer(0)` ani automatycznej naprawy. Tanie kontrole liniowe
+(finite, liczba punktów, zdegenerowane krawędzie, pole) zachować.
+
+Pełną walidację wykonywać na granicach, gdzie geometria rzeczywiście się zmienia
+(import -> normalize -> quantize/materialize), a nie wielokrotnie w czystych
+helperach meshera/portu. Po utworzeniu finalnego mesha przekazać ten sam obiekt
+do native preparation zamiast budować go drugi raz.
+
+Ta część jest obowiązkowym checkpointem przed modelem zredukowanym, bo "fast"
+solver nie może czekać minutami na walidację wejścia.
+
+### Priorytet 0B — fast PCB reduced-order solver
+
+Dodać osobny, jawnie przybliżony solver dla obsługiwanego podzbioru PCB:
+
+- mikrostrip na top copper nad ciągłą ground plane,
+- jednorodny laminat,
+- ścieżki głównie ortogonalne / rectilinear,
+- lumped R/L/C z istniejącego modelu,
+- pojedyncza niebranżowana ścieżka lub układ, którego topologia może być
+  jednoznacznie wyprowadzona; przypadki niejednoznaczne fail closed.
+
+Solver ma operować na grafie/napięciach/prądach, nie na objętościowym Yee-gridzie.
+Wykorzystać istniejące `compact_features()`: ma już fizyczne szerokości pasków,
+clearance/gap pairs i zakresy równoległych odcinków. Nie tworzyć drugiego,
+sprzecznego ekstraktora wymiarów.
+
+Minimalny model v1:
+
+- straight microstrip sections -> quasi-TEM per-unit-length L/C (or Z0/epsilon_eff),
+- długości elektryczne wzdłuż wyprowadzonej osi ścieżki,
+- istniejące lumped R/L/C w grafie,
+- równoległe odcinki rozpoznane z istniejących clearance features,
+- coupling tylko wtedy, gdy można go policzyć z jawnie udokumentowanego modelu;
+  nie wymyślać arbitralnego współczynnika,
+- brak modelowania promieniowania jako cecha kontraktu fast solvera,
+- brak udawania, że v1 zastępuje full-wave przy via, slotach, złożonych groundach,
+  silnej radiacji, oblique/ambiguous geometry.
+
+Preferowany wynik:
+
+- Z(f), S11(f), SWR,
+- podstawowe napięcia/prądy wzdłuż segmentów,
+- metadane: długości, szerokości, h, epsilon_r, użyty model, coupling sections,
+  jawne ograniczenia i powody fail-closed.
+
+Nie uruchamiać nowego FDTD w ticketcie implementacyjnym. Jeśli istnieją już zapisane
+wyniki full-wave, można je tylko odczytać do porównania; brak takich danych nie
+może prowadzić do wymyślania referencji.
+
+### Architektura jakości po tej zmianie
+
+```text
+FAST / APPROX
+  reduced quasi-TEM / transmission-line graph
+  -> codzienne iteracje, sweepy, kierunek zmian
+  -> promieniowanie celowo pomijane
+
+DESIGN
+  ograniczony full-wave openEMS
+  -> weryfikacja efektów 3D i sprzężeń, które fast model pomija
+
+VERIFY
+  konserwatywny openEMS
+  -> finaliści i kalibracja modelu fast
+```
+
+Docelowo full-wave ma służyć do kalibracji modelu zredukowanego. Jeśli różnica
+FAST vs VERIFY pozostaje akceptowalna dla danego typu PCB, kolejne iteracje tego
+typu nie wymagają pełnego FDTD.
+
+---
+
 ## Dlaczego ten plan istnieje
 
 Obecny solver PCB odziedziczył część polityki domeny i wizualizacji typowej dla anten.
