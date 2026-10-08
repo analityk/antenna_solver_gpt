@@ -1760,3 +1760,23 @@ osie również są przycięte. Nie uruchamiano natywnego FDTD.
 **Ograniczenia:** nie dodano jeszcze przełącznika Full field extent, nie
 zmniejszono samego obszaru DFT/dumpu i nie zmieniono pionowych przekrojów.
 
+## 2026-10-09 — PCB-016B: czytelne nazwy katalogów Gerber run
+
+**Powód:** automatyczne katalogi `outcomes/pcb_gerber` były tworzone przez
+`tempfile.mkdtemp` z timestampem i losowym sufiksem, np.
+`20261008T133513086948Z_k1qhix4j`. Nazwa nie mówiła, z którego ZIP pochodzi
+run i była niewygodna w codziennej pracy.
+
+**Zmiana:** domyślna nazwa nowego runu full-wave PCB ma format
+`<nazwa-wejścia>_<NNN>`, np. `test_spirala_001`, potem
+`test_spirala_002`. Numer jest monotoniczny dla danego stemu wejścia i
+alokowany przez utworzenie katalogu z `exist_ok=False`, więc konflikt
+równoległego startu przechodzi do kolejnego numeru. `--output` pozostaje bez
+zmian i ma pierwszeństwo.
+
+**Wpływ na fizykę i wyniki:** brak. Zmieniono wyłącznie nazwę automatycznego
+katalogu wynikowego. Stare katalogi timestamp/random pozostają nietknięte.
+
+**Sprawdzenie:** dodano test dla kolejnych numerów, pomijania już zajętego
+wyższego numeru i bezpiecznego slugowania nazwy wejścia. Nie uruchamiano FDTD.
+
