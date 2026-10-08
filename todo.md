@@ -165,17 +165,26 @@ Nie zmieniać kilku osi jakości naraz.
 
 ### P4 — pola i viewer PCB
 
+Częściowo wykonane w PCB-016A:
+
+- domyślny widok XY raportu używa teraz Fit PCB: bbox całej geometrii PCB
+  + 6% marginesu zamiast pełnego extentu dumpu,
+- E i H w tym samym widoku używają identycznego cropu,
+- browser sampling 80×80 jest wybierany wewnątrz pokazywanego zakresu,
+  więc nie marnuje rozdzielczości ekranu na puste powietrze,
+- statyczne diagramy fazowe XY używają tego samego viewportu,
+- zmiana jest wyłącznie prezentacyjna: NPZ, field dump, mesh i FDTD pozostają
+  bez zmian; stare przebiegi można przerysować bez ponownego solve.
+
 Pozostaje do wykonania:
 
 - field dump ograniczony do PCB bbox + jawny margines,
-- opcjonalny full-domain dump,
+- opcjonalny Full field extent / full-domain dump,
 - `xy_dielectric_mid`,
 - Ez / |E| dla laminatu,
 - pionowy przekrój trace→ground,
-- domyślny viewport Fit PCB,
-- Full field extent jako opcja,
-- wspólny crop E/H,
-- playback fazy co 15° bez dodatkowego FDTD.
+- sensowny viewport pionowych XZ/YZ,
+- playback fazy co 15° bez dodatkowego FDTD pozostaje zachowany.
 
 ## Zasady dalszej pracy
 
