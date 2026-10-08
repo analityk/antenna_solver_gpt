@@ -33,12 +33,20 @@ def _write_json(path, value):
     path.write_text(json.dumps(value, indent=2, allow_nan=False)+'\n', encoding='utf-8')
 
 
-def run_gerber_control(config_path, output_dir, *, prepare_only=False, quality='design', sweep_request=None, pcb_config=None, field_frequency_hz=(), geometry_resolution_um=10, **frequency_settings):
+def run_gerber_control(config_path, output_dir, *, prepare_only=False, quality=None, sweep_request=None, pcb_config=None, field_frequency_hz=None, geometry_resolution_um=10, resolved_profile=None, **frequency_settings):
     """Import, normalize once, project geometry, preflight, then XML or one solve."""
     # Public API uses the same explicit choices as the CLI; no implicit string/bool coercion.
     if isinstance(geometry_resolution_um, bool) or not isinstance(geometry_resolution_um, (int, float)) or geometry_resolution_um not in (100, 10, 1, .1):
         raise ConfigurationError("Geometry resolution must be one of 100, 10, 1, 0.1 um.")
     grid = PcbGrid({100:100000, 10:10000, 1:1000, .1:100}[geometry_resolution_um])
+    from antenna_lab.solvers.profiles import resolve_profile
+    profile = resolved_profile or resolve_profile(quality, experiment=frequency_settings, field_frequency_hz=field_frequency_hz)
+    settings = profile.settings
+    from .simulation import validate_pcb_simulation_settings
+    validate_pcb_simulation_settings(settings)
+    quality = profile.name
+    field_frequency_hz = profile.field_frequency_hz
+    exact = settings.runtime.exact_endcriteria
     bundle_metadata = {}
     if Path(config_path).is_dir():
         from .bundle import load_bundle_geometry
@@ -60,7 +68,6 @@ def run_gerber_control(config_path, output_dir, *, prepare_only=False, quality='
     normalized_source, transform = normalize_port_orientation(source)
     geometry = normalized_source  # provenance only until projection below
     modeled = False
-    settings, exact = gerber_quality_settings(quality, **frequency_settings)
     from antenna_lab.solvers.pcb_fields import validate_field_frequencies, pcb_field_layout
     field_frequency_hz = validate_field_frequencies(field_frequency_hz, settings)
     field_options = {"field_frequency_hz": field_frequency_hz} if field_frequency_hz else {}
@@ -112,7 +119,8 @@ def run_gerber_control(config_path, output_dir, *, prepare_only=False, quality='
     for assumption in geometry.assumptions:
         print('  '+assumption, flush=True)
     output.mkdir(parents=True, exist_ok=True)
-    diagnostics = dict(material_metadata, sweep=sweep, quality_profile=quality, actual_iterations=None, termination_status='not_started')
+    diagnostics = dict(material_metadata, sweep=sweep, quality_profile=quality, actual_iterations=None, termination_status='not_started',
+                       openems_profile=profile.metadata, report_phase_step_deg=settings.runtime.report_phase_step_deg)
     try:
         try:
             geometry, _, audit = apply_geometry_resolution(normalized_source, grid)
@@ -163,6 +171,7 @@ def run_gerber_control(config_path, output_dir, *, prepare_only=False, quality='
         diagnostics.update(cost)
         print(f"Quality: {quality}\nMesh: {mesh.shape_cells} = {mesh.cell_count} cells\n"
               f"Minimum steps: {cost['min_axis_steps_m']} m\n"
+              f"Estimated CFL dt: {cost['estimated_cfl_dt_s']:g} s; NrTS safety ceiling: {settings.max_timesteps}\n"
               f"Estimated excitation: {cost['estimated_excitation_steps']} timesteps (optimistic minimum)\n"
               f"Cost indicator: {cost['estimated_cell_updates']} cell updates (excitation only)", flush=True)
         require_excitation_fits(cost, settings)
@@ -185,12 +194,16 @@ def run_gerber_control(config_path, output_dir, *, prepare_only=False, quality='
                 simulation_settings=asdict(settings), mesh={'shape_cells': mesh.shape_cells, 'cell_count': mesh.cell_count})
         else:
             result = run_control_model(geometry, settings, output, gerber_quality=quality,
-                                       exact_endcriteria=exact, dump_statistics=True, copper_config=config, expected_domain_mesh=mesh, **field_options)
-            diagnostics['actual_iterations'] = result['native_statistics']['number_of_iterations']
-            if not 0 < diagnostics['actual_iterations'] < settings.max_timesteps:
-                raise ConfigurationError('Gerber native termination not established: timestep limit reached.')
-            diagnostics['termination_status'] = 'completed_before_limit'
-            result['status'] = 'completed'
+                                       exact_endcriteria=exact, dump_statistics=settings.runtime.dump_statistics, copper_config=config, expected_domain_mesh=mesh, **field_options)
+            if settings.runtime.dump_statistics:
+                diagnostics['actual_iterations'] = result['native_statistics']['number_of_iterations']
+                if not 0 < diagnostics['actual_iterations'] < settings.max_timesteps:
+                    raise ConfigurationError('Gerber native termination not established: timestep limit reached.')
+                diagnostics['termination_status'] = 'completed_before_limit'
+                result['status'] = 'completed'
+            else:
+                diagnostics['termination_status'] = 'not_established_statistics_disabled'
+                result['status'] = 'finished_unverified'
             result['note'] = result['note'].replace('First synthetic PCB FDTD control result.', 'PCB FDTD result imported from Gerber geometry.')
             result.update(sampled_diagnostics(result))
         if prepare_only:
@@ -230,7 +243,7 @@ def run_gerber_control(config_path, output_dir, *, prepare_only=False, quality='
         # Match antenna best-effort reporting: presentation never invalidates FDTD.
         try:
             from antenna_lab.visualization.report import generate_report
-            report = generate_report(output, automatic=True)
+            report = generate_report(output, automatic=True, phase_step=settings.runtime.report_phase_step_deg)
             print(f'Raport HTML: {report}', flush=True)
         except Exception as exc:
             warning = f'Nie utworzono raportu HTML: {type(exc).__name__}: {exc}. Wyniki FDTD są zachowane; użyj polecenia report.'
@@ -250,7 +263,12 @@ def main(argv=None):
     parser.add_argument('--output', type=Path)
     parser.add_argument('--geometry-resolution-um', type=float, choices=(100,10,1,.1), default=10,
                         help='CAD geometry resolution in um (default 10); independent of FDTD mesh resolution')
-    parser.add_argument('--quality', choices=('preview','design','verify'), default='design')
+    parser.add_argument('--quality', choices=('preview','design','verify'))
+    from antenna_lab.solvers.profiles import DEFAULT_CONFIG
+    parser.add_argument('--openems-config', type=Path, default=DEFAULT_CONFIG)
+    parser.add_argument('--openems-set', action='append', default=[], metavar='KEY=VALUE')
+    parser.add_argument('--yes', action='store_true', help='Accept resolved settings without a prompt')
+    parser.add_argument('--no-fields', action='store_true', help='Explicitly disable passive E/H output')
     parser.add_argument('--fields-mhz', type=float, nargs='+', help='1–3 passive E/H frequencies; same single Run')
     parser.add_argument('--prepare-only', action='store_true', help='Write native XML without running FDTD')
     add_frequency_arguments(parser)
@@ -275,17 +293,24 @@ def main(argv=None):
             if args.frequencies_mhz is None:
                 args.frequencies_mhz = [1300., 1420., 1500.]
             band = frequency_arguments_hz(args)
-        # Validate the unchanged excitation-band rule before creating output/native objects.
-        settings, _ = gerber_quality_settings(args.quality, **band)
-        from antenna_lab.solvers.pcb_fields import validate_field_frequencies
-        fields = validate_field_frequencies(tuple(f*1e6 for f in args.fields_mhz or ()), settings)
-        field_options = {"field_frequency_hz": fields} if fields else {}
+        from antenna_lab.solvers.profiles import parse_override
+        from .profile_cli import approve_profile
+        overrides = dict(parse_override(v) for v in args.openems_set)
+        profile = approve_profile(dict(name=args.quality, config_path=args.openems_config,
+            experiment=band, cli_overrides=overrides,
+            field_frequency_hz=None if args.fields_mhz is None else tuple(f*1e6 for f in args.fields_mhz),
+            no_fields=args.no_fields), yes=args.yes, prepare_only=args.prepare_only)
+        if profile is None:
+            print('Cancelled before native preparation/FDTD.'); return 0
+        # Run-specific edits to the array supersede the original regular sweep.
+        if sweep_options and tuple(profile.settings.result_frequency_hz) != tuple(band['result_frequency_hz']):
+            sweep_options = {}
         output = args.output
         if output is None:
             root = Path('outcomes/pcb_gerber')
             root.mkdir(parents=True, exist_ok=True)
             output = Path(mkdtemp(prefix=datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ_'), dir=root))
-        result = run_gerber_control(args.config, output, prepare_only=args.prepare_only, quality=args.quality, geometry_resolution_um=args.geometry_resolution_um, **sweep_options, pcb_config=args.pcb_config, **field_options, **band)
+        result = run_gerber_control(args.config, output, prepare_only=args.prepare_only, quality=profile.name, geometry_resolution_um=args.geometry_resolution_um, **sweep_options, pcb_config=args.pcb_config, resolved_profile=profile)
         print(f"Status: {result['status']}; validation_status: unverified\n{output.resolve()/'summary.json'}")
         if not args.prepare_only:
             print(output.resolve()/'impedance.csv')

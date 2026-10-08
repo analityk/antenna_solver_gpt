@@ -1,0 +1,146 @@
+# Numeryka openEMS; nie dokładność CAD ani parametry fizyczne laminatu.
+# Zmiana tego pliku zmienia przyszłe przebiegi. Edycja E w CLI dotyczy tylko jednego.
+schema_version = 1
+default_profile = "design"
+
+[interaction]
+confirm_before_fdtd = true
+noninteractive_requires_yes = true
+
+[profiles.preview]
+# Więcej komórek poprawia rozdzielczość, zwiększając pamięć i pracę FDTD.
+cells_per_wavelength = 10.0
+min_substrate_cells_z = 2
+min_port_gap_cells = 2
+min_port_width_cells = 2
+# Ograniczenia wzrostu są niezależne od geometry-resolution-um.
+growth_ratio_target = 1.4
+growth_ratio_limit = 1.5
+max_cells = 20000000
+# Od struktury do STARTU PML, względem najniższej częstotliwości wynikowej.
+air_padding_wavelengths = 0.10
+# Kolejność: x_min, x_max, y_min, y_max, z_min, z_max.
+# Dozwolone: PML, MUR, PEC, PMC. PML rozwija się do PML_N.
+boundary_conditions = ["PML", "PML", "PML", "PML", "PML", "PML"]
+pml_cells = 6
+# Mniejszy EndCriteria wymaga większego zaniku energii. Nie gwarantuje zbieżności.
+end_criteria = 1e-3
+# NrTS to awaryjny sufit, NIE definicja jakości ani żądany czas pracy.
+max_timesteps = 1000000000
+# Fizyczny czas propagacji [s], NIE czas zegarowy; 0 = nie ustawiaj MaxTime.
+max_time_s = 0.0
+# Próby czasowe i sondy: nadpróbkowanie Nyquista (nie gęstość sweep).
+oversampling = 4
+# 0 = AUTO. Jawny krok wymaga metody 1 oraz kontroli CFL ukończonej siatki.
+time_step_s = 0.0
+# >0..1: redukcja kroku; mniejsze = więcej iteracji.
+time_step_factor = 1.0
+# 1 = CFL, 3 = Rennings, domyślne openEMS.
+time_step_method = 3
+# 0 = automatyczny wybór liczby wątków.
+num_threads = 0
+engine = "fastest"
+verbose = 0
+# false wyłącza statystyki, zatem zakończenie nie może być potwierdzone.
+dump_statistics = true
+# true wymaga --no-fields (inaczej sprzeczne żądanie zapisu E/H).
+disable_dumps = false
+# Pasywne DFT E/H w tym samym solve; dodatkowy koszt I/O, bez kolejnego Run.
+fields_default = true
+field_frequency_policy = "center"
+# Prezentacja fazorów; nie zmienia FDTD.
+report_phase_step_deg = 15
+# Zachowuje dotychczasową opcję kontroli zakończenia dla verify.
+exact_endcriteria = false
+
+[profiles.design]
+# Więcej komórek poprawia rozdzielczość, zwiększając pamięć i pracę FDTD.
+cells_per_wavelength = 15.0
+min_substrate_cells_z = 3
+min_port_gap_cells = 2
+min_port_width_cells = 2
+# Ograniczenia wzrostu są niezależne od geometry-resolution-um.
+growth_ratio_target = 1.4
+growth_ratio_limit = 1.5
+max_cells = 20000000
+# Od struktury do STARTU PML, względem najniższej częstotliwości wynikowej.
+air_padding_wavelengths = 0.15
+# Kolejność: x_min, x_max, y_min, y_max, z_min, z_max.
+# Dozwolone: PML, MUR, PEC, PMC. PML rozwija się do PML_N.
+boundary_conditions = ["PML", "PML", "PML", "PML", "PML", "PML"]
+pml_cells = 6
+# Mniejszy EndCriteria wymaga większego zaniku energii. Nie gwarantuje zbieżności.
+end_criteria = 1e-4
+# NrTS to awaryjny sufit, NIE definicja jakości ani żądany czas pracy.
+max_timesteps = 1000000000
+# Fizyczny czas propagacji [s], NIE czas zegarowy; 0 = nie ustawiaj MaxTime.
+max_time_s = 0.0
+# Próby czasowe i sondy: nadpróbkowanie Nyquista (nie gęstość sweep).
+oversampling = 4
+# 0 = AUTO. Jawny krok wymaga metody 1 oraz kontroli CFL ukończonej siatki.
+time_step_s = 0.0
+# >0..1: redukcja kroku; mniejsze = więcej iteracji.
+time_step_factor = 1.0
+# 1 = CFL, 3 = Rennings, domyślne openEMS.
+time_step_method = 3
+# 0 = automatyczny wybór liczby wątków.
+num_threads = 0
+engine = "fastest"
+verbose = 0
+# false wyłącza statystyki, zatem zakończenie nie może być potwierdzone.
+dump_statistics = true
+# true wymaga --no-fields (inaczej sprzeczne żądanie zapisu E/H).
+disable_dumps = false
+# Pasywne DFT E/H w tym samym solve; dodatkowy koszt I/O, bez kolejnego Run.
+fields_default = true
+field_frequency_policy = "center"
+# Prezentacja fazorów; nie zmienia FDTD.
+report_phase_step_deg = 15
+# Zachowuje dotychczasową opcję kontroli zakończenia dla verify.
+exact_endcriteria = false
+
+[profiles.verify]
+# Więcej komórek poprawia rozdzielczość, zwiększając pamięć i pracę FDTD.
+cells_per_wavelength = 20.0
+min_substrate_cells_z = 4
+min_port_gap_cells = 4
+min_port_width_cells = 4
+# Ograniczenia wzrostu są niezależne od geometry-resolution-um.
+growth_ratio_target = 1.4
+growth_ratio_limit = 1.5
+max_cells = 20000000
+# Od struktury do STARTU PML, względem najniższej częstotliwości wynikowej.
+air_padding_wavelengths = 0.25
+# Kolejność: x_min, x_max, y_min, y_max, z_min, z_max.
+# Dozwolone: PML, MUR, PEC, PMC. PML rozwija się do PML_N.
+boundary_conditions = ["PML", "PML", "PML", "PML", "PML", "PML"]
+pml_cells = 8
+# Mniejszy EndCriteria wymaga większego zaniku energii. Nie gwarantuje zbieżności.
+end_criteria = 1e-5
+# NrTS to awaryjny sufit, NIE definicja jakości ani żądany czas pracy.
+max_timesteps = 1000000000
+# Fizyczny czas propagacji [s], NIE czas zegarowy; 0 = nie ustawiaj MaxTime.
+max_time_s = 0.0
+# Próby czasowe i sondy: nadpróbkowanie Nyquista (nie gęstość sweep).
+oversampling = 4
+# 0 = AUTO. Jawny krok wymaga metody 1 oraz kontroli CFL ukończonej siatki.
+time_step_s = 0.0
+# >0..1: redukcja kroku; mniejsze = więcej iteracji.
+time_step_factor = 1.0
+# 1 = CFL, 3 = Rennings, domyślne openEMS.
+time_step_method = 3
+# 0 = automatyczny wybór liczby wątków.
+num_threads = 0
+engine = "fastest"
+verbose = 0
+# false wyłącza statystyki, zatem zakończenie nie może być potwierdzone.
+dump_statistics = true
+# true wymaga --no-fields (inaczej sprzeczne żądanie zapisu E/H).
+disable_dumps = false
+# Pasywne DFT E/H w tym samym solve; dodatkowy koszt I/O, bez kolejnego Run.
+fields_default = true
+field_frequency_policy = "center"
+# Prezentacja fazorów; nie zmienia FDTD.
+report_phase_step_deg = 15
+# Zachowuje dotychczasową opcję kontroli zakończenia dla verify.
+exact_endcriteria = true

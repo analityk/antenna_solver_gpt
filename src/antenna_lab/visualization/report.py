@@ -312,6 +312,8 @@ def _pcb_metadata(data):
           ('Źródło założeń',imported.get('physical_config_source','legacy PCB config')),
           ('Parametry fizyczne',imported.get('physical_config',imported.get('resolved_config','not recorded')))]
     body=table(['Przebieg PCB','Wartość'],rows)
+    if s.get('openems_profile'):
+        body += '<h3>Rozwiązany profil openEMS</h3><pre>'+escape(json.dumps(s['openems_profile'], ensure_ascii=False, indent=2))+'</pre>'
     resolution = s.get('geometry_resolution', imported.get('geometry_resolution'))
     if resolution:
         from antenna_lab.pcb.grid import PcbGrid
@@ -386,6 +388,8 @@ def render_html(data, *, plots_path=None, phase_step=None, field_components=None
     if image_path.exists():
         geometry = '<section class="panel"><details><summary>Geometria zapisana w przebiegu</summary><img alt="Zapisany rysunek geometrii anteny" src="data:image/png;base64,' + base64.b64encode(image_path.read_bytes()).decode() + '"></details></section>'
     if pcb:
+        if phase_step is None:
+            phase_step = data['summary'].get('report_phase_step_deg', 30)
         geometry = _pcb_geometry(data, plots_path)
         from .pcb_stackup import stackup_section
         from .pcb_drills import drill_section

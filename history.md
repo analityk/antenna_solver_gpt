@@ -1584,3 +1584,15 @@ połączeniach padów/regionów: wewnętrzna obwiednia rozdziela połączony pol
 Nie wyłączono kontroli topologii, nie podniesiono budżetów ani nie zmieniono
 niepowiązanych oczekiwań testów. Test1, nowe serpentyny/łuki i komponenty PASS;
 cały adapter wymaga dalszej pracy przed uznaniem wydania za w pełni zgodne.
+
+
+## PCB-013A — zewnętrzne profile openEMS (checkpoint)
+
+Przeniesiono profile Gerber do komentowanego TOML; NrTS=1e9 jako wspólny sufit.
+Dodano walidowany runtime, MaxTime, kontrolę jawnego CFL, BC, natywne opcje Run,
+Y/N/E i nadpisania tylko bieżącego przebiegu, bez input w API. Pola domyślnie
+center, fazy raportu15°, jawne opt-out. Zapis profilu/SHA256/nadpisań w summary
+oraz raport offline. Nie zmieniono geometrii, meshera PCB-012G, parametrów
+fizycznych ani diagnostyk syntetycznych. Przy wyłączeniu statystyk zakończenie
+pozostaje niepotwierdzone. Checkpoint publikowany przed pełnym unittest.
+Testy profilów używają wyłącznie atrap native; nie wykonano FDTD.

@@ -192,15 +192,18 @@ def install_pcb_lumped_port(engine, csx, geometry: PcbGeometry,
 def prepare_pcb_native_model(geometry: PcbGeometry, settings: PcbSimulationSettings, *, port_edge_mode='aligned', gerber_quality=None, copper_config=None):
     """Return engine, CSX, port, mesh, spec, metadata; no waveform, BC, XML or run."""
     domain_mesh = make_pcb_domain_mesh(geometry, settings, port_edge_mode=port_edge_mode, **({'gerber_quality': gerber_quality} if gerber_quality is not None else {}))
+    from .runtime import native_engine_settings
+    engine_options = native_engine_settings(settings, domain_mesh)
     from .openems import native_modules
     ems_module, csx_module = native_modules()
     csx = csx_module.ContinuousStructure()
-    engine = ems_module.openEMS(NrTS=settings.max_timesteps, EndCriteria=settings.end_criteria)
+    engine = ems_module.openEMS(**engine_options)
     engine.SetCSX(csx)
     geometry_metadata = install_pcb_geometry(csx, geometry, domain_mesh, settings, copper_config=copper_config, port_edge_mode=port_edge_mode, **({'gerber_quality': gerber_quality} if gerber_quality is not None else {}))
     port, spec, port_metadata = install_pcb_lumped_port(engine, csx, geometry, domain_mesh, settings, port_edge_mode=port_edge_mode, **({'gerber_quality': gerber_quality} if gerber_quality is not None else {}))
     metadata = {'geometry': geometry_metadata, 'port': port_metadata,
-                'engine': {'max_timesteps': settings.max_timesteps, 'end_criteria': settings.end_criteria}}
+                'engine': {'max_timesteps': settings.max_timesteps, 'end_criteria': settings.end_criteria,
+                           'native_constructor': engine_options}}
     return engine, csx, port, domain_mesh, spec, metadata
 
 
@@ -214,14 +217,17 @@ def configure_pcb_fdtd(engine, csx, domain_mesh: PcbDomainMesh,
         raise ConfigurationError("PCB FDTD: pml_cells musi być zgodne z domeną i należeć do zakresu 6–20.")
     engine.SetGaussExcite(settings.excitation_center_hz, settings.excitation_cutoff_hz)
     _audit_port_grid(csx, domain_mesh, context='after SetGaussExcite')
-    boundaries = [f'PML_{count}'] * 6
+    from .runtime import native_boundaries
+    boundaries = list(native_boundaries(settings))
     engine.SetBoundaryCond(list(boundaries))
     _audit_port_grid(csx, domain_mesh, context='after SetBoundaryCond')
     return {'excitation': {'type': 'gaussian', 'center_hz': settings.excitation_center_hz,
                            'cutoff_hz': settings.excitation_cutoff_hz,
                            'mesh_design_frequency_hz': settings.excitation_center_hz+settings.excitation_cutoff_hz},
             'boundary_conditions': {'order': ['x_min','x_max','y_min','y_max','z_min','z_max'],
-                                    'values': boundaries, 'pml_cells': count}}
+                                    'values': boundaries, 'pml_cells': count,
+                                    'active_pml_faces': [b.startswith('PML_') for b in boundaries],
+                                    'non_pml_extension': 'unchanged mesh extension is ordinary space; boundary is at outer face'}}
 
 
 def write_pcb_xml(engine, csx, domain_mesh: PcbDomainMesh, xml_path) -> dict:
@@ -269,7 +275,14 @@ def run_pcb_fdtd(engine, csx, port, domain_mesh: PcbDomainMesh,
         raise ConfigurationError(f'PCB Run: wymagany istniejący, niepusty {xml}; przygotuj XML najpierw.')
     if not isinstance(exact_endcriteria, bool) or not isinstance(dump_statistics, bool):
         raise ConfigurationError('PCB Run: exact_endcriteria/dump_statistics muszą być bool.')
-    options = {}
+    from .runtime import native_run_options, runtime_preflight
+    runtime_preflight(settings, domain_mesh)
+    options = native_run_options(settings)
+    if settings.runtime:
+        exact_endcriteria = settings.runtime.exact_endcriteria
+        dump_statistics = settings.runtime.dump_statistics
+        if settings.runtime.disable_dumps and field_frequency_hz:
+            raise ConfigurationError('disable_dumps conflicts with requested field output.')
     if exact_endcriteria: options['exact_endcriteria'] = True
     if dump_statistics:
         options['dump_statistics'] = True
@@ -285,6 +298,8 @@ def run_pcb_fdtd(engine, csx, port, domain_mesh: PcbDomainMesh,
     statistics = None
     if dump_statistics:
         statistics = read_pcb_native_statistics(native_dir/'openEMS_stats.txt')
+        if settings.runtime and settings.runtime.max_time_s and statistics['total_numerical_time_s'] + statistics['fdtd_timestep_s'] >= settings.runtime.max_time_s:
+            raise ConfigurationError('PCB: temporal termination not established; physical MaxTime reached.')
         if statistics['number_of_iterations'] >= settings.max_timesteps:
             raise ConfigurationError('PCB: temporal termination not established; iterations >= max_timesteps.')
     frequencies = np.asarray(settings.result_frequency_hz, dtype=float)
@@ -345,7 +360,8 @@ def run_pcb_fdtd(engine, csx, port, domain_mesh: PcbDomainMesh,
         result['field_port_reference'] = field_reference
     if statistics is not None:
         result['native_statistics'] = statistics
-        result['run_options'] = dict(exact_endcriteria=exact_endcriteria, dump_statistics=dump_statistics)
+    if statistics is not None or settings.runtime is not None:
+        result['run_options'] = dict(options, numThreads=settings.threads)
     return result
 
 

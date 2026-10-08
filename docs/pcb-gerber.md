@@ -185,9 +185,9 @@ Domyślny profil to `design`; komendy syntetyczne i diagnostyczne nie zmieniają
 
 | Profil | Komórki/falę | Laminat Z | Port gap/width | Padding | PML | EndCriteria | Limit kroków | exact_endcriteria |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| preview | 10 | 2 | 2/2 | 0,10 | 6 | 1e-3 | 50000 | false |
-| design | 15 | 3 | 2/2 | 0,15 | 6 | 1e-4 | 75000 | false |
-| verify | 20 | 4 | 4/4 | 0,25 | 8 | 1e-5 | 120000 | true |
+| preview | 10 | 2 | 2/2 | 0,10 | 6 | 1e-3 | 1000000000 | false |
+| design | 15 | 3 | 2/2 | 0,15 | 6 | 1e-4 | 1000000000 | false |
+| verify | 20 | 4 | 4/4 | 0,25 | 8 | 1e-5 | 1000000000 | true |
 
 To profile numeryczne, nie certyfikaty dokładności. Miedź CSXCAD, wymiary
 portu, laminat i żądane częstotliwości pozostają identyczne.
@@ -960,3 +960,62 @@ przekroczono. Budżety impulsu 50000/75000 są nadal przekroczone; nie zmieniono
 profili ani czasu zakończenia. Przyrost kosztu wynika z zachowania cech miedzi
 i gradingu, nie globalnej kraty geometrii. Liczby wcześniejszych sekcji opisują
 poprzednie polityki meshera i nie są oczekiwaniem dla PCB-012F.
+
+
+## PCB-013A: jawne profile openEMS i zatwierdzanie przebiegu
+
+Źródłem domyślnych preview/design/verify jest `parameters/openems_profiles.toml`.
+Plik zawiera wszystkie kontrolowane parametry mesh/domain/BC/czasu/runtime oraz
+komentarze. Zmiana pliku zmienia przyszłe przebiegi; `--openems-config PATH`
+wybiera inny plik. Rozdzielczość geometrii CAD pozostaje osobną opcją.
+
+NrTS (`max_timesteps`) to sufit bezpieczeństwa, nie czas obliczeń ani definicja
+preview. Domyślnie każdy profil ma 1 miliard kroków. EndCriteria określa zanik
+energii. MaxTime jest fizycznym czasem propagacji, nie czasem zegarowym; 0
+wyłącza jego jawne ustawienie. Przy MaxTime pokazujemy przybliżone df=1/MaxTime,
+nie obietnicę fizycznej dokładności widma. Limit krótszy niż impuls jest błędem.
+
+Przed importem i meshingiem CLI pokazuje rozwiązany profil oraz pyta Y/N/E.
+N kończy bez native. E pozwala zmieniać nazwy wypisanych parametrów (SI, np.
+`excitation_center_hz`, `result_frequency_hz`, `loss_reference_frequency_hz`);
+tablice podaje się jako `[1.5e9, 2e9, 2.5e9]`. Puste pole nazwy kończy edycję,
+potem następuje walidacja i kolejne pytanie. Plik TOML nie jest nadpisywany.
+`--openems-set key=value` można powtarzać. Pierwszeństwo: TOML, argumenty
+częstotliwości eksperymentu, openems-set, edycja E. Zmiana center aktualizuje
+domyślną częstotliwość pól; jawne częstotliwości/loss reference pozostają jawne.
+
+Automatyzacja wymaga `--yes`; bez TTY program nie czeka na input.
+`--prepare-only` pokazuje profil, ale nie pyta o zgodę. API Pythona nie pyta.
+Przykład CMD (uruchomienie FDTD dopiero po własnym Y):
+
+```bat
+.\.venv\Scripts\python.exe -m antenna_lab.pcb.gerber_control ^
+  gerbs\realpcb_microstrip\test1.zip --quality preview ^
+  --center-mhz 2000 --cutoff-mhz 1900 ^
+  --sweep-start-mhz 1500 --sweep-stop-mhz 2500 --sweep-step-mhz 10
+```
+
+Pola domyślnie są ON na center, bez drugiego solve. `--fields-mhz` wybiera inne
+częstotliwości, `--no-fields` jawnie wyłącza zapis. `disable_dumps=true` wymaga
+braku żądanych pól. Raport odtwarza fazory co 15°, bez ponownego FDTD;
+`report --phase-step 30` nadal nadpisuje prezentację. `summary.json` przechowuje
+profil, ścieżkę/SHA256 TOML, rozwiązane parametry, nadpisania i sposób zgody;
+raport pokazuje ten zapis offline.
+
+AUTO TimeStep nie przekazuje argumentu TimeStep. Jawny krok wymaga CFL
+(method=1) i nie może przekroczyć konserwatywnego limitu CFL ukończonej siatki
+pomnożonego przez factor. Rennings (3) działa automatycznie; factor >0..1.
+Nie zmieniamy siatki dla mieszanego BC: nieaktywne pasy PML są zwykłą przestrzenią,
+a PEC/PMC/MUR leżą na zewnętrznej granicy. Metadane wskazują aktywne ściany PML.
+Zmienia to fizykę brzegów tylko po jawnej zmianie użytkownika.
+
+Statystyki domyślnie ON; przy OFF wynik ma `finished_unverified` oraz
+`not_established_statistics_disabled`, nie potwierdzone zakończenie. Osiągnięcie
+NrTS lub włączenie limitu MaxTime kończącego przed zanikiem jest wykrywane
+przed CalcPort, jeżeli są statystyki. Profile nie są certyfikatem zbieżności.
+
+API sprawdzono w dokumentacji openEMS 0.37.0-rc3 i przypiętym źródle:
+https://docs.openems.de/en/latest/python/openEMS/openEMS.html
+https://github.com/thliebig/openEMS/blob/67d378488ee40de815eed00f8aaa808f0a9e3c6d/python/openEMS/openEMS.pyx
+Syntetyczne komendy diagnostyczne zachowują dotychczasowe ustawienia; runtime
+jest opcjonalnym, walidowanym obiektem w PcbSimulationSettings.

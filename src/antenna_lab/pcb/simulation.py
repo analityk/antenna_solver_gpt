@@ -6,6 +6,7 @@ from math import isfinite
 from pathlib import Path
 
 from antenna_lab.core.config import ConfigurationError, validate_schema
+from antenna_lab.solvers.runtime import OpenEMSRuntime, validate_runtime
 
 
 @dataclass(frozen=True)
@@ -28,6 +29,8 @@ class PcbSimulationSettings:
     threads: int
     air_padding_wavelengths: float
     pml_cells: int
+    # None preserves the independent legacy/synthetic diagnostic API.
+    runtime: OpenEMSRuntime | None = None
 
 
 def validate_pcb_simulation_config(value: dict) -> dict:
@@ -91,4 +94,6 @@ def validate_pcb_simulation_settings(settings: PcbSimulationSettings) -> PcbSimu
         'domain': {'air_padding_wavelengths': settings.air_padding_wavelengths,
                    'pml_cells': settings.pml_cells},
     })
+    if settings.runtime is not None:
+        validate_runtime(settings.runtime)
     return settings
