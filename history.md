@@ -1780,3 +1780,23 @@ katalogu wynikowego. Stare katalogi timestamp/random pozostają nietknięte.
 **Sprawdzenie:** dodano test dla kolejnych numerów, pomijania już zajętego
 wyższego numeru i bezpiecznego slugowania nazwy wejścia. Nie uruchamiano FDTD.
 
+
+
+## PCB-015B — idealne PTH do masy w FAST (2026-10-08)
+
+Zastąpiono ogólną odmowę wierceń fizyczną klasyfikacją PTH. Promień kontaktu
+jest istniejącym promieniem solid-equivalent; test odległości korzysta z końcowej
+miedzi z otworami. Obsługujemy dokładnie jeden top i pełny udowodniony bottom.
+Cały polygon top trafia do ground, bez usuwania go z zapisanej geometrii.
+Ekstrakcja przyjmuje jawną listę sygnałowych ID; source/RLC mapują sprawdzony
+kontakt masowy do ground. Zwarcie źródła, oba końce RLC na masie, NPTH,
+niejednoznaczne/nieobsługiwane warstwy i niepoprawne promienie kończą się odmową.
+Indukcyjność i straty PTH oraz rozłożona impedancja polygonu masy są pominięte
+jawnie. Metadata/summary/konsola zachowują klasyfikację także przy coupling_required.
+
+Testy celowane: 31/31 PASS (14 nowych + 17 dotychczasowych reduced).
+Syntetyczny U: 3 sekcje, 30 mm osi, 2 PTH, 2 polygony masy, 1 overlap;
+osiąga coupling_required, bez CSV impedancji. To nie wynik rzeczywistej serpentyny.
+`gerbs/realpcb_microstrip/test_spirala.zip` nie jest dostępny w checkout.
+Publikacja checkpointu przed jedynym pełnym unittest; wynik suite będzie dopisany.
+Bez native FDTD, zmian full-wave, źródeł Gerber i stagingu niepowiązanych plików.

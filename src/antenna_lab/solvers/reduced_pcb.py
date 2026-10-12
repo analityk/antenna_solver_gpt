@@ -83,7 +83,7 @@ def _strip(section):
     return box(*low,*high)
 
 
-def extract_trace_sections(geometry):
+def extract_trace_sections(geometry, *, active_top_conductor_ids=None):
     """Recover rectilinear strips from compact_features, proving copper coverage.
 
     No raster skeleton or best-guess route. Only long physical width pairs are
@@ -91,16 +91,23 @@ def extract_trace_sections(geometry):
     same-owner rectangular bend. Their reconstructed footprints must cover the
     complete supplied copper without creating metal. Branches/ambiguity fail.
     A U/meander may extract successfully but solving requires coupling support.
+    active_top_conductor_ids explicitly selects signal owners. Grounded copper
+    remains in the supplied geometry and in physical contact/provenance audits;
+    it is never temporarily removed or represented by zero-length lines.
     """
+    top_ids={c.id for c in geometry.top_copper}
+    active_ids=top_ids if active_top_conductor_ids is None else set(active_top_conductor_ids)
+    if not active_ids.issubset(top_ids):
+        raise ConfigurationError('Reduced extraction: unknown active top conductor ID.')
     # Reject unsupported curves before the more expensive cross-section scan.
     _,curved=copper_features(geometry)
-    if any(r['layer_role']=='top' for r in curved):
+    if any(r['layer_role']=='top' and r['copper_id'] in active_ids for r in curved):
         raise ConfigurationError('Reduced extraction: curved/oblique top copper unsupported; no guessed centerline.')
     features,_,_,_=compact_features(geometry)
-    shapes={c.id:copper_shape(c) for c in geometry.top_copper}
+    shapes={c.id:copper_shape(c) for c in geometry.top_copper if c.id in active_ids}
     candidates=[]
     for f in features:
-        if f['layer_role']!='top' or f['kind']!='copper':continue
+        if f['layer_role']!='top' or f['kind']!='copper' or f['owners'][0] not in active_ids:continue
         transverse='xy'.index(f['axis']);axis=1-transverse
         lo,hi=f['modeled_boundaries_m'];mid=(lo+hi)/2;w=hi-lo
         for start,stop in f['spans_m']:
@@ -204,10 +211,49 @@ def detect_coupled_sections(sections):
     return rows
 
 
+def _classify_ground_vias(geometry, bottom_ground):
+    """Classify already validated through PTHs after the bottom-ground proof.
+
+    Contact is the exact point-to-final-polygon distance <= modeled solid via
+    radius, as in pcb.drills.connected_layers. Includes holes, no tessellated
+    disk or extra distance threshold. Layer labels are evidence, not ownership.
+    This FAST-only promotion treats the entire contacted top region as an
+    equipotential ground; it does not claim a physical zero-inductance barrel.
+    """
+    ground_ids=set();records=[]
+    shapes=[(c,copper_shape(c)) for c in geometry.copper]
+    for drill in sorted(geometry.drills,key=lambda d:d.id):
+        if drill.plated is not True:
+            raise ConfigurationError(f'Reduced v1: {drill.id}: NPTH unsupported; ground/active topology not approximated.')
+        radius=drill.equivalent_outer_radius_m
+        if (isinstance(radius,bool) or not isinstance(radius,(int,float))
+                or not isfinite(radius) or radius<=0):
+            raise ConfigurationError(f'Reduced ground via {drill.id}: positive finite equivalent outer radius required.')
+        point=Point(drill.x_m,drill.y_m)
+        contacts=[c for c,shape in shapes if point.distance(shape)<=radius]
+        top=[c for c in contacts if c.layer_role=='top']
+        bottom=[c for c in contacts if c.layer_role=='bottom']
+        if any(c.layer_role not in ('top','bottom') for c in contacts):
+            raise ConfigurationError(f'Reduced ground via {drill.id}: inner-layer contacts unsupported.')
+        if len(bottom)!=1 or bottom[0].id!=bottom_ground.id:
+            raise ConfigurationError(f'Reduced ground via {drill.id}: no physical contact with proven bottom ground.')
+        if len(top)!=1:
+            raise ConfigurationError(f'Reduced ground via {drill.id}: ambiguous/unresolved top ownership; '
+                                     f'expected exactly one conductor, found {[c.id for c in top]}.')
+        ground_ids.add(top[0].id)
+        records.append(dict(id=drill.id,centre_xy_m=[drill.x_m,drill.y_m],
+            drill_diameter_m=drill.drill_diameter_m,equivalent_outer_radius_m=radius,
+            contacted_top_conductor=top[0].id,contacted_bottom_conductor=bottom[0].id,
+            connected_layer_roles=list(drill.connected_layer_roles),
+            physical_contact_method='distance_to_final_copper_polygon <= equivalent_outer_radius_m',
+            treatment='ideal_ground_connection',network_node='ground',
+            source_file_role=drill.source_file_role,source_tool=drill.source_tool,
+            source_file_sha256=drill.source_file_sha256))
+    return frozenset(ground_ids),records
+
+
 def build_reduced_model(geometry):
     validate_pcb_geometry(geometry)
-    if geometry.drills:
-        raise ConfigurationError('Reduced v1: drills/via paths unsupported (not silently omitted).')
     if len(geometry.dielectrics)!=1 or {c.layer_role for c in geometry.copper}!={'top','bottom'}:
         raise ConfigurationError('Reduced v1 requires top microstrip, one homogeneous dielectric, continuous bottom ground.')
     board=Polygon(geometry.outline.vertices_xy_m)
@@ -219,7 +265,13 @@ def build_reduced_model(geometry):
     for i,c in enumerate(geometry.top_copper):
         if any(copper_shape(c).intersects(copper_shape(other)) for other in geometry.top_copper[:i]):
             raise ConfigurationError('Reduced v1: touching/overlapping separate top conductor records.')
-    sections,features=extract_trace_sections(geometry)
+    grounded_ids,ground_vias=_classify_ground_vias(geometry,ground[0])
+    # Detect a source short even if grounding leaves no active trace to extract.
+    if all(any(c.id in grounded_ids and _contains_copper(p,c) for c in geometry.top_copper)
+           for p in (geometry.port.negative_xy_m,geometry.port.positive_xy_m)):
+        raise ConfigurationError('Reduced source: both terminals shorted to ground through PTH connections.')
+    active_ids={c.id for c in geometry.top_copper}-grounded_ids
+    sections,features=extract_trace_sections(geometry,active_top_conductor_ids=active_ids)
     if not sections:raise ConfigurationError('Reduced v1: no resolvable trace sections.')
     substrate=geometry.dielectrics[0];h=substrate.z_max_m-substrate.z_min_m
     coords=sorted({p for s in sections for p in (s.start_xy_m,s.stop_xy_m)})
@@ -231,6 +283,7 @@ def build_reduced_model(geometry):
     def terminal(p,label):
         owners=[c for c in geometry.top_copper if _contains_copper(p,c)]
         if len(owners)!=1:raise ConfigurationError(f'{label}: ambiguous terminal ownership.')
+        if owners[0].id in grounded_ids:return 'ground'
         matches=[q for q in coords if hypot(q[0]-p[0],q[1]-p[1])<=TOLERANCE_M and
                  any(s.owner==owners[0].id and q in (s.start_xy_m,s.stop_xy_m) for s in sections)]
         if len(matches)!=1:raise ConfigurationError(f'{label}: terminal must coincide with one physical trace centerline end/junction; no guessed lead length.')
@@ -244,12 +297,17 @@ def build_reduced_model(geometry):
             raise ConfigurationError(f'{label}: collapsed contact gap.')
         audit_physical_feed(replace(geometry,port=PcbPort(label,a,b,width)))
         na,nb=terminal(a,label),terminal(b,label)
+        if na == nb == 'ground':
+            raise ConfigurationError(f'{label}: both terminals map to ground; shorted/irrelevant element rejected.')
         axis=0 if abs(a[1]-b[1])<=TOLERANCE_M else 1;t=1-axis
         if abs(a[t]-b[t])>TOLERANCE_M:
             raise ConfigurationError(f'{label}: nonorthogonal contact.')
         mid=(a[t]+b[t])/2;lo,hi=sorted((a[axis],b[axis]));half=width/2
         def xy(u,v):return (u,v) if axis==0 else (v,u)
         surface=Polygon([xy(lo,mid-half),xy(hi,mid-half),xy(hi,mid+half),xy(lo,mid+half)])
+        for drill in geometry.drills:
+            if Point(drill.x_m,drill.y_m).distance(surface)<=drill.equivalent_outer_radius_m:
+                raise ConfigurationError(f'{label}: ground via {drill.id} intersects contact/gap surface.')
         for other_label,other in contact_surfaces:
             if surface.intersection(other).area>TOLERANCE_M**2:
                 raise ConfigurationError(f'{label}: contact overlaps source/component {other_label}.')
@@ -269,6 +327,9 @@ def build_reduced_model(geometry):
         unsupported_status='coupling_required' if coupled else None,
         ground_reference=dict(status='passed',id=ground[0].id,z_m=ground[0].z_m,
             treatment='ideal common reference; finite board edge fields omitted'),
+        ground_connected_top_conductors=sorted(grounded_ids),ground_vias=ground_vias,
+        active_top_signal_conductors=sorted(active_ids),
+        ground_connection_approximation='whole contacted top conductor is ideal equipotential ground; via inductance/barrel loss and distributed ground-conductor impedance omitted',
         substrate_height_m=h,epsilon_r=substrate.epsilon_r,
         material_provenance=dict(loss_tangent=substrate.loss_tangent,
                                  copper_layers=[asdict(c) for c in geometry.copper_layers]),
@@ -276,7 +337,8 @@ def build_reduced_model(geometry):
         physical_features=features,coupled_sections=coupled,lumped_components=components,
         source_port_nodes=list(source),source_port_id=geometry.port.id,
         total_centerline_length_m=sum(s.length_m for s in sections),
-        width_classes_m=sorted({s.width_m for s in sections}),omitted_effects=list(OMITTED_EFFECTS),
+        width_classes_m=sorted({s.width_m for s in sections}),omitted_effects=list(OMITTED_EFFECTS)+(
+            ['via_inductance','via_barrel_loss','ground_connected_top_conductor_distributed_impedance'] if ground_vias else []),
         loss_model='lossless_lines; ideal_RLC_resistance_only',
         approximation_contract='quasi-static isolated microstrip, ideal bend junctions; no full-wave accuracy claim')
 

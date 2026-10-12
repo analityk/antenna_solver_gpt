@@ -44,9 +44,38 @@ nie dostanie udawanego CSV z liniami niesprzężonymi. Najbliższa brakująca cz
 to model macierzy C/C0 lub modalny sprzężonego przekroju oraz stamp wieloportu.
 
 Odrzucamy także: łuki/skosy, niejednoznaczne krótkie pady, rozgałęzione paski,
-nieudowodnione przejścia szerokości, wiercenia/vias, inner copper, różne
+nieudowodnione przejścia szerokości, nieobsługiwane wiercenia/vias (poniżej), inner copper, różne
 materiały w stackupie, ground slots, niepoprawne/singularne sieci. Trzy i więcej
 równoległych odcinków również nie są obsługiwane. Nie ma fallback do FDTD.
+
+## PCB-015B: idealne połączenia PTH do masy
+
+Obsługiwany PTH ma dodatni skończony promień `equivalent_outer_radius_m`,
+kontaktuje dokładnie jeden polygon top oraz wcześniej udowodnioną pełną
+płaszczyznę bottom. Kontakt oznacza odległość środka od końcowej miedzi
+(z uwzględnieniem otworów) nie większą niż ten promień. Nazwy warstw w
+metadanych nie zastępują kontroli geometrii.
+
+Cały dotknięty polygon top staje się idealnym ekwipotencjalnym węzłem `ground`.
+To świadoma aproksymacja FAST: pomijamy indukcyjność/straty przelotki i rozłożoną
+impedancję tego polygonu. Nie deklarujemy fizycznie zerowej indukcyjności.
+Polygon pozostaje w geometrii; jawna lista aktywnych ID wyłącza go jedynie
+z ekstrakcji linii. Terminal źródła/R/L/C na nim trafia do `ground`; terminal
+sygnałowy nadal musi odpowiadać rzeczywistemu końcowi/złączu osi ścieżki.
+Kontrola pełnej powierzchni kontaktu i pustej szczeliny pozostaje obowiązkowa.
+
+Odrzucamy wszystkie NPTH, brak kontaktu bottom, niejednoznaczny kontakt top,
+inner copper, wadliwe promienie i niebezpieczne kontakty. Dwa terminale źródła
+na masie oznaczają zwarcie; komponent z oboma terminalami na masie jest jawnie
+odrzucany. Przelotka nie może przecinać prostokąta kontaktu komponentu/źródła.
+
+`reduced_model.json` i `summary.json` zapisują `ground_vias`,
+`ground_connected_top_conductors`, osobny `ground_reference` oraz pominięte
+`via_inductance` i `via_barrel_loss`. Każdy PTH ma ID, środek, średnicę, promień,
+ID kontaktowanej miedzi top/bottom i `treatment=ideal_ground_connection`.
+Konsola podaje liczby przelotek i polygonów masy także przed odmową sprzężeń.
+Ograniczenie `coupling_required` nadal zatrzymuje solve bez `impedance.csv`.
+Nie zmienia się model przelotek full-wave ani siatka FDTD.
 
 ## Metoda i interpretacja wyników
 

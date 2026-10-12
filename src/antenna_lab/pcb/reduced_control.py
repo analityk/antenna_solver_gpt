@@ -63,11 +63,22 @@ def run_reduced(input_path, output_dir, *, pcb_config=None, geometry_resolution_
         model.update(geometry_resolution_um=geometry_resolution_um,provenance=provenance,
                      frequency_hz=list(result_frequency_hz),reference_impedance_ohm=reference_impedance_ohm)
         _json(output/'reduced_model.json',model)
+        # Keep classification/graph diagnostics even when the next physics guard
+        # rejects coupling; no impedance is emitted for that incomplete model.
+        summary.update(ground_vias=model['ground_vias'],
+            ground_connected_top_conductors=model['ground_connected_top_conductors'],
+            ground_reference=model['ground_reference'],
+            omitted_effects=model['omitted_effects'],unsupported_status=model['unsupported_status'],
+            extracted_section_count=len(model['line_sections']),
+            total_centerline_length_m=model['total_centerline_length_m'],
+            parallel_overlap_count=len(model['coupled_sections']))
         print(f"Model: reduced_quasi_tem (approximate, lossless TL)\n"
               f"Sections: {len(model['line_sections'])}; length: {model['total_centerline_length_m']*1e3:.2f} mm\n"
               f"Width classes [mm]: {[round(w*1e3,6) for w in model['width_classes_m']]}\n"
               f"Parallel overlaps: {len(model['coupled_sections'])}; "
               f"length: {sum(c['overlap_length_m'] for c in model['coupled_sections'])*1e3:.2f} mm\n"
+              f"Ground vias: {len(model['ground_vias'])}\n"
+              f"Ground-connected top conductors: {len(model['ground_connected_top_conductors'])}\n"
               f"Ideal components: {len(model['lumped_components'])}; frequencies: {len(result_frequency_hz)}\n"
               f"Omitted effects: {', '.join(model['omitted_effects'])}",flush=True)
         rows=solve_reduced_model(model,result_frequency_hz,reference_impedance_ohm)
