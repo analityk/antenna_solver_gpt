@@ -1800,3 +1800,18 @@ osiąga coupling_required, bez CSV impedancji. To nie wynik rzeczywistej serpent
 `gerbs/realpcb_microstrip/test_spirala.zip` nie jest dostępny w checkout.
 Publikacja checkpointu przed jedynym pełnym unittest; wynik suite będzie dopisany.
 Bez native FDTD, zmian full-wave, źródeł Gerber i stagingu niepowiązanych plików.
+
+PCB-015B — końcowa weryfikacja i publikacja (2026-10-12):
+- Checkpoint a3fccaf1e5dec5f09bae11a85e8653e77b6c0733 potwierdzony na
+  origin/main przed pełnym unittest. Zachowano nowsze zmiany PCB-016A/B
+  z 0c382361cb1720fc1087c7798c0be7210785fe6d, bez ich nadpisywania.
+- Pełną suite uruchomiono RAZ: 431 testów, 3 failures, 27 errors, 3 skipped.
+  Nowe 14 testów ground-via i dotychczasowe 17 reduced przeszły.
+- 27 errors: istniejące odmowy PCB copper fidelity (utrata topologii obwiedni
+  komórek). Failures: nazwa inna_pytka_001 zamiast inna_plytka_001 (PCB-016B),
+  thin-stackup oczekujący późniejszego preflight oraz stary oczekiwany rozmiar
+  emtest3 60×49×35 zamiast 271×278×35. Nie zmieniano niepowiązanego kodu/testów.
+- PCB-015B PASS w zakresie FAST ideal-ground; cała suite FAIL z powyższych
+  niezależnych powodów. Następne ograniczenie fizyczne: sprzężenie par linii.
+  Brak test_spirala.zip; podane 3 sekcje/30 mm/2 PTH/2 masy/1 overlap są
+  wyłącznie kontrolą syntetyczną. Nie wykonano żadnego native FDTD.
