@@ -59,7 +59,7 @@ def materialize_quantized_geometry(value: QuantizedPcbGeometry) -> PcbGeometry:
                      if value.source_port else None),
     )
     # Non-spatial route facts come from the detached snapshot, coordinates only
-    # from tick records. Re-audit against projected final copper, no repair.
+    # from tick records. Reuse physical topology proof; no footprint equality.
     source_routes={r['id']:r for r in source.get('routes',())}
     result.routes=tuple(replace(PcbRoute(**source_routes[r.id]),
         start_xy_m=point(r.start),stop_xy_m=point(r.stop),width_m=metre(r.width),
@@ -67,9 +67,21 @@ def materialize_quantized_geometry(value: QuantizedPcbGeometry) -> PcbGeometry:
         footprint_xy_m=ring(r.footprint),footprint_holes_xy_m=tuple(ring(h) for h in r.holes),
         candidate_conductor_ids=tuple(source_routes[r.id]['candidate_conductor_ids'])) for r in value.routes)
     result.route_provenance_available=source.get('route_provenance_available',False)
-    from .routes import audit_routes
-    result.routes=audit_routes(result.routes,result.copper)
+    from .routes import (audit_projected_routes, source_records,
+                         tick_audit_fingerprint, projection_fingerprint)
     validate_pcb_geometry(result)
+    if result.routes:
+        # Only quantize_pcb_geometry issues this receipt, after _audit/finish.
+        # A stale receipt disables FAST; full-wave physical geometry is unchanged.
+        proven=(bool(value.topology_audit_sha256) and
+                value.topology_audit_sha256==tick_audit_fingerprint(value))
+        evidence=dict(routes=source['routes'],copper=source['copper'])
+        source_routes,_=source_records(evidence)
+        result.routes=audit_projected_routes(result.routes,result.copper,source_routes)
+        result.route_projection=dict(source=evidence,quantum_nm=value.grid.quantum_nm,
+            physical_topology_audit='passed' if proven else 'missing_or_stale',
+            survival_basis='source composition + physical topology audit + modeled centerline ownership')
+        result.route_projection['geometry_sha256']=projection_fingerprint(result)
     return result
 
 

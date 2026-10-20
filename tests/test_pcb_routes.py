@@ -135,4 +135,121 @@ class RouteTests(unittest.TestCase):
             self.assertEqual(g.routes[0].source_sha256,sha256((root/'board.GTL').read_bytes()).hexdigest())
 
 
+def projection_case(quantum):
+    """Same physical edge, independently tessellated evidence before projection.
+
+    The extra collinear footprint vertex rounds to a stair-step outside the
+    projected outer edge. There is no physical hole, width loss or new owner.
+    """
+    from antenna_lab.pcb.model import CopperPolygon, PcbRoute
+    g=geometry('X-5000000Y0D02*\nX-1000000Y0D01*\n'+LINE+
+        '%ADD11R,0.2X0.2*%\nD11*\nX-1000000Y0D03*\nX1000000Y0D03*\n')
+    y0=.0001+.4*quantum;y1=.0001+.6*quantum
+    outer=((.0009,-.0001),(.0051,-.0001),(.0051,y1),(.0009,y0))
+    middle=(.003,(y0+y1)/2)
+    footprint=outer[:3]+(middle,)+outer[3:]
+    right=next(c for c in g.copper if c.vertices_xy_m[0][0]>0)
+    replacement=CopperPolygon(right.id,outer,0,'top')
+    g.copper=[replacement if c.id==right.id else c for c in g.copper]
+    r=next(r for r in g.routes if r.conductor_id==right.id)
+    r=replace(r,start_xy_m=(.001,0),stop_xy_m=(.005,0),
+              footprint_xy_m=footprint,footprint_holes_xy_m=())
+    g.routes=audit_routes(tuple(r if v.id==r.id else v for v in g.routes),g.copper,initial=True)
+    return g,r.id
+
+
+class ProjectedRouteTests(unittest.TestCase):
+    def test_independent_tessellations_do_not_define_physical_survival(self):
+        from antenna_lab.pcb.routes import route_footprint
+        from antenna_lab.pcb.regions import copper_shape
+        for quantum_nm in (10000,1000):
+            with self.subTest(quantum_nm=quantum_nm):
+                grid=PcbGrid(quantum_nm);g,rid=projection_case(grid.quantum_m)
+                before=g.as_dict()
+                modeled,ticks,audit=apply_geometry_resolution(g,grid)
+                self.assertEqual(audit['topology_status'],'PASS')
+                route=next(r for r in modeled.routes if r.id==rid)
+                owner=next(c for c in modeled.copper if c.id==route.conductor_id)
+                self.assertGreater(route_footprint(route).difference(copper_shape(owner)).area,0)
+                self.assertEqual(route.source_status,'verified')
+                self.assertEqual(route.status,'verified')
+                self.assertTrue(ticks.topology_audit_sha256)
+                self.assertEqual(len(extract_trace_sections(modeled)[0]),2)
+                self.assertEqual(g.as_dict(),before)
+                json.dumps(modeled.as_dict(),allow_nan=False)
+
+    def test_arc_survival_precedes_explicit_unsupported_guard(self):
+        body=('X-5000000Y0D02*\nX-1000000Y0D01*\n'+LINE+
+              'G75*\nG03X6000000Y1000000I0J1000000D01*\n'+
+              '%ADD11R,0.2X0.2*%\nD11*\nX-1000000Y0D03*\nX1000000Y0D03*\n')
+        for nm in (10000,1000):
+            with self.subTest(quantum_nm=nm):
+                modeled,_,_=apply_geometry_resolution(geometry(body),PcbGrid(nm))
+                arc=next(r for r in modeled.routes if r.kind=='Arc')
+                self.assertEqual(arc.status,'verified')
+                with self.assertRaisesRegex(ConfigurationError,'source route Arc unsupported'):
+                    extract_trace_sections(modeled)
+
+    def test_semantic_survival_rejects_real_changes(self):
+        from antenna_lab.pcb.routes import audit_projected_routes
+        from antenna_lab.pcb.model import CopperPolygon
+        g,rid=projection_case(1e-5)
+        r=next(r for r in g.routes if r.id==rid)
+        owner=next(c for c in g.copper if c.id==r.conductor_id)
+        cases=[
+            ('removed_by_projection',r,[]),
+            ('ambiguous_conductor',r,[owner,replace(owner,id='duplicate')]),
+            ('ownership_changed',r,[replace(owner,id='changed')]),
+            ('collapsed_axis',replace(r,stop_xy_m=r.start_xy_m),[owner]),
+            ('collapsed_width',replace(r,width_m=0),[owner]),
+            ('centerline_not_preserved',replace(r,stop_xy_m=(.006,0)),[owner]),
+            ('centerline_not_preserved',replace(r,start_xy_m=(.0008,0)),[owner]),
+        ]
+        for status,route,copper in cases:
+            with self.subTest(status=status,route=route.start_xy_m):
+                actual=audit_projected_routes((route,),copper,(r,))[0]
+                self.assertEqual(actual.status,status)
+                self.assertIsNone(actual.conductor_id)
+
+    def test_partial_clear_proof_cannot_be_upgraded_by_projection(self):
+        from antenna_lab.pcb.routes import audit_projected_routes
+        g=geometry(LINE+'%LPC*%\n%ADD11C,0.1*%\nD11*\nX3000000Y90000D03*\n')
+        # Even a restored modeled polygon cannot manufacture source evidence.
+        intact=geometry(LINE)
+        result=audit_projected_routes(g.routes,intact.copper,g.routes)
+        self.assertEqual(result[0].status,'stroke_not_preserved')
+        g.routes=result;g.copper=intact.copper
+        with self.assertRaisesRegex(ConfigurationError,'original=stroke_not_preserved'):
+            extract_trace_sections(g)
+
+    def test_physical_topology_failure_still_aborts(self):
+        from antenna_lab.pcb.quantization import QuantizationError
+        g,_=projection_case(1e-5)
+        # A real narrow physical hole collapses, irrespective of route status.
+        c=g.copper[0]
+        x=-.003
+        hole=((x-1e-6,-1e-6),(x+1e-6,-1e-6),(x+1e-6,1e-6),(x-1e-6,1e-6))
+        g.copper[0]=replace(c,holes_xy_m=(hole,))
+        with self.assertRaises(QuantizationError):apply_geometry_resolution(g,PcbGrid())
+
+    def test_stale_receipt_cannot_authorize_changed_geometry(self):
+        g,_=projection_case(1e-5)
+        modeled,ticks,_=apply_geometry_resolution(g,PcbGrid())
+        modeled.copper[0]=replace(modeled.copper[0],id='changed')
+        with self.assertRaisesRegex(ConfigurationError,'stale physical quantization audit'):
+            extract_trace_sections(modeled)
+        from antenna_lab.pcb.geometry_resolution import materialize_quantized_geometry
+        route=ticks.routes[0]
+        changed=replace(ticks,routes=(replace(route,width=route.width+1),)+ticks.routes[1:])
+        modeled=materialize_quantized_geometry(changed)
+        with self.assertRaisesRegex(ConfigurationError,'stale physical quantization audit'):
+            extract_trace_sections(modeled)
+
+    def test_synthetic_legacy_extraction_unchanged(self):
+        from test_pcb_reduced import case
+        g=case();before=g.as_dict()
+        self.assertEqual(len(extract_trace_sections(g)[0]),2)
+        self.assertEqual(before,g.as_dict())
+
+
 if __name__=='__main__':unittest.main()

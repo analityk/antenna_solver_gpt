@@ -10,14 +10,23 @@ from math import hypot
 from shapely import union_all
 from shapely.geometry import LineString, Point, Polygon
 from antenna_lab.core.config import ConfigurationError
-from antenna_lab.pcb.routes import audit_routes, route_footprint
+from antenna_lab.pcb.routes import (audit_routes, route_footprint, audit_projected_routes,
+                                    projection_fingerprint, source_records)
 from antenna_lab.pcb.regions import copper_shape
 from antenna_lab.pcb.validation import TOLERANCE_M
 
 
 def extract_source_routes(geometry, active_ids, section_type):
     shapes={c.id:copper_shape(c) for c in geometry.top_copper if c.id in active_ids}
-    audited=audit_routes(geometry.routes,geometry.copper)
+    receipt=getattr(geometry,'route_projection',None)
+    if receipt is not None:
+        if (receipt['physical_topology_audit']!='passed' or
+                receipt['geometry_sha256']!=projection_fingerprint(geometry)):
+            raise ConfigurationError('Reduced source route: missing/stale physical quantization audit; no polygon fallback.')
+        source_routes,source_copper=source_records(receipt['source'])
+        audited=audit_projected_routes(geometry.routes,geometry.copper,source_routes)
+    else:
+        audited=audit_routes(geometry.routes,geometry.copper)
     selected=[]
     for r in audited:
         if r.layer_role!='top' or not r.polarity_dark:continue
@@ -39,6 +48,15 @@ def extract_source_routes(geometry, active_ids, section_type):
         if not shapes[r.conductor_id].buffer(TOLERANCE_M).covers(LineString((r.start_xy_m,r.stop_xy_m))):
             raise ConfigurationError(f'Reduced source route {label}: modeled centerline leaves final copper.')
         selected.append(r)
+    if receipt is not None:
+        # Pad/region coverage and nonlocal stroke contacts are source-image
+        # questions. Prove them there, then use the existing physical topology
+        # receipt plus the modeled route-axis checks. Never compare two
+        # independently projected tessellations as physical copper images.
+        from types import SimpleNamespace
+        source=SimpleNamespace(routes=source_routes,copper=source_copper,
+            top_copper=[c for c in source_copper if c.layer_role=='top'])
+        extract_source_routes(source,active_ids,section_type)
     sections=[]; footprints={}; evidence=[]
     # Duplicate/reversed overdraw is provenance, not a parallel electrical path.
     groups={}
@@ -74,7 +92,7 @@ def extract_source_routes(geometry, active_ids, section_type):
                                              'overlapping/interior junction unsupported; no guessed graph.')
                 allowed=union_all([Point(p).buffer(max(a.width_m,b.width_m)) for p in common])
                 extra=footprints[a.id].intersection(footprints[b.id]).difference(allowed)
-                if extra.area>TOLERANCE_M*shape.length:
+                if receipt is None and extra.area>TOLERANCE_M*shape.length:
                     raise ConfigurationError(f'Reduced source routes {a.feature_ids}/{b.feature_ids}: '
                                              'nonlocal physical stroke contact unsupported.')
         pending=set(degree);todo=[min(pending)]
@@ -89,6 +107,6 @@ def extract_source_routes(geometry, active_ids, section_type):
                                      'unresolved pad/region/route junction, no guessed lead.')
         covered=union_all([footprints[s.id] for s in own])
         local=union_all([Point(p).buffer(s.width_m) for s in own for p in (s.start_xy_m,s.stop_xy_m)])
-        if shape.difference(covered).difference(local).area>TOLERANCE_M*shape.length:
+        if receipt is None and shape.difference(covered).difference(local).area>TOLERANCE_M*shape.length:
             raise ConfigurationError(f'Reduced source route {owner}: nonlocal pad/region copper not represented by strokes.')
     return tuple(sections),evidence

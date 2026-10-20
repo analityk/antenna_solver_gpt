@@ -6,6 +6,7 @@ XY maximum includes Euclidean point motion and absolute dimension changes.
 Layer thicknesses are rounded independently and interfaces accumulated in ticks.
 Circles use integer radius and derived diameter=2*radius, never a half-tick radius.
 """
+from dataclasses import replace
 from decimal import Decimal
 import json
 from math import hypot
@@ -153,7 +154,11 @@ def quantize_pcb_geometry(geometry, grid=PcbGrid()):
     result=QuantizedPcbGeometry(grid,geometry.model,outline,copper,tuple(dielectrics),layers,port,
         tuple(drills),tuple(components),source,tuple(geometry.assumptions),source_json,routes)
     _audit(geometry,result,p)
-    return result,p.finish()
+    audit=p.finish()  # raises before any receipt can be issued
+    if result.routes:
+        from .routes import tick_audit_fingerprint
+        result=replace(result,topology_audit_sha256=tick_audit_fingerprint(result))
+    return result,audit
 
 
 def _parts(shape):

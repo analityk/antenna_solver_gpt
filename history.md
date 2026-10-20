@@ -1933,3 +1933,25 @@ PCB-015C0 — końcowa ograniczona weryfikacja:
   skośnych kończą się precyzyjną odmową. Pairwise coupled physics nadal otwarte.
   Stan rzeczywistej serpentyny wymaga jednego lokalnego reduced run; bez
   deklaracji jej PASS/Z/S11 na podstawie samych testów kontraktu.
+
+
+## 2026-10-21 — PCB-015C0.1, checkpoint semantycznego route survival
+
+Przyczyna: niezależnie skwantyzowane contoury footprint/final copper mogły
+odrzucać poprawnie przypisany source stroke. Rozdzielono dowód kompozycji
+źródłowej od audytu osi po projekcji. Sukces istniejącego physical topology
+audit jest związany z wejściem/wynikiem skrótem; stale receipt zatrzymuje FAST.
+Source partial-clear, zmiana ownera, multiple ownership, zapadnięcie i wyjście
+osi nadal blokują użycie. Arc pozostaje bez modelu TL i ma jawny guard.
+
+Źródłowe pads/regions i pozalokalne kontakty stroke kontrolowane są w obrazie
+źródłowym, nie przez false equality dwóch zaokrąglonych tessellations.
+Analogia PCB-012G dotyczy rozdziału fizycznej prawdy i reprezentacji, bez
+przenoszenia thirds/subcell do FAST. Brak nowych tolerancji, zmian miedzi,
+full-wave, meshera, PML, PTH lub profili. Detached metadata dodaje receipt
+projekcji i źródłowy materiał dowodowy; legacy synthetics pozostają bez niego.
+
+Dodano małe testy kontraktu w test_pcb_routes.py. W chwili checkpointu testy
+nieuruchomione — publikacja przed testem zgodnie z instrukcją. Nie posiadamy
+lokalnego test_spirala.zip; spodziewany kolejny guard Arc nie jest potwierdzonym
+wynikiem tego realnego pliku. Pełna suite i native FDTD nie są planowane.

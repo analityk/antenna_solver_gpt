@@ -137,3 +137,25 @@ RLC, PTH i setback pozostaje w mocy. Sprzężenia par nie są zaimplementowane.
 
 Checkpoint C0 nie jest potwierdzeniem wyniku realnego test_spirala.zip;
 ten plik nie jest dostępny agentowi. Pełną weryfikację wykonuje użytkownik.
+
+
+### PCB-015C0.1 — przetrwanie źródłowej trasy po projekcji
+
+Source footprint jest dowodem ordered dark/clear/restore przed projekcją,
+a nie drugą fizyczną miedzią. Po geometry-resolution autorytatywne są finalne
+CopperPolygon i istniejący audyt topology/connectivity z `quantization._audit`.
+Jego sukces jest związany skrótem z wejściem i wynikiem projekcji; FAST odrzuca
+brakujący albo nieaktualny dowód po późniejszej zmianie geometrii.
+
+Route zachowuje użyteczność tylko przy źródłowym, jednoznacznym ownership,
+niezapadniętej osi/szerokości i osi (łącznie z końcami) we właściwym finalnym
+conductorze. Nie wymagamy containment niezależnie skwantyzowanego footprintu.
+Kontrola pads/regions i pozalokalnych kontaktów stroke korzysta z obrazu
+źródłowego; kontrola grafu osi działa również na wyniku projekcji. Arc jest
+sprawdzany geometrycznie z dotychczasową aproksymacją Gerbonary, ale nadal
+kończy FAST jawnym `source route Arc unsupported`, bez modelu TL łuku.
+
+To lekcja architektoniczna PCB-012G: fizycznej prawdy nie zastępuje zgodność
+dwóch wtórnych reprezentacji numerycznych. **Nie** przenosi to reguły 1/3–2/3
+z mesha FDTD do FAST i nie dodaje tolerancji q ani q/2. Full-wave, mesh,
+PML i geometria miedzi pozostają niezmienione.

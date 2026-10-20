@@ -179,6 +179,9 @@ class PcbGeometry:
     source_port: PcbSourceProvenance | None = None
     routes: tuple[PcbRoute, ...] = ()
     route_provenance_available: bool = False
+    # Detached source evidence + receipt of the existing physical topology audit.
+    # FAST rejects stale receipts; this never changes physical/native geometry.
+    route_projection: dict | None = None
 
     @property
     def dielectrics(self):

@@ -180,6 +180,7 @@ class QuantizedPcbGeometry:
     assumptions: tuple[str, ...]
     source_json: str
     routes: tuple[TickRoute, ...] = ()
+    topology_audit_sha256: str = ""
 
     @property
     def provenance(self):
