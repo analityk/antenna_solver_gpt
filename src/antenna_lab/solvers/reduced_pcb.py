@@ -99,10 +99,13 @@ def extract_trace_sections(geometry, *, active_top_conductor_ids=None):
     active_ids=top_ids if active_top_conductor_ids is None else set(active_top_conductor_ids)
     if not active_ids.issubset(top_ids):
         raise ConfigurationError('Reduced extraction: unknown active top conductor ID.')
-    # Reject unsupported curves before the more expensive cross-section scan.
+    # Curved Gerber boundaries are common even for rectilinear routed traces
+    # (round aperture joins/caps).  Do not reject the whole conductor merely
+    # because its polygonization contains oblique edges.  Long physical width
+    # pairs still define the straight centreline sections; later coverage checks
+    # allow only width-scale residual copper local to proven ends/junctions.
     _,curved=copper_features(geometry)
-    if any(r['layer_role']=='top' and r['copper_id'] in active_ids for r in curved):
-        raise ConfigurationError('Reduced extraction: curved/oblique top copper unsupported; no guessed centerline.')
+    curved_ids={r['copper_id'] for r in curved if r['layer_role']=='top' and r['copper_id'] in active_ids}
     features,_,_,_=compact_features(geometry)
     shapes={c.id:copper_shape(c) for c in geometry.top_copper if c.id in active_ids}
     candidates=[]
@@ -144,7 +147,14 @@ def extract_trace_sections(geometry, *, active_top_conductor_ids=None):
                 raise ConfigurationError('Reduced extraction: unequal-width orthogonal junction is ambiguous.')
             half=a.width_m/2
             corner=box(point[0]-half,point[1]-half,point[0]+half,point[1]+half)
-            if corner.difference(shapes[a.owner]).area > TOLERANCE_M*corner.length:
+            if a.owner in curved_ids:
+                # A round-aperture 90-degree join does not contain the full
+                # square corner used by rectilinear copper.  Prove a full-width
+                # conductive neighbourhood at the centreline junction instead.
+                junction=Point(point).buffer(max(half-TOLERANCE_M,half*.99))
+                if junction.difference(shapes[a.owner]).area > TOLERANCE_M*junction.length:
+                    raise ConfigurationError('Reduced extraction: curved/oblique copper does not prove orthogonal junction.')
+            elif corner.difference(shapes[a.owner]).area > TOLERANCE_M*corner.length:
                 raise ConfigurationError('Reduced extraction: copper does not prove orthogonal junction.')
             cuts[i].add(point);cuts[j].add(point);bends.append((a.owner,corner))
     # Remove original end-of-pair cuts inside the bend, keeping only centerline
@@ -154,9 +164,32 @@ def extract_trace_sections(geometry, *, active_top_conductor_ids=None):
         ordered=sorted(points,key=lambda p:p[s.axis]);a,b=ordered[0],ordered[-1]
         extended.append(LineSection('',s.owner,a,b,s.width_m,s.feature_ids))
     for owner,shape in shapes.items():
-        pieces=[_strip(s) for s in extended if s.owner==owner]+[p for o,p in bends if o==owner]
-        if not pieces or not _same_shape(union_all(pieces),shape):
-            raise ConfigurationError(f'Reduced extraction: {owner} has unresolved pad/branch/width geometry; full copper coverage not proven.')
+        owner_sections=[s for s in extended if s.owner==owner]
+        pieces=[_strip(s) for s in owner_sections]
+        if owner not in curved_ids:
+            pieces += [p for o,p in bends if o==owner]
+            if not pieces or not _same_shape(union_all(pieces),shape):
+                raise ConfigurationError(f'Reduced extraction: {owner} has unresolved pad/branch/width geometry; full copper coverage not proven.')
+            continue
+        if not pieces:
+            raise ConfigurationError(f'Reduced extraction: curved/oblique top copper {owner} has no resolvable straight sections.')
+        core=union_all(pieces)
+        if core.difference(shape).area > TOLERANCE_M*core.length:
+            raise ConfigurationError(f'Reduced extraction: curved/oblique top copper {owner} does not contain the extracted strip core.')
+        # Accept only local round/chamfered Gerber residue around proven
+        # centreline ends/junctions.  This models those small regions as ideal
+        # junction/end parasitics already declared omitted by the FAST contract.
+        node_width={}
+        for s in owner_sections:
+            for p in (s.start_xy_m,s.stop_xy_m):
+                node_width[p]=max(node_width.get(p,0.),s.width_m)
+        local_zones=[Point(p).buffer(w) for p,w in node_width.items()]
+        residual=shape.difference(core)
+        allowed=union_all(local_zones) if local_zones else Polygon()
+        if residual.difference(allowed).area > TOLERANCE_M*shape.length:
+            raise ConfigurationError(
+                f'Reduced extraction: curved/oblique top copper {owner} is nonlocal; '
+                'only width-scale bend/end residue around proven straight sections is supported.')
     # Split at all true centerline intersections, not raw CAD polygon vertices.
     points=[{s.start_xy_m,s.stop_xy_m} for s in extended]
     for i,a in enumerate(extended):
@@ -354,7 +387,7 @@ def build_reduced_model(geometry):
         width_classes_m=sorted({s.width_m for s in sections}),omitted_effects=list(OMITTED_EFFECTS)+(
             ['via_inductance','via_barrel_loss','ground_connected_top_conductor_distributed_impedance'] if ground_vias else []),
         loss_model='lossless_lines; ideal_RLC_resistance_only',
-        approximation_contract='quasi-static isolated microstrip, ideal bend junctions; no full-wave accuracy claim')
+        approximation_contract='quasi-static isolated microstrip; rectilinear centreline sections may retain only width-scale round/chamfered Gerber residue at proven bends/ends, modeled as ideal junction/end parasitics; no full-wave accuracy claim')
 
 
 def solve_network(nodes, lines, components, source, frequency_hz):
