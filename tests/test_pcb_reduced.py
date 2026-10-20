@@ -115,6 +115,22 @@ class ReducedTests(unittest.TestCase):
         g=case();g.copper[1]=replace(g.copper[1],vertices_xy_m=((.0005,-.0005),(.01,-.0005),(.012,.001),(.0005,.0005)))
         with self.assertRaisesRegex(ConfigurationError,'curved/oblique'):build_reduced_model(g)
 
+    def test_inset_ground_is_allowed_when_active_signal_is_fully_referenced(self):
+        g=case()
+        inset=box(-.015,-.015,.015,.015)
+        g.copper[-1]=replace(g.copper[-1],vertices_xy_m=tuple(inset.exterior.coords)[:-1])
+        model=build_reduced_model(g)
+        self.assertEqual(model['ground_reference']['status'],'passed')
+        self.assertLess(model['ground_reference']['board_area_coverage_fraction'],1)
+        self.assertIn('board-edge setback is allowed',model['ground_reference']['coverage_contract'])
+
+    def test_ground_setback_fails_if_active_signal_leaves_reference_plane(self):
+        g=case()
+        inset=box(-.005,-.015,.015,.015)
+        g.copper[-1]=replace(g.copper[-1],vertices_xy_m=tuple(inset.exterior.coords)[:-1])
+        with self.assertRaisesRegex(ConfigurationError,'active signal copper.*not fully above bottom ground'):
+            build_reduced_model(g)
+
     def test_parallel_runs_detected_not_silently_ignored(self):
         model=build_reduced_model(case('U'))
         self.assertEqual(len(model['coupled_sections']),1)
