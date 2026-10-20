@@ -1,7 +1,7 @@
 # TODO — PCB: aktualny stan i następne kroki
 
-Stan na 2026-10-08. Ten plik opisuje **faktyczny stan main** po PCB-015A oraz
-kolejność dalszej pracy. Nie oznacza, że pozycje otwarte zostały wykonane.
+Stan na 2026-10-20. Ten plik opisuje **faktyczny stan main** po PCB-015B/B1/B2
+oraz kolejność dalszej pracy. Nie oznacza, że pozycje otwarte zostały wykonane.
 
 ## Co jest już zrobione
 
@@ -62,58 +62,86 @@ Testy PCB-015A:
 
 W PCB-015A nie uruchamiano natywnego FDTD.
 
-## Faktyczny blocker lokalnej serpentyny
+## Faktyczny stan lokalnej serpentyny
 
-Lokalny plik użytkownika `test_spirala.zip` istnieje poza śledzonym stanem repo
-i został uruchomiony po PCB-015A. FAST zatrzymuje się obecnie na:
+Lokalny plik użytkownika `test_spirala.zip` istnieje poza śledzonym stanem repo.
+Po PCB-015B użytkownik uruchomił FAST na rzeczywistym ZIP-ie. Kolejne jawne
+blokery ujawniły dwa zbyt konserwatywne założenia oraz właściwy problem ekstrakcji.
 
-`Reduced v1: drills/via paths unsupported (not silently omitted).`
+PCB-015B jest **ukończone**: plated PTH top→udowodniony bottom ground może być
+traktowany w FAST jako idealne połączenie do `ground`, z jawnym pominięciem
+indukcyjności/strat via i rozłożonej impedancji topowego polygonu masowego.
+Signal vias, inner-layer vias, NPTH i kontakty niejednoznaczne nadal fail closed.
 
-To jest blanket guard wykonywany przed właściwą ekstrakcją reduced.
+PCB-015B1 dopuściło naturalny setback bottom ground od obrysu płytki. Rzeczywisty
+bottom `bottom:copper_0001` ma jeden polygon, zero holes, pole
+599,50695 mm² i bbox około 24,49×24,48 mm przy board 25×25 mm; różnica
+25,49305 mm² wynika z około 0,25–0,26 mm cofnięcia od krawędzi. FAST nie wymaga
+już `ground == board outline`; wymaga jednej ciągłej, hole-free referencji
+pokrywającej całą aktywną miedź sygnałową i powierzchnie kontaktów source/RLC.
 
-Z zapisanego lokalnie `geometry.json` ustalono dwa PTH:
+PCB-015B2 przestało odrzucać cały conductor tylko dlatego, że Gerberowa
+polygonizacja prostoliniowej trasy zawiera lokalne round/chamfered joins.
+Dopuszczone są wyłącznie width-scale resztki przy udowodnionych końcach/złączach;
+rzeczywiste nielokalne krzywe/skosy nadal fail closed. Użytkownik podał, że po
+tych zmianach lokalne testy reduced przechodzą.
 
-1. `Drill_PTH_Through.DRL:1`
-   - kontakt top: `top:copper_0002`
-   - kontakt bottom: `bottom:copper_0001`
-   - `connected_layer_roles = ['top', 'bottom']`
+Rzeczywisty run serpentyny zatrzymuje się obecnie na:
 
-2. `Drill_PTH_Through.DRL:2`
-   - kontakt top: `top:copper_0003`
-   - kontakt bottom: `bottom:copper_0001`
-   - `connected_layer_roles = ['top', 'bottom']`
+`Reduced extraction: curved/oblique top copper top:copper_0001 has no resolvable straight sections.`
 
-Oba dotykają tej samej ciągłej płaszczyzny bottom ground. To uzasadnia następny
-wąski krok: w modelu FAST traktować taki **udowodniony PTH top→continuous-ground**
-jako idealne połączenie do węzła `ground`, z jawnym pominięciem indukcyjności
-via i strat barrel. Nie wolno rozszerzyć tego automatycznie na signal vias,
-inner-layer vias, NPTH albo kontakty niejednoznaczne.
+Diagnostyka tego conductora:
+- pole 14,85795 mm²,
+- bbox (-3,79, -17,83) … (2,64, 0,43) mm,
+- 3088 wierzchołków,
+- 1085 krawędzi sklasyfikowanych jako oblique i 2003 orthogonal,
+- łączna długość krawędzi oblique około 52,257 mm,
+- przykładowa długa krawędź (-0,56,-0,43)→(-0,57,-2,29) mm ma tylko około
+  0,31° odchylenia od pionu.
 
-Nie ma jeszcze wyniku FAST Z/S11 dla serpentyny.
+To nie jest mały pad ani wyłącznie lokalny narożnik. Obecny FAST próbuje
+odtworzyć centerline z końcowego `CopperPolygon`, mimo że importer Gerbera
+wcześniej zna źródłowe `Line`/`Arc` i szerokość apertury. To jest aktualny
+blocker. Nie należy go obchodzić globalną tolerancją kąta ani dalszym
+rozluźnianiem polygon guardów.
+
+Nie ma jeszcze wyniku FAST Z/S11 dla realnej serpentyny.
 
 ## Priorytety
 
-### P0 — PCB-015B: ideal ground-connected PTH w reduced solverze
+### P0 — PCB-015C0: zachować route provenance z Gerbera
 
-Do zrobienia:
+Następny krok ma usunąć potrzebę zgadywania centerline z 3-tysięcznego polygonu.
 
-- najpierw udowodnić ciągły bottom ground,
-- fizycznie sklasyfikować plated PTH,
-- wspierać tylko PTH dotykający dokładnie jednego top conductor i udowodnionego
-  bottom ground,
-- cały taki top conductor mapować do sieciowego `ground`,
-- nie ekstrahować go jako zwykłej linii mikrostripowej,
-- terminal źródła/RLC na takim conductorze mapować do `ground`,
-- zapisać `ground_vias`, `ground_connected_top_conductors`,
-  `via_inductance` i `via_barrel_loss` jako jawne uproszczenia,
-- signal/inner/ambiguous vias nadal fail closed.
+Wymagania:
 
-Kryterium sukcesu na serpentynie: przejść **za** blanket-via rejection. Jeżeli
-kolejną barierą będzie `coupling_required`, PCB-015B jest sukcesem.
+- zachować z importu Gerbera źródłowe stroke/route provenance co najmniej dla
+  `Line` i `Arc`: geometria osi, szerokość apertury, warstwa i provenance źródła,
+- nie zastępować finalnego `CopperPolygon`; polygon pozostaje źródłem prawdy
+  dla fizycznego kontaktu, clear polarity, PTH, padów i ciągłości,
+- po końcowej kompozycji boolean przypisać route primitive do dokładnie jednego
+  finalnego conductora albo fail closed; clear/restore nie może pozostawić
+  niezweryfikowanego stroke jako aktywnej linii,
+- normalizacja i geometry resolution muszą objąć route provenance spójnie z
+  resztą geometrii; bez drugiego, niezależnego snappingu,
+- FAST ma budować odcinki z udowodnionych centerlines/provenance, a finalny
+  polygon ma potwierdzać istnienie i ciągłość przewodnika,
+- dowolny kąt prostego `Line` ma być obsługiwany bez wymogu `x1==x2` /
+  `y1==y2`; nie wprowadzać arbitralnej tolerancji kąta,
+- prawdziwe `Arc` może pozostać jawnie unsupported w pierwszym checkpointcie,
+  jeśli nie da się go poprawnie sprowadzić bez zgadywania; metadata musi jednak
+  zachować fakt istnienia łuku,
+- pady/flashe/regions nie mogą zostać fałszywie potraktowane jako linia TL,
+- zachować deterministyczność i strict JSON provenance.
+
+Kryterium sukcesu checkpointu: realna serpentyna ma przejść za obecny błąd
+`top:copper_0001 has no resolvable straight sections` albo zatrzymać się na
+nowym, bardziej fizycznym i jednoznacznym ograniczeniu źródłowego route
+provenance. Nie wolno produkować Z/S11 przez zgadywanie geometrii.
 
 ### P1 — PCB-015C: pairwise coupled microstrip
 
-To jest główny brak fizyki FAST dla serpentyny.
+Dopiero po poprawnym route extraction wrócić do głównego braku fizyki FAST.
 
 Wymagania:
 
@@ -198,7 +226,14 @@ Pozostaje do wykonania:
 6. Full-wave DESIGN/VERIFY pozostaje arbitrem dla finalistów i kalibracji FAST.
 7. Drogie FDTD tylko wtedy, gdy decyzji nie da się podjąć z modelu reduced,
    prepare-only albo istniejących wyników.
-8. PASS/PARTIAL/FAIL nie blokuje trwałego commita/pusha znaczącej pracy.
+8. Testy na lokalnym komputerze użytkownika są tanie; testy wykonywane przez
+   zdalnego agenta są kosztowne. Agent ma preferować analizę statyczną i mały,
+   bezpośrednio związany zestaw testów, a pełny unittest uruchamiać najwyżej raz
+   i tylko wtedy, gdy jest naprawdę potrzebny do decyzji.
+9. Znaczącą pracę commitować i publikować na origin/main przed drogim testem.
+   PASS/PARTIAL/FAIL, brak fixture użytkownika lub błąd integracyjny nie blokuje
+   checkpointu/pusha. Po nieudanym teście opublikować stan wraz z diagnozą,
+   zamiast pozostawiać pracę wyłącznie w środowisku agenta.
 
 ## Docelowy układ
 
@@ -218,4 +253,5 @@ VERIFY
   -> finaliści i kalibracja modelu FAST
 ```
 
-Najbliższy pojedynczy krok to **PCB-015B**, nie dalsze strojenie PML ani viewer.
+Najbliższy pojedynczy krok to **PCB-015C0: route provenance z Gerbera**,
+nie dalsze strojenie PML, viewer ani coupled-line solver przed poprawną ekstrakcją osi.
