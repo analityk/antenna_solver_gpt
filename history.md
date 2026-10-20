@@ -1913,3 +1913,23 @@ a Region jako GKO trafia w istniejące ograniczenie Gerbonara converted().
 Poprawiono wyłącznie fixtures: prostokątne flashed feed pads oraz kontur GKO
 z linii. Nie osłabiono audytów ani nie zmieniano parsera/solvera dla testu.
 Ta diagnoza i poprawka są publikowane przed ponownym testem tych dwóch metod.
+
+PCB-015C0 — końcowa ograniczona weryfikacja:
+- Implementacja opublikowana przed testami: 08480ae5ae33706cea4ce326a5f145defc44e804.
+- Poprawka fixtures/diagnoza opublikowana przed retestem:
+  48c779c66b3d5e513a26613d6c8ab1fca036af44.
+- Pierwsze uruchomienie test_pcb_routes: 8 testów, 6 PASS i 2 błędy fixtures
+  opisane wyżej. Ponowiono tylko dwie poprawione metody:
+  test_multilayer_folder_route_ids_and_hashes oraz
+  test_transform_and_shared_projection_preserve_detached_provenance — PASS.
+- Dodatkowo pojedyncza zmieniona regresja
+  test_pcb_reduced.ReducedTests.test_real_gerbonara_region_only_rejected_without_route_no_native
+  — PASS. Potwierdza jawny brak CSV i brak fallback dla region-only importu.
+- Łącznie sprawdzono 9 różnych metod, końcowo wszystkie zaliczone; nie
+  uruchomiono ponownie całego pliku ani pełnej suite. Nie uruchomiono native
+  openEMS/FDTD, benchmarków ani test_spirala.zip (plik wyłącznie u użytkownika).
+- Aktualne ograniczenia C0: aktywny Arc, brak dowodu stroke survival/ownership,
+  nierozwiązane połączenia osi/padów, oraz downstream analiza sprzężeń linii
+  skośnych kończą się precyzyjną odmową. Pairwise coupled physics nadal otwarte.
+  Stan rzeczywistej serpentyny wymaga jednego lokalnego reduced run; bez
+  deklaracji jej PASS/Z/S11 na podstawie samych testów kontraktu.
