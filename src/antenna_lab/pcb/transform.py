@@ -50,6 +50,11 @@ def _map_xy(geometry, point):
                      positive_xy_m=point(geometry.port.positive_xy_m)),
         drills=tuple(drill(d) for d in geometry.drills),
         components=tuple(component(c) for c in geometry.components),
+        routes=tuple(replace(r,start_xy_m=point(r.start_xy_m),stop_xy_m=point(r.stop_xy_m),
+            center_xy_m=point(r.center_xy_m) if r.center_xy_m is not None else None,
+            footprint_xy_m=tuple(point(p) for p in r.footprint_xy_m),
+            footprint_holes_xy_m=tuple(tuple(point(p) for p in ring) for ring in r.footprint_holes_xy_m))
+            for r in geometry.routes),
         source_port=(replace(geometry.source_port,
             pin1_xy_m=point(geometry.source_port.pin1_xy_m),
             pin2_xy_m=point(geometry.source_port.pin2_xy_m)) if geometry.source_port else None),

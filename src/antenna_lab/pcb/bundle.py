@@ -182,7 +182,9 @@ def load_bundle_geometry(directory, physical_path=None, *, physical_value=None, 
     selected,records=discover_bundle(directory, members=members)
     top=_read(selected['top_copper'],'top copper')
     counts={}
-    copper=_copper(top,counts);outline=_outline(_read(selected['outline'],'board outline'))
+    routes=[]
+    copper=_copper(top,counts,routes=routes,source_file=str(selected['top_copper']),
+        source_sha256=sha256(selected['top_copper'].read_bytes()).hexdigest());outline=_outline(_read(selected['outline'],'board outline'))
     components, source_port = (), None
     if component_sources is not None:
         from .components import load_components
@@ -208,7 +210,8 @@ def load_bundle_geometry(directory, physical_path=None, *, physical_value=None, 
         'geometric copper thickness / extra Z cells: none', 'copper roughness: omitted']
     geometry=PcbGeometry('pcb',outline,copper,Substrate(outline,-config.substrate_thickness_m,0.,
         config.substrate_epsilon_r,config.substrate_loss_tangent),port,assumptions,
-        copper_composition=(CopperImageStats('top',**counts),))
+        copper_composition=(CopperImageStats('top',**counts),),
+        routes=tuple(routes),route_provenance_available=True)
     geometry.components,geometry.source_port=components,source_port
     validate_pcb_geometry(geometry);audit_physical_feed(geometry)
     return config,geometry,dict(source_directory=str(Path(directory).resolve()),discovered_files=records,

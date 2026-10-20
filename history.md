@@ -1881,3 +1881,25 @@ uruchamiać najwyżej raz i tylko gdy jest potrzebny do decyzji. Każda znacząc
 implementacja ma zostać commitowana i wypchnięta do `origin/main` przed
 drogimi testami. PASS/PARTIAL/FAIL, brak lokalnego fixture albo błąd integracji
 nie mogą pozostawić znaczącej pracy wyłącznie w efemerycznym środowisku agenta.
+
+
+## 2026-10-20 — PCB-015C0: checkpoint route provenance dla FAST
+
+Zachowano źródłowe Line/Arc z Gerbonara w detached modelu: oś/apertura,
+warstwa/polarity, plik/SHA256/indeks oraz obrys stroke. Końcowa ordered boolean
+miedź wiąże stroke z pojedynczym conductorem albo zapisuje odmowę FAST.
+Normalizacja obejmuje wszystkie współrzędne route; projekcja korzysta z
+istniejącego PcbGrid/tick records, bez zmiany polygonów i polityki siatki EM.
+Po projekcji przetrwanie stroke jest audytowane ponownie. Clear/restore nie
+może aktywować nieudowodnionej TL; pełna geometria full-wave pozostaje źródłem
+prawdy i nie zależy od tego, czy route jest obsługiwany przez FAST.
+
+FAST preferuje provenance; Line dowolnego kąta ma długość z endpointów.
+Arc i dalsza analiza sprzężeń skośnych sekcji mają jawne guardy z source ID.
+Nie zgadujemy lead length/padów ani nowych junctions. Syntetyczny legacy path
+B2 i zasady masy B/B1 pozostają. Test region-only prawdziwego importu zmienia
+oczekiwanie na precyzyjną odmowę braku routes (bez sztucznego CSV).
+Dodano mały plik testów Line/Arc/clear/restore, źródeł, transformacji/projekcji
+oraz multilayer folder import. Stan przy publikacji: analiza statyczna,
+TESTÓW JESZCZE NIE URUCHOMIONO. Checkpoint przed weryfikacją zdalną.
+Nie uruchomiono pełnej suite, FDTD, benchmarków ani fixture test_spirala.zip.

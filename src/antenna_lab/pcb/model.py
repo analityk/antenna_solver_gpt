@@ -28,6 +28,35 @@ class CopperPolygon:
 
 
 @dataclass(frozen=True)
+class PcbRoute:
+    """Detached Gerber stroke, not additional physical metal or mesh anchors.
+
+    Axis/aperture and tessellated footprint share the PCB coordinate frame.
+    source_status proves survival after the original ordered boolean image;
+    status rechecks survival after projection. Neither replaces final copper.
+    """
+    id: str
+    kind: str
+    start_xy_m: tuple[float, float]
+    stop_xy_m: tuple[float, float]
+    width_m: float
+    center_xy_m: tuple[float, float] | None
+    clockwise: bool | None
+    layer_role: str
+    polarity_dark: bool
+    footprint_xy_m: tuple[tuple[float, float], ...]
+    footprint_holes_xy_m: tuple[tuple[tuple[float, float], ...], ...]
+    source_file: str
+    source_sha256: str
+    source_object_index: int
+    aperture_type: str = 'CircleAperture'
+    conductor_id: str | None = None
+    candidate_conductor_ids: tuple[str, ...] = ()
+    source_status: str = 'unverified'
+    status: str = 'unverified'
+
+
+@dataclass(frozen=True)
 class CopperImageStats:
     layer_role: str
     dark_primitive_count: int
@@ -148,6 +177,8 @@ class PcbGeometry:
     drills: tuple[PcbDrill, ...] = ()
     components: tuple[PcbLumpedComponent, ...] = ()
     source_port: PcbSourceProvenance | None = None
+    routes: tuple[PcbRoute, ...] = ()
+    route_provenance_available: bool = False
 
     @property
     def dielectrics(self):

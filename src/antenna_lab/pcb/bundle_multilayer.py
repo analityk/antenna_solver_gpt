@@ -91,10 +91,17 @@ def load_multilayer_bundle(directory, value, *, members=None, component_sources=
     hashes = {r['role']:r['sha256'] for r in records if r['role'] in roles}
     layers, dielectrics = resolve_stackup(value, outline, hashes)
     copper, top_file, composition = [], None, []
+    routes = []
     for layer in layers:
         parsed = _read(selected[layer.role], 'top copper' if layer.role == 'top' else layer.role+' copper')
         counts = {}
-        polygons = _copper(parsed, counts)
+        layer_routes = []
+        polygons = _copper(parsed, counts, routes=layer_routes,
+            source_file=str(selected[layer.role]),source_sha256=hashes[layer.role])
+        routes.extend(replace(r,id=layer.role+':'+r.id,layer_role=layer.role,
+            conductor_id=layer.role+':'+r.conductor_id if r.conductor_id else None,
+            candidate_conductor_ids=tuple(layer.role+':'+i for i in r.candidate_conductor_ids))
+            for r in layer_routes)
         composition.append(CopperImageStats(layer.role, **counts))  # Per-file boolean union; never across Z layers.
         copper.extend(replace(p, id=layer.role+':'+p.id, z_m=layer.z_m, layer_role=layer.role) for p in polygons)
         if layer.role == 'top': top_file = parsed
@@ -122,6 +129,7 @@ def load_multilayer_bundle(directory, value, *, members=None, component_sources=
         'absence of drill files does not establish physical completeness',
         'copper roughness: omitted', 'conducting-sheet thickness: material parameter; no geometric extrusion']
     geometry = PcbGeometry('pcb', outline, copper, substrate, port, assumptions, dielectrics, layers, tuple(composition))
+    geometry.routes, geometry.route_provenance_available = tuple(routes), True
     geometry.components, geometry.source_port = components, source_port
     if source_port: geometry.assumptions.append(IDEAL_NOTE)
     from .drills import load_drills

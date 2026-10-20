@@ -149,6 +149,18 @@ class TickSource:
 
 
 @dataclass(frozen=True)
+class TickRoute:
+    """Projected provenance only; never a mesh anchor or native primitive."""
+    id: str
+    start: XY
+    stop: XY
+    width: int
+    center: XY | None
+    footprint: Ring
+    holes: tuple[Ring, ...]
+
+
+@dataclass(frozen=True)
 class QuantizedPcbGeometry:
     """All authoritative spatial values are ticks; no native/export integration.
 
@@ -167,6 +179,7 @@ class QuantizedPcbGeometry:
     source_port: TickSource | None
     assumptions: tuple[str, ...]
     source_json: str
+    routes: tuple[TickRoute, ...] = ()
 
     @property
     def provenance(self):

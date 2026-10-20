@@ -109,7 +109,13 @@ Nie ma jeszcze wyniku FAST Z/S11 dla realnej serpentyny.
 
 ## Priorytety
 
-### P0 — PCB-015C0: zachować route provenance z Gerbera
+### P0 — PCB-015C0: zweryfikować source-route checkpoint
+
+Checkpoint implementuje detached Line/Arc, audyt ordered composition,
+normalizację/projekcję i preferencję source axes w FAST. Przy publikacji nie
+potwierdzono jeszcze realnej serpentyny. Aktualny krok to lokalna weryfikacja
+route-status/Arc/połączeń osi i kontaktów; nie luzowanie polygon guardów.
+Poniższy kontrakt pozostaje kryterium odbioru.
 
 Następny krok ma usunąć potrzebę zgadywania centerline z 3-tysięcznego polygonu.
 
@@ -253,5 +259,5 @@ VERIFY
   -> finaliści i kalibracja modelu FAST
 ```
 
-Najbliższy pojedynczy krok to **PCB-015C0: route provenance z Gerbera**,
+Najbliższy pojedynczy krok to **lokalna weryfikacja PCB-015C0 na source routes**,
 nie dalsze strojenie PML, viewer ani coupled-line solver przed poprawną ekstrakcją osi.

@@ -204,7 +204,7 @@ class ReducedTests(unittest.TestCase):
         check = "import antenna_lab.pcb.reduced_control; import sys; assert not any(n in sys.modules for n in ('openEMS','CSXCAD','antenna_lab.solvers.openems_pcb','antenna_lab.solvers.openems'))"
         subprocess.run([sys.executable,'-c',check],check=True,env=os.environ.copy())
 
-    def test_real_gerbonara_folder_to_csv_no_native(self):
+    def test_real_gerbonara_region_only_rejected_without_route_no_native(self):
         from antenna_lab.pcb.reduced_control import run_reduced
         from hashlib import sha256
         header='%FSLAX46Y46*%\n%MOMM*%\n%ADD10C,0.1*%\nD10*\nG01*\n'
@@ -226,11 +226,13 @@ class ReducedTests(unittest.TestCase):
                 port=dict(mode='explicit',layer='top',negative_mm=[19.5,20],positive_mm=[20.5,20],width_mm=1))))
             before={p.name:sha256(p.read_bytes()).hexdigest() for p in inp.iterdir()}
             with patch('antenna_lab.solvers.pcb_mesh.make_pcb_domain_mesh',side_effect=AssertionError('no FDTD mesh')):
-                result=run_reduced(inp,root/'out',pcb_config=physical)
-            self.assertEqual(result['status'],'completed')
+                with self.assertRaisesRegex(ConfigurationError,'flashes/regions are not transmission lines'):
+                    run_reduced(inp,root/'out',pcb_config=physical)
+            result=json.loads((root/'out'/'summary.json').read_text())
+            self.assertEqual(result['status'],'failed')
             self.assertEqual(before,{p.name:sha256(p.read_bytes()).hexdigest() for p in inp.iterdir()})
             self.assertEqual(len(result['provenance']['discovered_files']),3)
-            self.assertTrue((root/'out'/'impedance.csv').exists())
+            self.assertFalse((root/'out'/'impedance.csv').exists())
 
     def test_physical_gap_intrusion_is_not_hidden_by_network(self):
         g=case()

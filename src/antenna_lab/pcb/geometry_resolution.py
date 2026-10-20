@@ -4,12 +4,12 @@ Production and detached diagnostics share this projection. Coordinates are proje
 after one normalization; mesh coordinates are NOT restricted to the geometry
 lattice. Raw source data are provenance, never a source of downstream anchors.
 """
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 
 from antenna_lab.pcb.grid import PcbGrid, QuantizedPcbGeometry
 from antenna_lab.pcb.model import (
     BoardOutline, CopperPolygon, CopperLayer, CopperImageStats, DielectricLayer,
-    Substrate, PcbGeometry, PcbPort, QuantizedPcbDrill, PcbLumpedComponent, PcbSourceProvenance,
+    Substrate, PcbGeometry, PcbPort, QuantizedPcbDrill, PcbLumpedComponent, PcbSourceProvenance, PcbRoute,
 )
 from antenna_lab.pcb.quantization import quantize_pcb_geometry
 from antenna_lab.pcb.transform import normalize_port_orientation
@@ -58,6 +58,17 @@ def materialize_quantized_geometry(value: QuantizedPcbGeometry) -> PcbGeometry:
                      value.source_port.enet_sha256,value.source_port.flying_probe_sha256)
                      if value.source_port else None),
     )
+    # Non-spatial route facts come from the detached snapshot, coordinates only
+    # from tick records. Re-audit against projected final copper, no repair.
+    source_routes={r['id']:r for r in source.get('routes',())}
+    result.routes=tuple(replace(PcbRoute(**source_routes[r.id]),
+        start_xy_m=point(r.start),stop_xy_m=point(r.stop),width_m=metre(r.width),
+        center_xy_m=point(r.center) if r.center is not None else None,
+        footprint_xy_m=ring(r.footprint),footprint_holes_xy_m=tuple(ring(h) for h in r.holes),
+        candidate_conductor_ids=tuple(source_routes[r.id]['candidate_conductor_ids'])) for r in value.routes)
+    result.route_provenance_available=source.get('route_provenance_available',False)
+    from .routes import audit_routes
+    result.routes=audit_routes(result.routes,result.copper)
     validate_pcb_geometry(result)
     return result
 

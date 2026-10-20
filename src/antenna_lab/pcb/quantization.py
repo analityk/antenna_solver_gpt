@@ -16,7 +16,7 @@ from shapely import union_all
 from antenna_lab.core.config import ConfigurationError
 from .validation import TOLERANCE_M, validate_pcb_geometry
 from .grid import (PcbGrid, QuantizedPcbGeometry, TickCopper, TickDielectric,
-                   TickCopperLayer, TickPort, TickDrill, TickComponent, TickSource)
+                   TickCopperLayer, TickPort, TickDrill, TickComponent, TickSource, TickRoute)
 
 
 class QuantizationError(ConfigurationError):
@@ -137,8 +137,21 @@ def quantize_pcb_geometry(geometry, grid=PcbGrid()):
         s=geometry.source_port
         source=TickSource(s.source_refdes,s.source_pin_nets,p.point(s.pin1_xy_m,'source.pin1'),
             p.point(s.pin2_xy_m,'source.pin2'),s.enet_sha256,s.flying_probe_sha256)
+    # Project auxiliary route evidence with the SAME grid as physical copper.
+    # A collapsed route disables FAST, not a valid full-wave polygon model.
+    def route_ring(vertices, label):
+        points=[]
+        for i,raw in enumerate(vertices):
+            point=p.point(raw,f'{label}[{i}]')
+            if not points or points[-1]!=point:points.append(point)
+        if len(points)>1 and points[0]==points[-1]:points.pop()
+        return tuple(points)
+    routes=tuple(TickRoute(r.id,p.point(r.start_xy_m,r.id+'.start'),p.point(r.stop_xy_m,r.id+'.stop'),
+        p.value(r.width_m,r.id+'.width'),p.point(r.center_xy_m,r.id+'.center') if r.center_xy_m is not None else None,
+        route_ring(r.footprint_xy_m,r.id+'.footprint'),
+        tuple(route_ring(h,r.id+'.hole') for h in r.footprint_holes_xy_m)) for r in geometry.routes)
     result=QuantizedPcbGeometry(grid,geometry.model,outline,copper,tuple(dielectrics),layers,port,
-        tuple(drills),tuple(components),source,tuple(geometry.assumptions),source_json)
+        tuple(drills),tuple(components),source,tuple(geometry.assumptions),source_json,routes)
     _audit(geometry,result,p)
     return result,p.finish()
 

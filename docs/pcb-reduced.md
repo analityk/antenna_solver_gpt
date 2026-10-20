@@ -24,7 +24,8 @@ we wspólnym parserze, ale w tym bezstratnym modelu nie zmienia obliczeń.
 ## Dokładny zakres pierwszego checkpointu
 
 - Jednorodny dielektryk i dokładnie top/bottom; bottom to jeden pełny polygon
-  pokrywający obrys, bez szczelin/otworów. Jest idealnym wspólnym odniesieniem.
+  bez szczelin/otworów, pokrywający aktywną miedź i kontakty. Setback od obrysu
+  jest dozwolony (PCB-015B1). Jest idealnym wspólnym odniesieniem.
 - Paski prostokątne i jednoznaczne połączenia ortogonalne tej samej szerokości;
   możliwe współosiowe zmiany szerokości, gdy cechy i pokrycie są jednoznaczne.
 - `compact_features()` dostarcza rzeczywistych granic szerokości i ich zakresów.
@@ -102,3 +103,37 @@ Błąd zostawia summary ze statusem failed i dostępną geometrią, bez CSV.
 Brak nieskończonych liczb w JSON: null/empty SWR oznacza nieskończony SWR
 bezstratnego obciążenia; null dB oznacza −infinity przy dokładnie zerowym S11.
 S11 i Z nie są sztucznie obcinane. Raport antenowy nie jest tu generowany.
+
+
+## PCB-015C0: źródłowe trasy Gerbera
+
+Nowy import zapisuje `routes` i `route_provenance_available` w geometrii.
+Każdy Line/Arc zachowuje oś, szerokość apertury kołowej, dla Arc środek/kierunek,
+warstwę, polarity, kolejność obiektu, plik i SHA256 oraz polygonizowany obrys
+tego stroke z istniejącym budżetem aproksymacji importera. Region/Flash nie
+staje się trasą. Końcowy CopperPolygon nadal określa fizyczną miedź.
+
+Po pełnej kompozycji dark/clear/restore cały stroke musi przetrwać w dokładnie
+jednym conductorze (`source_status=verified`). Stan niepełny/niejednoznaczny
+zostaje zapisany i zatrzymuje FAST; nie odrzuca poprawnego importu full-wave.
+Normalizacja przekształca oś i obrys razem; geometry resolution używa tego samego
+PcbGrid co miedź, zapisuje tick records i ponownie sprawdza przetrwanie/ownership.
+Nie dodano tolerancji kąta, naprawy polygonu ani kotwic siatki. Surowe wartości
+pozostają w geometry.source.json i snapshotach provenance projekcji.
+
+FAST używa tych osi, nie granic polygonu. Line ma rzeczywistą długość endpointów
+przy dowolnym kącie. W C0 późniejsza analiza sprzężeń linii skośnych ma jawny
+guard — nigdy nie klasyfikuje ich jako pionowych. Aktywny Arc ma błąd z ID,
+plikiem, indeksem obiektu i SHA256. Region-only import nie przechodzi do legacy
+polygon extraction; brak routingu jest jawnym ograniczeniem. Syntetyczna
+PcbGeometry bez provenance zachowuje dotychczasowy B2 path.
+
+Pokrycie końcowej miedzi przez zweryfikowane strokes jest sprawdzane; tylko
+istniejąca width-local aproksymacja końców/złączy może pozostawić lokalny pad.
+Nie zgadujemy połączeń osi, lead length do kontaktów ani centrów padów.
+Nieobsługiwane przecięcia/rozgałęzienia, zmienione clear/restore, niespójne
+połączenia przez pady/regions kończą się błędem. Dokładny fizyczny audyt źródła,
+RLC, PTH i setback pozostaje w mocy. Sprzężenia par nie są zaimplementowane.
+
+Checkpoint C0 nie jest potwierdzeniem wyniku realnego test_spirala.zip;
+ten plik nie jest dostępny agentowi. Pełną weryfikację wykonuje użytkownik.

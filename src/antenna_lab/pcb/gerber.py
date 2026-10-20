@@ -7,6 +7,7 @@ and point-only conductor junctions are rejected, never repaired or filled.
 """
 
 from math import acos, ceil, pi
+from hashlib import sha256
 from pathlib import Path
 import warnings
 
@@ -21,7 +22,7 @@ from shapely.ops import polygonize_full
 
 from antenna_lab.core.config import ConfigurationError
 from .config import ResolvedPcbConfig
-from .model import BoardOutline, CopperPolygon, PcbGeometry, PcbPort, Substrate, CopperImageStats
+from .model import BoardOutline, CopperPolygon, PcbGeometry, PcbPort, Substrate, CopperImageStats, PcbRoute
 from .sources import member, read_gerber
 from .validation import validate_pcb_geometry
 
@@ -98,7 +99,7 @@ def _vertices(polygon):
     return tuple((float(x)*1e-3, float(y)*1e-3) for x,y in polygon.exterior.coords[:-1])
 
 
-def _copper(gerber, statistics=None):
+def _copper(gerber, statistics=None, *, routes=None, source_file="", source_sha256=""):
     """Compose primitives in original object/primitive order, including restores.
 
     Never union all dark first: a later dark feature can restore cleared copper.
@@ -106,13 +107,26 @@ def _copper(gerber, statistics=None):
     """
     merged = Polygon()
     counts = dict(dark_primitive_count=0, clear_primitive_count=0)
-    for obj in gerber.objects:
+    collected_routes = []
+    for object_index, obj in enumerate(gerber.objects, 1):
         if isinstance(obj, (go.Line, go.Arc)) and not isinstance(obj.aperture, CircleAperture):
             raise ConfigurationError('PCB-v0 supports circular-aperture strokes only; do not approximate other strokes.')
         for primitive in obj.to_primitives(unit=MM):
             shape = _primitive_polygon(primitive)
             if shape.is_empty or not shape.is_valid or shape.area <= 0:
                 raise ConfigurationError('Invalid copper primitive; no automatic repair.')
+            if routes is not None and isinstance(obj, (go.Line, go.Arc)):
+                def si(p): return tuple(float(v)*1e-3 for v in p)
+                collected_routes.append(PcbRoute(
+                    f'route_{object_index:06d}', type(obj).__name__,
+                    si((primitive.x1,primitive.y1)), si((primitive.x2,primitive.y2)),
+                    float(primitive.width)*1e-3,
+                    si((primitive.cx,primitive.cy)) if isinstance(obj,go.Arc) else None,
+                    primitive.clockwise if isinstance(obj,go.Arc) else None,
+                    'top', bool(primitive.polarity_dark),
+                    tuple(si(p) for p in shape.exterior.coords[:-1]),
+                    tuple(tuple(si(p) for p in h.coords[:-1]) for h in shape.interiors),
+                    source_file,source_sha256,object_index))
             dark = primitive.polarity_dark
             counts['dark_primitive_count' if dark else 'clear_primitive_count'] += 1
             try:
@@ -136,6 +150,9 @@ def _copper(gerber, statistics=None):
         _simple_polygon(p, 'cleaned copper', allow_holes=True)
         result.append(CopperPolygon(f'copper_{i+1:04d}', ring(p.exterior.coords), 0.,
             holes_xy_m=tuple(ring(h.coords) for h in p.interiors)))
+    if routes is not None:
+        from .routes import audit_routes
+        routes.extend(audit_routes(collected_routes, result, initial=True))
     if statistics is not None:
         statistics.update(counts, final_conductor_count=len(result),
                           final_hole_count=sum(len(p.holes_xy_m) for p in result))
@@ -176,13 +193,16 @@ def load_pcb_geometry(config: ResolvedPcbConfig) -> PcbGeometry:
     try:
         outline = _outline(_read(config.board_outline_path, 'board outline'))
         counts = {}
-        copper = _copper(_read(config.copper_top_path, 'top copper'), counts)
+        routes = []
+        copper = _copper(_read(config.copper_top_path, 'top copper'), counts, routes=routes,
+            source_file=str(config.copper_top_path), source_sha256=sha256(config.copper_top_path.read_bytes()).hexdigest())
     except (GEOSException, ValueError, NotImplementedError) as exc:
         raise ConfigurationError(f'Gerber geometry conversion failed: {exc}') from exc
     geometry = PcbGeometry('pcb', outline, copper,
         Substrate(outline, -config.substrate_thickness_m, 0.,
                   config.substrate_epsilon_r, config.substrate_loss_tangent),
         PcbPort('gerber_feed', config.port_negative_xy_m, config.port_positive_xy_m, config.port_width_m),
-        list(ASSUMPTIONS), copper_composition=(CopperImageStats('top', **counts),))
+        list(ASSUMPTIONS), copper_composition=(CopperImageStats('top', **counts),),
+        routes=tuple(routes), route_provenance_available=True)
     validate_pcb_geometry(geometry)
     return geometry

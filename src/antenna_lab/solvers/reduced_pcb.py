@@ -68,7 +68,9 @@ class LineSection:
 
     @property
     def axis(self):
-        return 0 if self.start_xy_m[1] == self.stop_xy_m[1] else 1
+        if self.start_xy_m[1] == self.stop_xy_m[1]:return 0
+        if self.start_xy_m[0] == self.stop_xy_m[0]:return 1
+        raise ConfigurationError(f'Reduced section {self.id} from {self.feature_ids}: oblique source Line has no Cartesian axis.')
 
 
 def _same_shape(a, b):
@@ -99,6 +101,9 @@ def extract_trace_sections(geometry, *, active_top_conductor_ids=None):
     active_ids=top_ids if active_top_conductor_ids is None else set(active_top_conductor_ids)
     if not active_ids.issubset(top_ids):
         raise ConfigurationError('Reduced extraction: unknown active top conductor ID.')
+    if geometry.route_provenance_available:
+        from .reduced_routes import extract_source_routes
+        return extract_source_routes(geometry,active_ids,LineSection)
     # Curved Gerber boundaries are common even for rectilinear routed traces
     # (round aperture joins/caps).  Do not reject the whole conductor merely
     # because its polygonization contains oblique edges.  Long physical width
@@ -227,6 +232,12 @@ def extract_trace_sections(geometry, *, active_top_conductor_ids=None):
 
 def detect_coupled_sections(sections):
     """All separated parallel overlaps need coupling; no arbitrary gap cutoff."""
+    oblique=[s for s in sections if s.start_xy_m[0]!=s.stop_xy_m[0] and s.start_xy_m[1]!=s.stop_xy_m[1]]
+    if oblique:
+        s=oblique[0]
+        raise ConfigurationError(f'Reduced source Line {s.feature_ids}: centerline extracted '
+            f'{s.start_xy_m} -> {s.stop_xy_m}, length={s.length_m} m; '
+            'oblique coupling analysis unsupported in C0 (no x/y misclassification).')
     rows=[]
     for i,a in enumerate(sections):
         for b in sections[i+1:]:
@@ -316,6 +327,7 @@ def build_reduced_model(geometry):
                 f'Reduced ground reference: active signal copper {copper.id!r} is not fully above bottom ground.')
     sections,features=extract_trace_sections(geometry,active_top_conductor_ids=active_ids)
     if not sections:raise ConfigurationError('Reduced v1: no resolvable trace sections.')
+    coupled=detect_coupled_sections(sections)
     substrate=geometry.dielectrics[0];h=substrate.z_max_m-substrate.z_min_m
     coords=sorted({p for s in sections for p in (s.start_xy_m,s.stop_xy_m)})
     nodes={p:f'n{i:04d}' for i,p in enumerate(coords)}
@@ -367,7 +379,6 @@ def build_reduced_model(geometry):
         t=1-'xy'.index(c.axis);vs=[p[t] for p in c.contact_window_xy_m]
         na,nb=contact(c.gap_start_xy_m,c.gap_stop_xy_m,max(vs)-min(vs),c.id)
         components.append(dict(asdict(c),node_a=na,node_b=nb))
-    coupled=detect_coupled_sections(sections)
     return dict(solver_model='reduced_quasi_tem',validation_status='approximate',
         unsupported_status='coupling_required' if coupled else None,
         ground_reference=dict(status='passed',id=ground[0].id,z_m=ground[0].z_m,
@@ -381,6 +392,8 @@ def build_reduced_model(geometry):
         material_provenance=dict(loss_tangent=substrate.loss_tangent,
                                  copper_layers=[asdict(c) for c in geometry.copper_layers]),
         nodes=[dict(id=nodes[p],xy_m=p) for p in coords],line_sections=lines,
+        extraction_method='gerber_source_routes' if geometry.route_provenance_available else 'legacy_synthetic_polygon',
+        source_routes=[asdict(r) for r in geometry.routes],
         physical_features=features,coupled_sections=coupled,lumped_components=components,
         source_port_nodes=list(source),source_port_id=geometry.port.id,
         total_centerline_length_m=sum(s.length_m for s in sections),
