@@ -131,6 +131,18 @@ class ReducedTests(unittest.TestCase):
         with self.assertRaisesRegex(ConfigurationError,'active signal copper.*not fully above bottom ground'):
             build_reduced_model(g)
 
+    def test_rounded_rectilinear_gerber_trace_is_reduced_to_same_sections(self):
+        g=case('U')
+        rounded=LineString(((.0005,0),(.0105,0),(.0105,.01),(.0005,.01))).buffer(
+            .0005,cap_style='flat',join_style='round')
+        g.copper[1]=replace(g.copper[1],vertices_xy_m=tuple(rounded.exterior.coords)[:-1])
+        sections,_=extract_trace_sections(g)
+        self.assertEqual(len(sections),4)
+        self.assertAlmostEqual(sum(s.length_m for s in sections),.04,places=12)
+        model=build_reduced_model(g)
+        self.assertEqual(len(model['coupled_sections']),1)
+        self.assertEqual(model['unsupported_status'],'coupling_required')
+
     def test_parallel_runs_detected_not_silently_ignored(self):
         model=build_reduced_model(case('U'))
         self.assertEqual(len(model['coupled_sections']),1)
