@@ -68,7 +68,9 @@ def extract_source_routes(geometry, active_ids, section_type):
         if hypot(b[0]-a[0],b[1]-a[1])<=TOLERANCE_M:
             raise ConfigurationError(f'Reduced source route {records[0].id}: collapsed axis.')
         s=section_type(f'line_{len(sections):04d}',owner,a,b,width,tuple(sorted(r.id for r in records)))
-        sections.append(s);footprints[s.id]=union_all([route_footprint(r) for r in records])
+        sections.append(s)
+        if receipt is None:
+            footprints[s.id]=union_all([route_footprint(r) for r in records])
         evidence.extend(asdict(r) for r in records)
     for owner,shape in shapes.items():
         own=[s for s in sections if s.owner==owner]
@@ -90,11 +92,12 @@ def extract_source_routes(geometry, active_ids, section_type):
                         tuple(intersection.coords[0]) not in common):
                     raise ConfigurationError(f'Reduced source routes {a.feature_ids}/{b.feature_ids}: '
                                              'overlapping/interior junction unsupported; no guessed graph.')
-                allowed=union_all([Point(p).buffer(max(a.width_m,b.width_m)) for p in common])
-                extra=footprints[a.id].intersection(footprints[b.id]).difference(allowed)
-                if receipt is None and extra.area>TOLERANCE_M*shape.length:
-                    raise ConfigurationError(f'Reduced source routes {a.feature_ids}/{b.feature_ids}: '
-                                             'nonlocal physical stroke contact unsupported.')
+                if receipt is None:
+                    allowed=union_all([Point(p).buffer(max(a.width_m,b.width_m)) for p in common])
+                    extra=footprints[a.id].intersection(footprints[b.id]).difference(allowed)
+                    if extra.area>TOLERANCE_M*shape.length:
+                        raise ConfigurationError(f'Reduced source routes {a.feature_ids}/{b.feature_ids}: '
+                                                 'nonlocal physical stroke contact unsupported.')
         pending=set(degree);todo=[min(pending)]
         while todo:
             point=todo.pop()
@@ -105,8 +108,9 @@ def extract_source_routes(geometry, active_ids, section_type):
         if pending:
             raise ConfigurationError(f'Reduced source route {owner}: disconnected axes despite connected copper; '
                                      'unresolved pad/region/route junction, no guessed lead.')
-        covered=union_all([footprints[s.id] for s in own])
-        local=union_all([Point(p).buffer(s.width_m) for s in own for p in (s.start_xy_m,s.stop_xy_m)])
-        if receipt is None and shape.difference(covered).difference(local).area>TOLERANCE_M*shape.length:
-            raise ConfigurationError(f'Reduced source route {owner}: nonlocal pad/region copper not represented by strokes.')
+        if receipt is None:
+            covered=union_all([footprints[s.id] for s in own])
+            local=union_all([Point(p).buffer(s.width_m) for s in own for p in (s.start_xy_m,s.stop_xy_m)])
+            if shape.difference(covered).difference(local).area>TOLERANCE_M*shape.length:
+                raise ConfigurationError(f'Reduced source route {owner}: nonlocal pad/region copper not represented by strokes.')
     return tuple(sections),evidence

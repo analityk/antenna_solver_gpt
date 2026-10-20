@@ -178,6 +178,20 @@ class ProjectedRouteTests(unittest.TestCase):
                 self.assertEqual(g.as_dict(),before)
                 json.dumps(modeled.as_dict(),allow_nan=False)
 
+    def test_projected_footprint_is_not_reused_as_physical_image(self):
+        from unittest.mock import patch
+        g,_=projection_case(1e-5)
+        modeled,_,_=apply_geometry_resolution(g,PcbGrid())
+        from antenna_lab.pcb.routes import route_footprint
+        def source_only(route):
+            # Source widths differ in tessellation, so compare the exact source
+            # record. Only the recursive SOURCE-image coverage audit may read it.
+            source=next(r for r in g.routes if r.id==route.id)
+            self.assertEqual(route.footprint_xy_m,source.footprint_xy_m)
+            return route_footprint(route)
+        with patch('antenna_lab.solvers.reduced_routes.route_footprint',side_effect=source_only):
+            self.assertEqual(len(extract_trace_sections(modeled)[0]),2)
+
     def test_arc_survival_precedes_explicit_unsupported_guard(self):
         body=('X-5000000Y0D02*\nX-1000000Y0D01*\n'+LINE+
               'G75*\nG03X6000000Y1000000I0J1000000D01*\n'+

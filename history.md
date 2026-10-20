@@ -1955,3 +1955,18 @@ Dodano małe testy kontraktu w test_pcb_routes.py. W chwili checkpointu testy
 nieuruchomione — publikacja przed testem zgodnie z instrukcją. Nie posiadamy
 lokalnego test_spirala.zip; spodziewany kolejny guard Arc nie jest potwierdzonym
 wynikiem tego realnego pliku. Pełna suite i native FDTD nie są planowane.
+
+
+### PCB-015C0.1 — mały test checkpointu i domknięcie użycia evidence
+
+Opublikowano checkpoint a3fb155cca227a09033dc487834bc3102f208d75 przed testami.
+Uruchomiono wyłącznie `python -X utf8 -m unittest test_pcb_routes -v`:
+15 testów PASS, w tym q=10/1 µm, Arc survival → explicit unsupported,
+partial-clear, ownership, collapse, stale receipt, physical topology rejection
+i legacy synthetic. Realnej serpentyny nie uruchamiano (plik lokalny użytkownika).
+
+Przegląd po teście usunął również zbędne konstruowanie Shapely footprintów
+po projekcji: nie były już warunkiem decyzji, ale nie powinny być używane jako
+physical image nawet pomocniczo. Dodano pojedynczy test, że projected extraction
+czyta footprint wyłącznie w źródłowym audycie coverage. Ta ostatnia zmiana jest
+publikowana przed jej wąskim sprawdzeniem; szeroka suite nadal pominięta.
