@@ -151,7 +151,7 @@ def extract_trace_sections(geometry, *, active_top_conductor_ids=None):
                 # A round-aperture 90-degree join does not contain the full
                 # square corner used by rectilinear copper.  Prove a full-width
                 # conductive neighbourhood at the centreline junction instead.
-                junction=Point(point).buffer(max(half-TOLERANCE_M,half*.99))
+                junction=Point(point).buffer(half*.9)
                 if junction.difference(shapes[a.owner]).area > TOLERANCE_M*junction.length:
                     raise ConfigurationError('Reduced extraction: curved/oblique copper does not prove orthogonal junction.')
             elif corner.difference(shapes[a.owner]).area > TOLERANCE_M*corner.length:
