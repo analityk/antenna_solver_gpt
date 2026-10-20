@@ -1970,3 +1970,16 @@ po projekcji: nie były już warunkiem decyzji, ale nie powinny być używane ja
 physical image nawet pomocniczo. Dodano pojedynczy test, że projected extraction
 czyta footprint wyłącznie w źródłowym audycie coverage. Ta ostatnia zmiana jest
 publikowana przed jej wąskim sprawdzeniem; szeroka suite nadal pominięta.
+
+
+### PCB-015C0.1 — wynik końcowej wąskiej kontroli
+
+Po publikacji 95796d5be7d22aa9d41dd8f24e13e1f3e79adb58 uruchomiono tylko
+`python -X utf8 -m unittest test_pcb_routes.ProjectedRouteTests.test_projected_footprint_is_not_reused_as_physical_image -v`:
+1 test PASS. Łącznie wykonano plik 15 testów przed ostatnią korektą oraz
+powyższy pojedynczy nowy test po korekcie; nie twierdzimy, że ponownie
+uruchomiono cały plik lub całą suite. Brak test_spirala.zip uniemożliwia
+potwierdzenie lokalnego blockera. Oczekiwany Arc unsupported pozostaje jawnym
+ograniczeniem C0.1; pairwise coupling nieimplementowany. Bez FDTD, native
+openEMS, benchmarków ani prepare-only. todo pozostaje bez zmiany, bo realny
+następny blocker wymaga lokalnego potwierdzenia użytkownika.
