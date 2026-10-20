@@ -258,10 +258,13 @@ def build_reduced_model(geometry):
         raise ConfigurationError('Reduced v1 requires top microstrip, one homogeneous dielectric, continuous bottom ground.')
     board=Polygon(geometry.outline.vertices_xy_m)
     ground=[c for c in geometry.copper if c.layer_role=='bottom']
-    if len(ground)!=1 or ground[0].holes_xy_m or not _same_shape(copper_shape(ground[0]),board):
-        raise ConfigurationError('Reduced v1: bottom ground must be one continuous uncut board-covering plane.')
+    if len(ground)!=1 or ground[0].holes_xy_m:
+        raise ConfigurationError('Reduced v1: bottom ground must be one continuous hole-free reference polygon.')
+    ground_shape=copper_shape(ground[0])
+    if ground_shape.difference(board).area > TOLERANCE_M*ground_shape.length:
+        raise ConfigurationError('Reduced v1: bottom ground extends outside the board outline.')
     if any(not board.covers(copper_shape(c)) for c in geometry.top_copper):
-        raise ConfigurationError('Reduced v1: all traces must lie above the ground reference.')
+        raise ConfigurationError('Reduced v1: all top copper must lie inside the board outline.')
     for i,c in enumerate(geometry.top_copper):
         if any(copper_shape(c).intersects(copper_shape(other)) for other in geometry.top_copper[:i]):
             raise ConfigurationError('Reduced v1: touching/overlapping separate top conductor records.')
@@ -271,6 +274,13 @@ def build_reduced_model(geometry):
            for p in (geometry.port.negative_xy_m,geometry.port.positive_xy_m)):
         raise ConfigurationError('Reduced source: both terminals shorted to ground through PTH connections.')
     active_ids={c.id for c in geometry.top_copper}-grounded_ids
+    for copper in geometry.top_copper:
+        if copper.id not in active_ids:
+            continue
+        shape=copper_shape(copper)
+        if shape.difference(ground_shape).area > TOLERANCE_M*shape.length:
+            raise ConfigurationError(
+                f'Reduced ground reference: active signal copper {copper.id!r} is not fully above bottom ground.')
     sections,features=extract_trace_sections(geometry,active_top_conductor_ids=active_ids)
     if not sections:raise ConfigurationError('Reduced v1: no resolvable trace sections.')
     substrate=geometry.dielectrics[0];h=substrate.z_max_m-substrate.z_min_m
@@ -305,6 +315,8 @@ def build_reduced_model(geometry):
         mid=(a[t]+b[t])/2;lo,hi=sorted((a[axis],b[axis]));half=width/2
         def xy(u,v):return (u,v) if axis==0 else (v,u)
         surface=Polygon([xy(lo,mid-half),xy(hi,mid-half),xy(hi,mid+half),xy(lo,mid+half)])
+        if surface.difference(ground_shape).area > TOLERANCE_M*surface.length:
+            raise ConfigurationError(f'{label}: source/component contact surface is not fully above bottom ground.')
         for drill in geometry.drills:
             if Point(drill.x_m,drill.y_m).distance(surface)<=drill.equivalent_outer_radius_m:
                 raise ConfigurationError(f'{label}: ground via {drill.id} intersects contact/gap surface.')
@@ -326,7 +338,9 @@ def build_reduced_model(geometry):
     return dict(solver_model='reduced_quasi_tem',validation_status='approximate',
         unsupported_status='coupling_required' if coupled else None,
         ground_reference=dict(status='passed',id=ground[0].id,z_m=ground[0].z_m,
-            treatment='ideal common reference; finite board edge fields omitted'),
+            treatment='ideal common reference; finite board edge fields omitted',
+            coverage_contract='one continuous hole-free bottom polygon must cover all active signal copper and source/component contact surfaces; board-edge setback is allowed',
+            board_area_coverage_fraction=ground_shape.area/board.area),
         ground_connected_top_conductors=sorted(grounded_ids),ground_vias=ground_vias,
         active_top_signal_conductors=sorted(active_ids),
         ground_connection_approximation='whole contacted top conductor is ideal equipotential ground; via inductance/barrel loss and distributed ground-conductor impedance omitted',
