@@ -1903,3 +1903,13 @@ Dodano mały plik testów Line/Arc/clear/restore, źródeł, transformacji/proje
 oraz multilayer folder import. Stan przy publikacji: analiza statyczna,
 TESTÓW JESZCZE NIE URUCHOMIONO. Checkpoint przed weryfikacją zdalną.
 Nie uruchomiono pełnej suite, FDTD, benchmarków ani fixture test_spirala.zip.
+
+
+PCB-015C0 — pierwszy mały test po pushu 08480ae5ae33706cea4ce326a5f145defc44e804:
+`python -X utf8 -m unittest test_pcb_routes -v`: 8 testów, 6 PASS, 2 errors.
+Oba błędy ujawniły niepoprawne założenia nowych fixtures: źródło na okrągłym
+cap nie ma kontaktu pełnej szerokości (audyt projekcji słusznie odmawia),
+a Region jako GKO trafia w istniejące ograniczenie Gerbonara converted().
+Poprawiono wyłącznie fixtures: prostokątne flashed feed pads oraz kontur GKO
+z linii. Nie osłabiono audytów ani nie zmieniano parsera/solvera dla testu.
+Ta diagnoza i poprawka są publikowane przed ponownym testem tych dwóch metod.

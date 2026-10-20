@@ -87,7 +87,8 @@ class RouteTests(unittest.TestCase):
             extract_trace_sections(g)
 
     def test_transform_and_shared_projection_preserve_detached_provenance(self):
-        g=geometry('X-5000000Y0D02*\nX-1000000Y0D01*\n'+LINE)
+        g=geometry('X-5000000Y0D02*\nX-1000000Y0D01*\n'+LINE+
+                   '%ADD11R,0.2X0.2*%\nD11*\nX-1000000Y0D03*\nX1000000Y0D03*\n')
         # rotate once to a vertical source, then production normalization once
         from antenna_lab.pcb.transform import _map_xy
         g=_map_xy(g,lambda p:(-p[1]+.002,p[0]+.003))
@@ -121,7 +122,7 @@ class RouteTests(unittest.TestCase):
             root=Path(tmp)
             (root/'board.GTL').write_text(HEADER+'X-5000000Y0D02*\nX-1000000Y0D01*\n'+LINE+'%ADD11R,0.2X0.2*%\nD11*\nX-1000000Y0D03*\nX1000000Y0D03*\nM02*\n')
             (root/'board.GBL').write_text(HEADER+region+'M02*\n')
-            (root/'board.GKO').write_text(HEADER+region+'M02*\n')
+            (root/'board.GKO').write_text(HEADER+region.replace('G36*\n','').replace('G37*\n','')+'M02*\n')
             physical=dict(schema_version=2,stackup=[
                 dict(type='copper',role='top',model='pec',thickness_um=35,conductivity_s_m=58e6),
                 dict(type='dielectric',name='core',thickness_mm=1,epsilon_r=4.3,loss_tangent=0),
