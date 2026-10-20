@@ -1815,3 +1815,69 @@ PCB-015B — końcowa weryfikacja i publikacja (2026-10-12):
   niezależnych powodów. Następne ograniczenie fizyczne: sprzężenie par linii.
   Brak test_spirala.zip; podane 3 sekcje/30 mm/2 PTH/2 masy/1 overlap są
   wyłącznie kontrolą syntetyczną. Nie wykonano żadnego native FDTD.
+
+
+## 2026-10-20 — PCB-015B1/B2: realna serpentyna, ground setback i granice ekstrakcji FAST
+
+**Powód:** po opublikowaniu PCB-015B użytkownik uruchomił rzeczywisty
+`gerbs\realpcb_microstrip\test_spirala.zip` lokalnie. Celem nie było
+uzyskanie wyniku za wszelką cenę, tylko przechodzenie kolejnych fizycznych
+guardów bez zgadywania i bez uruchamiania native FDTD.
+
+**Pierwszy blocker — bottom ground:** FAST odrzucił model komunikatem
+`bottom ground must be one continuous uncut board-covering plane`. Lokalna
+diagnostyka zapisanego `geometry.json` wykazała jeden bottom polygon,
+zero holes, pole 599,50695 mm², bbox około (-13,46,-21,82)…(11,03,2,66) mm.
+Board ma 625 mm² i bbox 25×25 mm; symmetric difference wynosi 25,49305 mm².
+To odpowiada naturalnemu około 0,25–0,26 mm setbackowi miedzi od krawędzi,
+nie slotowi ani przerwaniu ground.
+
+PCB-015B1 (commity `40459b77efdd3a40017a36d8f40598a0e859c609` i
+`5ead341cff8ce0bf66a850b1880155ba39c3fab2`) zastąpiło wymóg
+`bottom copper == board outline` fizycznym kontraktem: jeden ciągły,
+hole-free bottom polygon może być cofnięty od obrysu, ale musi pokrywać całą
+aktywną miedź sygnałową oraz powierzchnie kontaktów source/RLC. Ground poza
+board albo aktywny sygnał bez bottom reference nadal kończy się odmową.
+Dodano regresję dla dozwolonego inset ground i dla ścieżki wychodzącej poza
+reference plane. Nie zmieniono full-wave, PTH modelu ani siatki FDTD.
+
+**Drugi blocker — curved/oblique polygon:** po przejściu ground guard realna
+serpentyna zatrzymała się na
+`Reduced extraction: curved/oblique top copper unsupported; no guessed centerline.`
+PCB-015B2 (commity `53695f4d7dc3478c2a7566f3040ee711e9f6a57f`,
+`fd0bd5bf3b022e294f77230f991de2d431188c7c` i
+`d9756971bbfd8786d1d0b44d0a42b37ab44a3112`) dopuściło wyłącznie lokalne
+round/chamfered Gerber residue przy udowodnionych prostych końcach/złączach.
+Długie/nielokalne krzywe lub skosy nadal fail closed. Test syntetyczny obejmuje
+rounded U-meander, który redukuje się do tych samych sekcji i nadal zatrzymuje
+na wymaganym sprzężeniu. Użytkownik podał, że lokalne testy reduced po zmianach
+przechodzą; dokładnej liczby testów nie zapisano. Nie uruchamiano pełnego suite
+ani natywnego FDTD w ramach tych zmian.
+
+**Aktualny blocker realnej serpentyny:** po PCB-015B2 run zatrzymuje się na
+`Reduced extraction: curved/oblique top copper top:copper_0001 has no resolvable straight sections.`
+Lokalna diagnostyka `top:copper_0001`: pole 14,85795 mm², bbox
+(-3,79,-17,83)…(2,64,0,43) mm, 3088 wierzchołków, 1085 krawędzi oblique,
+2003 orthogonal, łączna długość oblique około 52,257 mm. Przykładowa długa
+krawędź (-0,56,-0,43)→(-0,57,-2,29) mm odchyla się od pionu tylko około
+0,31°. To nie jest mały pad ani wyłącznie lokalny narożnik.
+
+**Wniosek architektoniczny:** obecny reduced solver próbuje odtworzyć centerline
+z końcowego `CopperPolygon`, chociaż importer Gerbera wcześniej zna źródłowe
+`Line`/`Arc` oraz szerokości apertur. Następny krok to PCB-015C0: zachować
+route provenance z importu, przeprowadzić je przez normalizację/projekcję i
+przypisać po końcowej kompozycji boolean do dokładnie jednego finalnego
+conductora albo fail closed. Finalny polygon pozostaje źródłem prawdy dla
+kontaktów, clear polarity, PTH i ciągłości. Nie należy dodawać globalnej
+tolerancji kąta, która mogłaby zamieniać prawdziwe skosy/łuki w prostą linię.
+
+Pairwise coupled microstrip pozostaje następnym etapem PCB-015C dopiero po
+poprawnej ekstrakcji route. Nie ma jeszcze FAST Z/S11 dla realnej serpentyny.
+
+**Koszt weryfikacji i trwałość:** lokalne testy użytkownika są preferowanym
+miejscem dla taniej, szerokiej weryfikacji. Zdalny agent ma ograniczać się do
+analizy statycznej i najmniejszego sensownego zestawu testów; pełny unittest
+uruchamiać najwyżej raz i tylko gdy jest potrzebny do decyzji. Każda znacząca
+implementacja ma zostać commitowana i wypchnięta do `origin/main` przed
+drogimi testami. PASS/PARTIAL/FAIL, brak lokalnego fixture albo błąd integracji
+nie mogą pozostawić znaczącej pracy wyłącznie w efemerycznym środowisku agenta.
