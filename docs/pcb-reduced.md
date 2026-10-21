@@ -193,3 +193,10 @@ ograniczenia bibliotek/geometrii. D0/D1 .epcb i Gerber pozostają kompatybilne.
 `--source-config` jawnie wybiera source_index, plating i idealne wartości RLC;
 nie są dopowiadane z Device. Arc TL i pairwise coupling pozostają OPEN. Pełny kontrakt i zadania:
 [pcb-easyeda.md](pcb-easyeda.md), [todo.md](../todo.md).
+
+### Automatyczne katalogi FAST
+
+Bez `--output`: `outcomes/pcb_reduced/<nazwa-wejścia>_<NNN>`, np.
+`spirala_001`, `spirala_002`. Numer jest większy od zajętych numerów danego
+wejścia; mkdir rozstrzyga równoległe starty. Dotyczy także `--inspect-source`.
+Jawny `--output` ma pierwszeństwo. Dawne wyniki pozostają nietknięte.

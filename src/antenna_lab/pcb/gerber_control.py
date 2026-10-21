@@ -9,7 +9,7 @@ from pathlib import Path
 import sys
 
 from antenna_lab.core.config import ConfigurationError
-from antenna_lab.core.catalog import variant_slug
+from .output import allocate_output_dir
 from antenna_lab.solvers.openems_pcb import prepare_pcb_xml_model, read_pcb_native_statistics
 from antenna_lab.solvers.pcb_mesh import make_pcb_domain_mesh, make_gerber_mesh_anchor_plan
 from .config import load_pcb_config
@@ -33,25 +33,7 @@ def _write_json(path, value):
 
 
 def _default_output_dir(config_path, root=Path('outcomes/pcb_gerber')):
-    """Create <input-name>_<series> without timestamps or random suffixes."""
-    source=Path(config_path)
-    name=source.name if source.is_dir() else source.stem
-    prefix=variant_slug(name) or 'pcb'
-    root=Path(root);root.mkdir(parents=True,exist_ok=True)
-    used=[]
-    marker=prefix+'_'
-    for path in root.iterdir():
-        if not path.is_dir() or not path.name.startswith(marker):continue
-        suffix=path.name[len(marker):]
-        if suffix.isdigit():used.append(int(suffix))
-    number=max(used,default=0)+1
-    while True:
-        candidate=root/f'{prefix}_{number:03d}'
-        try:
-            candidate.mkdir()
-            return candidate
-        except FileExistsError:
-            number+=1
+    return allocate_output_dir(config_path, root)
 
 
 def run_gerber_control(config_path, output_dir, *, prepare_only=False, quality=None, sweep_request=None, pcb_config=None, field_frequency_hz=None, geometry_resolution_um=10, resolved_profile=None, **frequency_settings):

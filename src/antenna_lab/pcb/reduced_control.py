@@ -2,14 +2,13 @@
 import argparse
 import csv
 from dataclasses import asdict
-from datetime import datetime, timezone
 from pathlib import Path
 import json
 import sys
-from tempfile import mkdtemp
 
 from antenna_lab.core.config import ConfigurationError
 from antenna_lab.solvers.reduced_pcb import build_reduced_model, solve_reduced_model
+from .output import allocate_output_dir
 from .frequency import add_frequency_arguments, frequency_arguments_hz
 from .gerber_sweep import sweep_frequencies_hz
 from .geometry_resolution import apply_geometry_resolution
@@ -173,8 +172,8 @@ def main(argv=None):
         validate_frequency_band(band['result_frequency_hz'],band['excitation_center_hz'],band['excitation_cutoff_hz'])
         output=args.output
         if output is None:
-            root=Path('outcomes/pcb_reduced');root.mkdir(parents=True,exist_ok=True)
-            output=Path(mkdtemp(prefix=datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ_'),dir=root))
+            output=allocate_output_dir(args.input or args.easyeda_source or args.easyeda_project,
+                                       Path('outcomes/pcb_reduced'))
         result=run_reduced(args.input,output,pcb_config=args.pcb_config,
             geometry_resolution_um=args.geometry_resolution_um,reference_impedance_ohm=args.reference_impedance_ohm,
             sweep_request=request if sweep else None,easyeda_source=args.easyeda_source,

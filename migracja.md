@@ -266,3 +266,11 @@ Jeśli odpowiedź brzmi „nie”, uzupełnij przekazanie przed końcem pracy
 zamiast liczyć, że następnym razem użytkownik pamięta brakujące fakty.
 Unikaj rutynowych aktualizacji bez zmian merytorycznych. Ten mechanizm
 powinien działać niezależnie od czasu życia, liczby i modelu kolejnych czatów.
+
+### Checkpoint 2026-10-21 — zakres wyłącznie spirala
+
+Najnowsze polecenie użytkownika ogranicza pracę do `spirala.epro`, bez PSU.
+FAST przechodzi na wspólną z Gerber numerację `spirala_NNN`, także dla
+`--inspect-source`; testy w `test_pcb_output.py`. Następny krok to D3
+semantyczne ARC, potem jawna blokada niewymodelowanych sprzężeń. Ostatni
+opublikowany HEAD przed tym checkpointem: `4af79ef1dc3ddfca82cbf13228e84e22db7ff822`.

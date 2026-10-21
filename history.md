@@ -2318,3 +2318,12 @@ kontrolę, a round pad holes również przechodzą wspólną transformację/proj
 Uaktualniono migracja/todo/README/AGENTS oraz docs/pcb-easyeda i pcb-reduced;
 następny priorytet D3 Arc TL, potem coupling. Nic nie zmieniono w archiwach
 użytkownika, openEMS, mesherze ani zasadach PTH. Source CAD nie jest dopowiadany.
+
+## 2026-10-21 — FAST: nazwy katalogów według PCB-016B
+
+Wspólny lekki allocator nadaje Gerber/FAST nazwy `<wejście>_<NNN>`.
+FAST `.epro`, `.epcb`, katalog/ZIP oraz `--inspect-source` korzystają z tej
+samej numeracji max+1 i atomowego mkdir; jawny `--output` ma pierwszeństwo.
+Nie zmieniono istniejących wyników ani fizyki. Dodano małe testy numeracji,
+równoległego tworzenia i CLI. Checkpoint przed D3; testy opisane po wykonaniu.
+Wykonano `test_pcb_output`: 3/3 PASS. Bez pełnej suite i native/FDTD.
