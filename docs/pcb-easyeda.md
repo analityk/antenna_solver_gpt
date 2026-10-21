@@ -157,3 +157,56 @@ złożonym nie może być automatycznie uznany za standardowe `.epcb`.
 `DOCTYPE PCB`; D1 jedynie wykrywa zależności i odmawia solve bez geometrii.
 Nie dodano obsługi archiwów projektu, parsera `.efoo` ani nowej fizyki.
 
+### Odczyt pełnego eksportu `test_psu.epro` — checkpoint analityczny 2026-10-21
+
+Użytkownik udostępnił `test_psu.epro` jako załącznik rozmowy. Sprawdzono
+rzeczywiste bajty pliku i integralność ZIP: **jest to prawidłowe archiwum ZIP**,
+nie nieznana binarka. Uwaga o trwałości: ten załącznik **nie został dodany do
+repozytorium** i może być niedostępny dla nowego czatu. Identyfikator kontrolny
+SHA256 archiwum:
+`659e3eacb05b4f91645bab3f621723adf85d14f56505aa6962e7d3f60a770982`.
+
+W środku są: `project.json`, 1 `PCB/<uuid>.epcb`, **46** `FOOTPRINT/*.efoo`,
+**77** `SYMBOL/*.esym` oraz katalogi pomocnicze. Łącznie 125 plików
+i 9 wpisów katalogowych, 134 elementy ZIP. `project.json` indeksuje
+46 footprintów, 77 symboli i 77 definicji device. Wewnętrzne PCB nadal
+zawiera 34 wbudowane dokumenty typu FOOTPRINT przed jednym dokumentem PCB.
+Jest to format EasyEDA Pro **V2** (`DOCTYPE ... 1.8`, editor 2.2.x),
+nie V3/`.epro2`.
+
+**Kontrola kompletności referencji w tym pełnym projekcie:**
+- **291/291** instancji `COMPONENT` ma odszukiwaną definicję footprintu:
+  254 przez bezpośredni identyfikator do `.efoo`, 34 przez `HEAD.uuid`
+  osadzonego FOOTPRINT, a 3 `F/F1/F3` przez identyfikator `Device`
+  i jego atrybut `Footprint` w `project.json`.
+- **906/906** rekordów `PAD_NET` znajduje odpowiadający numer pola `PAD`
+  w swojej definicji. To potwierdzenie dostępności semantyki pinów i
+  geometrii bibliotecznej, **nie** poprawności transformacji, fizycznych
+  połączeń, stackupu ani skutecznego solve.
+- `R1206` ma rzeczywiste prostokątne pola lutownicze. Kondensator
+  `CAP-TH_BD18.0-P7.5-D0.8-FD` zawiera pady z otworami. Dostępne są
+  także m.in. `QFN-24`, `QFN-16`, `LQFP-144`; nie znaleziono
+  nazwanego footprintu `0805`. Typ SMD/THT/QFN nie decyduje
+  o brakach w samym `.epcb`.
+
+**Znaczenie wcześniejszych liczb 119/169/3:** dotyczyły
+`test_psu.epcb` rozpatrywanego **bez biblioteki projektu**.
+Brakujące w nim 169 definicji rozwiązują pliki archiwum; 3 instancje
+bez bezpośredniego atrybutu rozwiązują się przez mapę `Device`.
+Nie należy dalej opisywać 169 referencji jako brakujących
+w pełnym `test_psu.epro`.
+
+**Dalsza implementacja:** importer ma dostać osobną ścieżkę do
+`.epro` (bezpieczny odczyt ZIP w pamięci, `project.json`, indeks bibliotek,
+wyodrębnienie właściwego bloku PCB przy złożonych plikach, parser `.efoo`,
+identyfikatory i numerację PAD, fallback `Device`, transformacja do SI,
+warstwy i rodzaje padów). Osobno zweryfikować wielowarstwowe i THT,
+a następnie fizyczny contact/net audit. Nie uznawać 291/291 oraz 906/906
+za zaliczony FAST. `test_spirala.epcb` nadal nie ma swojej pełnej
+biblioteki: do uruchomienia tego przypadku potrzebny odpowiadający
+mu eksport projektu, nie biblioteka z innego PCB.
+
+Sprawdzenia przy tym checkpointcie: poprawne otwarcie/test CRC ZIP,
+odczyt JSON, inwentaryzacja wszystkich ścieżek, indeksów, komponentów,
+rekordów PAD/PAD_NET i statyczna kontrola ich zgodności. Nie wykonywano
+testów programu, FDTD, benchmarków ani natywnego solve.

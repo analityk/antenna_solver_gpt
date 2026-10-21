@@ -2146,3 +2146,32 @@ Zapisano diagnozę w docs/pcb-easyeda.md, todo.md i migracja.md.
 Sprawdzenia: statyczna inspekcja rekordów/identyfikatorów oraz dokumentacji
 formatu EasyEDA; **nie uruchamiano testów, FDTD ani benchmarków**.
 Ograniczenie: nie sprawdzono jeszcze pełnego archiwum projektu z footprintami.
+
+## 2026-10-21 — analiza dostarczonego pełnego projektu `test_psu.epro`
+
+Zdiagnozowano strukturę przesłanego przez użytkownika pliku `test_psu.epro`:
+ZIP EasyEDA V2, nie nieczytelna binarka. CRC/test integralności archiwum
+PASS. W środku `project.json`, 1 `.epcb`, 46 `.efoo`, 77 `.esym`
+(125 plików i 9 katalogów), 46 wpisów footprintów i 77 devices
+w indeksie projektu. SHA256:
+`659e3eacb05b4f91645bab3f621723adf85d14f56505aa6962e7d3f60a770982`.
+
+Statyczny resolver wszystkich COMPONENT na podstawie bezpośrednich
+Footprint UUID, osadzonych HEAD.uuid i fallbacku Device uzyskał:
+254 + 34 + 3 = **291/291** rozpoznanych footprintów. Odpowiadające
+pola PAD istnieją dla **906/906** rekordów PAD_NET. Zwraca to
+nową interpretację wcześniejszych wyników dla pliku `.epcb`:
+169 brakujących definicji nie występuje w archiwum pełnego projektu.
+Wykryto m.in. R1206, footprint przewlekany kondensatora, QFN-24,
+QFN-16 i LQFP-144. Nie znaleziono nazwanej definicji 0805.
+
+**Wpływ na kod/fizykę:** żaden. Nie zaimplementowano importera ZIP,
+projektowego resolvera, instancji `.efoo`, audytu połączeń ani solvera
+dla realnego PSU. Plik użytkownika nie został wgrany do Git, więc
+w innym czacie trzeba go dostarczyć ponownie lub jawnie dodać jako
+test fixture. `test_spirala` pozostaje bez odpowiadającej jej biblioteki.
+
+**Sprawdzenia:** odczyt ZIP/CRC, JSON, mapy UUID/Device, wszystkich
+PAD_NET i numerów PAD z biblioteki. Brak testów natywnych, suite,
+FDTD i benchmarków. `docs/pcb-easyeda.md`, `todo.md`
+i `migracja.md` odzwierciedlają nowy stan.

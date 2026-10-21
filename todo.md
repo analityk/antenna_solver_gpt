@@ -177,14 +177,20 @@ CSRC/R1 i adapter kontaktów komponentów**, następnie semantic Arc TL oraz
 pairwise/curved coupling. Nie rekonstruować brakującego footprintu z Gerbera.
 D2 reconciliation pozostaje opcjonalne i nie jest implementowane.
 
-**Wstępny krok zależności (audyt source 2026-10-21):** najpierw pozyskać
-pełny lokalny eksport projektu EasyEDA z `project.json` i biblioteką
-`FOOTPRINT/*.efoo`, sprawdzić kompletność powiązań po UUID/source i
-ustalić rzeczywisty zakres braków. Pojedynczy `.epcb` nie musi zawierać
-footprintów; w `test_psu.epcb` 34 dołączone definicje obejmują także THT,
-a jednocześnie brakuje definicji wielu R/C SMD. To nie jest reguła THT/SMD.
-Dopiero potem implementować instancjonowanie i audyt kontaktów;
-szczegóły `docs/pcb-easyeda.md`. Nie zmienia to kolejności Arc/coupling.
+**Zależności footprintów — nowy wynik 2026-10-21:** pełny
+`test_psu.epro` (udostępniony w rozmowie; **nie w repo**) okazał się
+archiwum ZIP EasyEDA V2 z `project.json`, `PCB/`, 46 plikami `.efoo`
+i 77 `.esym`. Statycznie rozwiązano 291/291 instancji COMPONENT
+oraz 906/906 przypisań PAD_NET (254 przez bibliotekę, 34 przez
+wbudowane footprinty, 3 przez atrybut Device). Wcześniejsze 169
+brakujących definicji dotyczyło **samego** `test_psu.epcb`, nie
+całego eksportu. Pierwszy krok programistyczny: obsługa importu
+projektu `.epro`, biblioteki `.efoo`, mapy `project.json`,
+źródłowych pads/net i instancji wraz z geometrią i audytem.
+Pełny projekt źródłowy `test_spirala` nadal nie jest dostępny;
+jego fingerprint `e8bf627583724bdebefbaa0be79b0d2f`
+nie wolno odzyskiwać z obcego projektu ani z Gerbera.
+Szczegóły `docs/pcb-easyeda.md`; Arc i coupling pozostają kolejne.
 
 ### Checkpoint D0/D1 — 2026-10-21
 

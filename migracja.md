@@ -172,14 +172,18 @@ footprintu o hashu `e8bf627583724bdebefbaa0be79b0d2f`, którego
 geometrii nie ma w zbudowanym modelu. Nie zgaduj padów/połączeń i nie
 odtwarzaj ich z Gerbera.
 
-**Najbliższe zadanie (skorygowane audytem 2026-10-21):** najpierw pozyskać
-pełny lokalny eksport projektu EasyEDA (projekt/archiwum z `project.json`
-oraz `FOOTPRINT/*.efoo`), zinwentaryzować identyfikatory footprintów
-i ich brakujące definicje; następnie zaprojektować/zaimplementować
-resolver i adapter instancji `COMPONENT → FOOTPRINT → PAD → PAD_NET`,
-z transformacjami oraz fizycznym audytem zwarć i kontaktów. Nie zakładać,
-że pojedyncze `.epcb` zawiera bibliotekę projektu. Jeśli pełny eksport jest
-niedostępny, zachować jawne `missing-source-dependency`.
+**Najbliższe zadanie (uzupełnione po analizie pełnego epro):**
+zaimplementować parser projektu EasyEDA Pro V2 `.epro` jako ZIP
+(`project.json` i katalog `FOOTPRINT/`), resolver bibliotek i fallback
+`Device`, parser `.efoo`/złożonego `.epcb`, instancjonowanie padów
+z transformacją SI i audytem fizycznym. Na przykładzie `test_psu.epro`
+potwierdzono 291/291 instancji i 906/906 przypisań pad→net w danych
+źródłowych, lecz **nie jest to jeszcze zdolność obecnego kodu**.
+Przesłane `test_psu.epro` nie jest częścią repozytorium;
+dla odtwarzalności testów będzie potrzebna osobna zgoda na dodanie
+artefaktu lub ponowne dostarczenie. Do odblokowania CSRC/R1
+w serpentynie potrzebny jest **jej** pełny projekt `.epro`;
+nie zastępuj go biblioteką niepowiązanego projektu.
 Jeśli wymagany plik `.efoo` nie jest dostępny, zachowaj jawny
 `missing-source-dependency` i wskaż dokładną brakującą zależność zamiast
 udawać udany solve.
@@ -202,6 +206,18 @@ Przed podjęciem działań zawsze ponownie przeczytaj końcówkę `todo.md`.
 `src/antenna_lab/pcb/reduced_control.py`,
 `src/antenna_lab/solvers/reduced_source.py`,
 `tests/test_pcb_easyeda.py`. Kieruj się stanem kodu, nie samą listą plików.
+
+**Późniejsza weryfikacja pełnego archiwum (2026-10-21):**
+przesłany przez użytkownika poza Git `test_psu.epro` jest poprawnym
+ZIP EasyEDA Pro V2 (SHA256 `659e3eacb05b4f91645bab3f621723adf85d14f56505aa6962e7d3f60a770982`);
+wewnątrz: 1 PCB, 46 plików `.efoo`, 77 plików `.esym` i
+`project.json` z 46 footprintami oraz 77 device. Wszystkie
+291 instancji komponentów mają definicję footprintu (254 bezpośrednio
+w `.efoo`, 34 w `.epcb`, 3 przez Device), a wszystkie 906 rekordów
+`PAD_NET` wskazuje istniejący numer pada. Wcześniejsze 169 brakujących
+odnosi się **tylko do pojedynczego pliku** `test_psu.epcb`.
+Nie udowodniono fizycznego connectivity ani obliczeń FAST;
+plik `.epro` nie jest wersjonowany. Szczegóły `docs/pcb-easyeda.md`.
 
 **Nowe rozpoznanie zależności (statyczna inspekcja 2026-10-21):**
 `test_spirala.epcb` zawiera 2 `COMPONENT`, 4 `PAD_NET` i 0 `PAD`/`FOOTPRINT`;
