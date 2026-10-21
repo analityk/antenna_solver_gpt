@@ -68,7 +68,8 @@ wpisów i sięgaj do wcześniejszych decyzji, gdy są istotne.
 - Importer `.epro` D4 działa tylko w zadeklarowanym podzbiorze:
   canonical serpentyny jest sprawdzony, cały PSU nie. Nie utożsamiaj
   mapowania footprintów z poprawną geometrią lub wynikiem FAST.
-  Arc TL i fizyczny model sprzężenia pozostają otwarte. Aktualny
+  D3 zachowuje analityczną metrykę/graf source ARC; fizyczny model sprzężenia
+  i korekty krzywizny pozostają otwarte. Aktualny
   zakres/status: `todo.md`, `migracja.md`, `docs/pcb-easyeda.md`.
 
 ## Cel i stan pracy

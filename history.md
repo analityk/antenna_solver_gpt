@@ -2339,3 +2339,28 @@ ale zatrzymała się na źródłowej skośnej LINE e40 w detektorze x/y.
 Checkpoint rejestruje też skośne sekcje mieszanego grafu jako niewspierane
 sprzężenia, umożliwiając zapis grafu bez solve. Ta poprawka oczekuje celowanego
 ponowienia. Bez pełnej suite, FDTD, PSU. Archiwum użytkownika nietknięte.
+
+
+### PCB-015D3 — odbiór celowany i przekazanie
+
+Po checkpointcie `02d6abbf535f2dd88abcbe28edb3d51dd9c339e4` ponowiono
+`test_reduced_source_arcs`: 3 PASS. Rozszerzono o nietypowe ±sweeps oraz >180°:
+4 testy pliku + 3 regresje source ARC/projected LINE/real spiral canonical:
+**7 PASS**. Dodatkowo 2 pojedyncze regresje: parallel coupling guard i brak
+native/full-wave importów FAST: **2 PASS**. Nazewnictwo wcześniej 3 PASS.
+
+Realna spirala Git (SHA d94187520eaf519afd6fa3ba8625a3aa43d2b03a9a9178a924ac98586e504132):
+5 aktywnych LINE + 7 ARC netu A = **36.373621555 mm** analitycznej osi przed
+oraz po geometry resolution 10 µm. Zachowano 2 ground PTH, R1 i źródło.
+Jawne założenia testu: plating 25 µm i R1 49.9 Ω, nie parametry odczytane z CAD.
+CLI zapisuje graf oraz summary z curved audit, odmawia solve na **curved coupling
+analysis unsupported** i nie tworzy impedance.csv. Konsola wymienia też
+5 skośnych LINE: zero wykrytych x/y overlaps nie jest dowodem braku sprzężeń.
+Parametry TL pozostają uniform quasi-TEM, korekty krzywizny jawnie pominięte;
+żaden graf ARC nie dostaje automatycznie niesprzężonego wyniku.
+
+Zaktualizowano todo/docs/migracja: D3 metryka/graf DONE, PCB-015C OPEN.
+Audyt dokumentacji objął README/AGENTS (aktualizacja statusu ARC) oraz cel/architekturę (bez zmian).
+Bez PSU, pełnej suite, natywnych solverów, FDTD, benchmarków i zmian archiwów
+użytkownika/starych wyników. Wersja lokalna użytkownika af91f861... nie była
+badana. Następny zakres to wyłącznie fizyczne sprzężenia spirali.

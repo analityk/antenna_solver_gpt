@@ -8,7 +8,7 @@
 **Repozytorium:** `analityk/antenna_solver_gpt`  
 **Docelowa gałąź:** `main` (chyba że użytkownik jawnie wskaże inną)  
 **Ostatnia inspekcja dokumentów:** 2026-10-21, Europe/Warsaw  
-**Potwierdzony opublikowany checkpoint przed aktualizacją:** `3b373e9efc7cca5e5ef9e8d71bf8b02038bcd867`
+**Potwierdzony opublikowany checkpoint przed aktualizacją:** `02d6abbf535f2dd88abcbe28edb3d51dd9c339e4`
 **Uwaga:** ten SHA jest punktem historycznym, nie obietnicą, że nadal jest HEAD. Każde wznowienie rozpoczyna się sprawdzeniem Git.
 
 ## 1. Instrukcja dla nowego czatu — wykonaj po wskazaniu tego pliku
@@ -133,95 +133,84 @@ utworzeniem. W nagłówku zapisuj SHA ostatniego *już potwierdzonego*
 commita bazowego, a opublikowany SHA nowego commita podawaj po publikacji
 w raporcie końcowym. Nowy czat zawsze sam sprawdza HEAD.
 
-## 4. Bieżący punkt wznowienia — PCB-015D4
+## 4. Bieżący punkt wznowienia — spirala po PCB-015D3
 
-**Kierunek:** pełne `.epro` → canonical PCB/source semantics → FAST.
-**Baza zadania:** b7626f36bd582d678893b7f587f89f59cc745d50.
-**Ostatni już opublikowany checkpoint przed tym zapisem:**
-3b373e9efc7cca5e5ef9e8d71bf8b02038bcd867 (wcześniej b2086ca9ff41a848534c8945d440bd970beea5ed).
-Zawsze sprawdź nowy HEAD; niniejszy końcowy checkpoint dostaje SHA po publikacji.
+**Zakres użytkownika: wyłącznie `gerbs/emtest4/spirala.epro`. Bez PSU.**
+Nie powtarzać szerokiego D4, nie uruchamiać pełnej suite/native/FDTD/benchmarków.
 
-**DONE:** importer `.epro` bez ekstrakcji/pośredniego Gerbera, CRC/limity,
-strict JSON, project.json i wybór PCB, resolver `.efoo`/embedded, PCB Footprint
-przed Device, PAD ID+number+net, obrót/odbicie/SI, CSRC Value=0/source_index=0.
-Materializacja padów, union miedzi per net/warstwa, kontrola zwarć i ownership,
-contact metadata, port z rzeczywistej szczeliny i jawne idealne RLC są zintegrowane
-z istniejącą ścieżką. Gerber i samodzielny .epcb pozostają kompatybilne.
+**DONE — nazewnictwo:** wspólny lekki allocator Gerber/FAST daje
+`outcomes/pcb_reduced/spirala_001`, następnie max zajętych numerów +1.
+Atomowy mkdir obsługuje równoległe starty; działa także `--inspect-source`.
+Jawny `--output` ma pierwszeństwo. Stare katalogi i archiwa nietknięte.
+Opublikowany checkpoint `b9c99872ceb6eb936bbcc666eb10bb2ee78a7de9`.
 
-**Obsługiwany profil:** PCB/footprint 1.8, editor 2.2.x, top/bottom/jeden dielektryk,
-RECT bez round corners, circle/OVAL SMD, round through PAD z jawnym plating.
-Footprinty 1.3/1.7 tylko indeksowane; ich geometria odrzucana. Przesunięcie
-pad local → mirror Y na bottom → obrót instancji → PCB. Nie zmieniono
-full-wave, meshera, PML ani tolerancji. Epsilon_r=1 i gruby dielektryk legalne.
+**DONE — D3 metryka i graf semantic ARC:** `SourceSection` rozróżnia ARC/LINE,
+zachowuje source endpoints/center/signed sweep i rzeczywistą długość r*abs(theta).
+Projektowane węzły nie wyznaczają nowego promienia. Kierunek, net/owner, source
+junctions, physical contact i receipt projekcji są kontrolowane. Nie zmieniono
+full-wave, mesh, PTH ani tolerancji. Implementacja opublikowana w
+`02d6abbf535f2dd88abcbe28edb3d51dd9c339e4`; późniejszy checkpoint uzupełnia
+wyniki, diagnostykę konsoli i dokumentację (sprawdź HEAD).
 
-**Dostępność i odbiór realny:** oba archiwa są w Git od b7626f3, nie w ulotnym
-załączniku; żadnego pliku użytkownika nie zmodyfikowano.
+**Potwierdzona spirala Git:** SHA256
+`d94187520eaf519afd6fa3ba8625a3aa43d2b03a9a9178a924ac98586e504132`.
+Canonical D4 nadal: 2 COMPONENT, 4/4 PAD_NET, pady R0603, 6 LINE, 7 ARC,
+2 VIA, 4 conductors. CSRC = source_index 0, nie kondensator zero.
+Aktywny net A: **5 LINE + 7 ARC, 36.373621555 mm**, przed/po projekcji 10 µm.
+2 PTH uziemiają dwa top conductors. Jeden jawny testowy R1 = 49.9 Ω,
+plating = 25 µm; to nie odczytane/domyślne parametry produkcyjne.
+Testowana ścieżka CLI zapisuje graf/summary, bez impedance.csv.
+Wariant lokalny użytkownika SHA `af91f8611267418ca6039f0af45b78475c8998694abf324632a14de69e743df0`
+nie był tutaj dostępny/testowany; nie nadpisano pliku Git ani danych użytkownika.
 
-- `gerbs/emtest4/spirala.epro`, SHA256
-  d94187520eaf519afd6fa3ba8625a3aa43d2b03a9a9178a924ac98586e504132:
-  canonical PASS — 2 COMPONENT, 4 PAD_NET, cztery fizyczne pady R0603,
-  6 LINE, 7 ARC, 2 VIA, 4 conductors. CSRC source_index=0. Każdy pad ma
-  fizyczny kontakt. PcbGeometry, normalizacja/odwrotność, pełna szczelina portu,
-  PTH top/bottom i R1 sprawdzone z **jawnymi testowymi** plating=25 um,
-  R1=49.9ohm (to nie domyślny parametr producenta/source).
-- `gerbs/test_psu/test_psu.epro`, SHA256
-  659e3eacb05b4f91645bab3f621723adf85d14f56505aa6962e7d3f60a770982:
-  identity PASS — 291 komponentów/906 PAD_NET z kontrolą ID i numeru,
-  288 PCB explicit + 3 Device fallback; 257 library + 34 embedded.
-  **Physical canonical UNSUPPORTED:** pierwsza odmowa pusty NET (PCB record 145).
-  Dalej są stare footprinty 1.3/1.7, slots i bogatszy materiał/pours.
-  Nie deklarować ich fizycznego connectivity ani wyniku FAST.
-
-**PARTIAL:** ogólna zgodność EasyEDA, elektryczny FAST i source component subset.
-CSRC/Value to indeks, nie nominalna pojemność Device. Zwykły C1 nie jest źródłem.
-Kolejne jawne źródła mogą mieć Solver Role=source i ciągłe indeksy od 0;
-obecny solver odrzuca wiele źródeł. `component_values` ustala jawne R/L/C;
-niezamodelowany element nie jest cicho pomijany. 3D nie rozstrzyga footprintu.
-
-**OPEN:** D3 Arc TL, PCB-015C coupling, rozszerzenie PSU i opcjonalne D2.
-Realna spirala po udanym canonical dociera do **EasyEDA source ARC unsupported**.
-Nie wygenerowano dla niej Z/S11 i nie należy deklarować całego FAST jako PASS.
+**PARTIAL — fizyka FAST:** analityczna długość łuku jest w istniejącym modelu
+TL, ale parametry przekroju są nadal uniform quasi-TEM; korekty krzywizny i
+sprzężenia nie są obliczane. **OPEN / pierwszy blocker:**
+`Reduced PARTIAL: semantic ARC lengths/topology extracted; curved coupling analysis unsupported (PCB-015C)`.
+`curved_coupling_audit` wymienia 7 ARC oraz 5 skośnych LINE. Brak osiowych
+parallel overlaps nie znaczy braku sprzężeń. Solve jest blokowany przed Z/S11.
 
 ## 5. Następne zadanie i źródła kodu
 
-**Najbliżej PCB-015D3:** korzystać z zachowanych source ARC/signed sweep/radius,
-nie tessellacji ani cięciwy. Po nim coupled microstrip; nie omijać guardów.
-Warunek: poprawny model i testy łuku, zachowana semantyczna ciągłość i długość.
-PSU jest odrębnym zakresem kompatybilności, nie wymogiem do rozpoczęcia D3.
+**PCB-015C: pairwise/curved coupling dla spirali.** Najpierw jawny fizyczny
+kontrakt modelu, potem implementacja; żadnych zgadywanych współczynników,
+obcięcia łuków do cięciw ani milczącego pomijania bliskich sekcji. D3 nie jest
+walidacją EM całej serpentyny. Arc curvature corrections pozostają jawnie
+niezamodelowane. Nie rozszerzać zadania o PSU.
 
-Kod D4: `pcb/easyeda_project.py` (bezpieczny ZIP/resolver),
-`pcb/easyeda_footprints.py` (pady i transformacje), `pcb/easyeda_model.py`
-(canonical/net/contact), `pcb/reduced_control.py` (CLI),
-`pcb/source_ir.py`, `solvers/reduced_source.py` (guard/terminal).
-`tests/test_pcb_easyeda_project.py` i legacy `test_pcb_easyeda.py`.
-Pełny kontrakt i ograniczenia: docs/pcb-easyeda.md, docs/pcb-reduced.md, todo.md.
+Kod: `solvers/reduced_source.py` (source axis/audit), `solvers/reduced_pcb.py`
+(SourceSection, graph, guard), `pcb/reduced_control.py` (CLI i zapis przed odmową),
+`pcb/output.py` (nazwy). Źródła D4: `pcb/easyeda_project.py`,
+`pcb/easyeda_footprints.py`, `pcb/easyeda_model.py`, `pcb/source_ir.py`.
+Pełny kontrakt: docs/pcb-easyeda.md, docs/pcb-reduced.md, todo.md.
 
-## 6. Dowody i następne tanie komendy (CMD Windows)
+## 6. Wykonane testy i następna tania komenda (CMD Windows)
 
-Faktycznie uruchomione w D4:
-- `python -X utf8 -m unittest test_pcb_easyeda_project -v`: 11 PASS (pierwszy checkpoint).
-- `python -X utf8 -m unittest test_pcb_easyeda_project test_pcb_easyeda -v`: 25 PASS.
-- Trzy testy po wzmocnieniu asercji: round THT z jawnym plating,
-  real spiral canonical/Arc guard, explicit source indices: 3 PASS.
-- Read-only diagnostic obu archiwów: wyniki powyżej; pierwsza próba PSU
-  wykazała wersję biblioteki 1.7, po rozdzieleniu indeksu od materializacji
-  potwierdzono 291/906 i aktualny physical guard pustego NET.
-Nie uruchomiono pełnej suite, native/FDTD, benchmarków ani convergence sweeps.
-Nie wykonywano pełnego solve serpentyny. Wyniki historyczne anten i D0/D1
-pozostają w history.md; nie są dowodem nowej walidacji EM.
+W tej sesji faktycznie wykonano:
+- `test_pcb_output`: 3 PASS (nazwy, równoległość, explicit output/inspect).
+- `test_reduced_source_arcs`: pierwsza próba 2 PASS / 1 ERROR (skośna e40 w
+  starym x/y guardzie), po poprawce 3 PASS. Następnie rozszerzony plik: 4 PASS.
+- Wraz z rozszerzonym plikiem 3 pojedyncze regresje: `test_pcb_easyeda.EasyEdaTests.test_source_arc_survives_projection_but_physics_remains_guarded`,
+  `test_pcb_easyeda.EasyEdaTests.test_source_only_fast_without_manufacturing_files`,
+  `test_pcb_easyeda_project.ProjectTests.test_real_spiral_canonical_port_vias_and_explicit_passive`:
+  cały ten mały zestaw 7 PASS.
+- `test_pcb_reduced.ReducedTests.test_parallel_runs_detected_not_silently_ignored`
+  i `test_import_does_not_load_native_or_fullwave_adapter`: 2 PASS.
+- `git diff --check`: bez błędów whitespace.
+
+Nie uruchomiono pełnej suite, PSU, native/FDTD, benchmarków, convergence ani
+szerokich sweepów. Testy realnej spirali użyły tymczasowych katalogów; stare
+`outcomes/` pozostały nietknięte. Historia D4 jest w history.md, nie jest nowym
+testem tej sesji.
+
+Następny tani test lokalny (bez parametrów/solverów natywnych):
 
 ```cmd
-git pull --ff-only && .\.venv\Scripts\python.exe -m antenna_lab.pcb.reduced_control --easyeda-project gerbs\emtest4\spirala.epro --inspect-source
+git pull --ff-only && .\.venv\Scripts\python.exe -X utf8 -m unittest discover -s tests -p test_reduced_source_arcs.py -v
 ```
 
-```cmd
-.\.venv\Scripts\python.exe -X utf8 -m unittest discover -s tests -p test_pcb_easyeda_project.py -v
-```
-
-Inspekcja nie wymaga config portu/plating. Solve wymaga jawnego source-config
-(port mode=source/source_index albo explicit; plating oraz component_values),
-przy czym obecne guardy Arc/coupling nadal uniemożliwiają pełny wynik serpentyny.
-Nie zgaduj brakującej elektryki z Device. Polecenia/dane przykładów są w docs.
+Inspekcja użytkowa:
+`.\.venv\Scripts\python.exe -m antenna_lab.pcb.reduced_control --easyeda-project gerbs\emtest4\spirala.epro --inspect-source`
 
 ## 7. Dokumenty, decyzje i ograniczenia wymagające zachowania
 
@@ -266,20 +255,3 @@ Jeśli odpowiedź brzmi „nie”, uzupełnij przekazanie przed końcem pracy
 zamiast liczyć, że następnym razem użytkownik pamięta brakujące fakty.
 Unikaj rutynowych aktualizacji bez zmian merytorycznych. Ten mechanizm
 powinien działać niezależnie od czasu życia, liczby i modelu kolejnych czatów.
-
-### Checkpoint 2026-10-21 — zakres wyłącznie spirala
-
-Najnowsze polecenie użytkownika ogranicza pracę do `spirala.epro`, bez PSU.
-FAST przechodzi na wspólną z Gerber numerację `spirala_NNN`, także dla
-`--inspect-source`; testy w `test_pcb_output.py`. Następny krok to D3
-semantyczne ARC, potem jawna blokada niewymodelowanych sprzężeń. Ostatni
-opublikowany HEAD przed tym checkpointem: `4af79ef1dc3ddfca82cbf13228e84e22db7ff822`.
-
-### D3 checkpoint implementacji (przed ponownym testem spirali)
-
-Nazwy opublikowane: `b9c99872ceb6eb936bbcc666eb10bb2ee78a7de9`, 3 testy PASS.
-SourceSection liczy ARC analitycznie i zapisuje graf przed odmową coupling.
-Pierwszy `test_reduced_source_arcs`: 2 PASS / 1 ERROR — rzeczywista skośna LINE
-`e40` wymagała pozostawienia jawnego oblique guardu obok curved guardu.
-Poprawka jest w checkpointcie, wymaga ponowienia tego samego małego pliku.
-D3 PARTIAL do weryfikacji; brak wyniku Z/S11 jest zamierzony. Nie badać PSU.

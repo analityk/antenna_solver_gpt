@@ -440,6 +440,8 @@ def build_reduced_model(geometry):
         nodes=[dict(id=nodes[p],xy_m=p) for p in coords],line_sections=lines,
         extraction_method='easyeda_source_routes' if geometry.design_source is not None else ('gerber_source_routes' if geometry.route_provenance_available else 'legacy_synthetic_polygon'),
         design_source=geometry.design_source,
+        source_axis_metric_contract=('original normalized CAD radius/signed sweep or LINE endpoint distance; projected endpoints define graph nodes, not a refitted curve' if geometry.design_source is not None else 'existing Gerber/synthetic section endpoint distance'),
+        arc_parameter_contract='uniform lossless quasi-TEM cross-section integrated over analytic arc length; curvature corrections not modeled, all ARC solves blocked pending curved coupling',
         source_routes=[asdict(r) for r in (geometry.source_routes if geometry.design_source is not None else geometry.routes)],
         physical_features=features,coupled_sections=coupled,lumped_components=components,
         source_port_nodes=list(source),source_port_id=geometry.port.id,

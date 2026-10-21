@@ -47,7 +47,8 @@ do bottom ground oraz wąski parser source-only `*.epcb` (D0/D1),
 oraz importer `.epro`/`.efoo` D4 w zadeklarowanym podzbiorze.
 Canonical serpentyny z rzeczywistymi padami przechodzi audyt; PSU pozostaje
 częściowo obsługiwany (referencje 291/906, nie pełna geometria).
-Nie ma modelu elektrycznej długości `ARC` ani fizycznego sprzężenia linii.
+D3 zachowuje analityczną długość osi `ARC` i graf tras. Nadal brak fizycznego
+modelu sprzężeń krzywych/skośnych odcinków; solve odmawia jawnie.
 Pełna serpentyna nie ma potwierdzonego wyniku FAST Z/S11.
 
 **Nowy docelowy workflow PCB**: geometria pochodzi z pełnego
@@ -72,7 +73,7 @@ jest teraz głównie w wielokrotnym `compact_features()`; w pomiarze wykonano
 go 17 razy, a `make_pcb_domain_mesh()` nadal dwa razy.
 
 Najbliższe kroki i kolejność są utrzymywane w [todo.md](todo.md):
-po canonical import D4 dla serpentyny następny jest model Arc TL (D3),
+po canonical import D4 i grafie/metryce ARC D3 dla serpentyny następne są
 fizyczne sprzężenia (PCB-015C) i opcjonalny audyt
 zgodności produkcji z Gerberami. Viewer pól full-wave ma już domyślny
 **Fit PCB** dla widoku XY (bbox PCB + 6% marginesu) i można nim przerysować

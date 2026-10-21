@@ -52,13 +52,17 @@ canonical serpentyny sprawdzony, cała geometria PSU nadal niewspierana.
   projektu+legacy .epcb, następnie 3 celowane testy (THT/serpentyna/source index).
   Każdy zestaw PASS; bez pełnej suite i native/FDTD.
 
-**TERAZ — PCB-015D3 (OPEN):** model semantic Arc TL, fizyczna długość
-z promienia/signed sweep, bez cięciwy. Realny canonical jest dostępny;
-`build_reduced_model` zatrzymuje go na `EasyEDA source ARC unsupported`.
-**POTEM — PCB-015C (OPEN):** fizyczne pairwise/curved coupling.
-Nie produkować niesprzężonego przybliżenia serpentyny jako wyniku końcowego.
-**Osobny dług D4:** rozszerzenie PSU (puste/unconnected nets, starsze biblioteki,
-slots/custom pads, complex pours/stackup). Nie blokuje rozpoczęcia D3 dla spirali.
+**PCB-015D3 DONE — geometria, metryka i graf semantic ARC dla spirali:**
+5 LINE + 7 ARC netu A, długość 36.373621555 mm przed/po projekcji.
+Promień i signed sweep źródła; projektowane węzły nie wyznaczają nowego okręgu.
+Zachowane kontakty, 2 ground-PTH, jawny testowy R1 oraz source_index=0.
+`spirala_NNN` działa także dla inspekcji; checkpoint nazw `b9c9987`.
+**TERAZ — PCB-015C (OPEN):** fizyczne pairwise/curved coupling wyłącznie spirali.
+Pierwszy blocker: `curved coupling analysis unsupported`; 7 ARC i 5 skośnych
+LINE mają niewspierane sprzężenia. Powstaje graf, nigdy pozornie poprawne Z/S11.
+Krzywiznowa korekta parametrów przekroju pozostaje jawnie niezamodelowana.
+**Poza aktualnym zakresem:** PSU i dalsza zgodność D4; nie analizować/testować
+bez nowego polecenia użytkownika.
 D2 source/manufacturing reconciliation nadal opcjonalne. Pełny zakres/CLI:
 [docs/pcb-easyeda.md](docs/pcb-easyeda.md).
 
@@ -182,7 +186,7 @@ Wymagania:
 
 Nie używać tej tolerancji jako tolerancji FAST, meshera ani geometry-resolution.
 
-### P3 — PCB-015D3: semantic Line/Arc transmission-line graph
+### P3 — PCB-015D3: semantic Line/Arc transmission-line graph (DONE dla spirali)
 
 Po source-first parserze FAST ma brać długość i topologię z prymitywów CAD.
 
@@ -230,6 +234,6 @@ viewerów i minimalnej liczby FDTD. Nie mieszać tego z parserem EasyEDA.
 10. Znaczącą pracę commitować i publikować na `origin/main` przed drogimi
     testami. PASS/PARTIAL/FAIL nie blokuje checkpointu/pusha.
 
-Aktualny krok to **D3 Arc TL**, następnie coupling. D4 canonical serpentyny
+Aktualny krok to **PCB-015C curved/pairwise coupling dla spirali**. D4 canonical serpentyny
 nie wymaga Gerbera. Starsze wpisy D0/D1 i audyty przed D4 są w history.md;
 nie traktować ich dawnych braków bibliotek jako aktualnego blockera.

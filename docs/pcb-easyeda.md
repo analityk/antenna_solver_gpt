@@ -25,7 +25,12 @@ się domyślną geometrią.
 R0603, 6 LINE / 7 ARC / 2 VIA, nety A/B i 4 conductors. CSRC ma source_index=0.
 Potwierdzono kontakt wszystkich czterech padów, PcbGeometry, normalizację
 oraz — przy jawnych testowych założeniach metalizacji i R1 — port i PTH.
-FAST następnie odmawia na `EasyEDA source ARC unsupported`; nie emituje Z/S11.
+D3 wyznacza 5 LINE + 7 ARC aktywnego netu A, 36.373621555 mm osi.
+Graf zapisuje `reduced_model.json`; solve odmawia na `curved coupling analysis
+unsupported` (PCB-015C), nie emituje Z/S11. 2 ground-PTH oraz R1 pozostają
+w grafie. Parametry 25 µm i 49,9 Ω były jawne, wyłącznie testowe.
+Automatyczny katalog to `outcomes/pcb_reduced/spirala_NNN`, także dla inspekcji.
+Nie nadpisuje dawnych wyników; `--output` ma pierwszeństwo.
 
 **PSU: identity PASS, physical canonical UNSUPPORTED.** Archiwum
 `gerbs/test_psu/test_psu.epro`: kod potwierdził 291 komponentów, 906 mapowań

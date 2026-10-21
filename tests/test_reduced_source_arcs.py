@@ -1,7 +1,7 @@
 """Semantic ARC geometry/graph only; no native solver or coupling guesses."""
 from dataclasses import replace
 from hashlib import sha256
-from math import hypot, pi
+from math import hypot, pi, sin, radians
 from pathlib import Path
 import json
 from tempfile import TemporaryDirectory
@@ -56,6 +56,16 @@ class SemanticArcTests(unittest.TestCase):
                 with self.assertRaisesRegex(ConfigurationError,'ARC is not a straight line'):
                     detect_coupled_sections(sections)
         self.assertTrue(all(abs(x-lengths[0])<1e-14 for x in lengths))
+
+    def test_nonspecial_signed_sweeps_use_true_radius(self):
+        for angle in (59.0156,-104.918,270,-270):
+            items=records();items[13]=['ARC','right',0,'A',1,100,0,200,0,angle,10,0]
+            route=parse_easyeda_source(encoded(items)).routes[1]
+            radius=source_arc_radius(route)
+            chord=hypot(*(b-a for a,b in zip(route.start_xy_m,route.stop_xy_m)))
+            self.assertAlmostEqual(radius,chord/(2*abs(sin(radians(angle)/2))),places=14)
+            reversed_route=replace(route,start_xy_m=route.stop_xy_m,stop_xy_m=route.start_xy_m,signed_sweep_deg=-angle)
+            self.assertAlmostEqual(source_arc_radius(reversed_route),radius,places=14)
 
     def test_inconsistent_source_arc_and_stale_projection_rejected(self):
         raw=routes_fixture();r=next(r for r in raw.routes if r.kind=='ARC')

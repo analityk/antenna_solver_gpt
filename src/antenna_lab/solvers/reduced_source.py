@@ -78,7 +78,7 @@ def extract_source_sections(geometry,active_ids,section_type):
             if overlap.area>TOLERANCE_M*(route_shape(a).length+route_shape(b).length):
                 raise ConfigurationError(f'Reduced EasyEDA {a.id}/{b.id}: nonlocal source stroke contact unsupported.')
     # CAD component copper is not an implicit electrical two-terminal model.
-    # Arc retains its precise guard; for LINE-only projects never silently omit RLC.
+    # No component may be silently omitted, with either LINE or ARC routes.
     unresolved=[c['designator'] for c in geometry.design_source.get('resolved_components',())
                 if c['role']!='source' and c['designator'] not in {p.id for p in geometry.components}]
     if unresolved:

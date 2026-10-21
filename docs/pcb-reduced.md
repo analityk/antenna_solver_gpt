@@ -44,7 +44,8 @@ arbitralnego progu „wystarczająco daleko”. Serpentyna wymagająca sprzęże
 nie dostanie udawanego CSV z liniami niesprzężonymi. Najbliższa brakująca część
 to model macierzy C/C0 lub modalny sprzężonego przekroju oraz stamp wieloportu.
 
-Odrzucamy także: łuki/skosy, niejednoznaczne krótkie pady, rozgałęzione paski,
+Solve nadal odrzuca łuki/skosy bez modelu sprzężeń (semantic ekstrakcja D3 poniżej),
+niejednoznaczne krótkie pady, rozgałęzione paski,
 nieudowodnione przejścia szerokości, nieobsługiwane wiercenia/vias (poniżej), inner copper, różne
 materiały w stackupie, ground slots, niepoprawne/singularne sieci. Trzy i więcej
 równoległych odcinków również nie są obsługiwane. Nie ma fallback do FDTD.
@@ -200,3 +201,39 @@ Bez `--output`: `outcomes/pcb_reduced/<nazwa-wejścia>_<NNN>`, np.
 `spirala_001`, `spirala_002`. Numer jest większy od zajętych numerów danego
 wejścia; mkdir rozstrzyga równoległe starty. Dotyczy także `--inspect-source`.
 Jawny `--output` ma pierwszeństwo. Dawne wyniki pozostają nietknięte.
+
+
+## PCB-015D3 — semantyczne ARC dla `spirala.epro`
+
+`SourceSection.kind` rozróżnia LINE i ARC. Kierunek start→stop i signed sweep
+nie są sortowane ani zastępowane cięciwą. Długość ARC = r·abs(theta), theta w
+radianach; r jest odległością źródłowego startu od źródłowego środka. Kontrola
+obrotu o signed sweep musi trafić w source end w dotychczasowej tolerancji.
+LINE zachowuje długość rzeczywistych source endpointów, także przy skosie.
+
+Po geometry resolution węzły grafu używają projektowanych endpointów, natomiast
+metryka pozostaje metryką oryginalnego, znormalizowanego CAD. Receipt projekcji
+wiąże audyt z geometrią; zmieniony/stary receipt jest odrzucany. Niezależnie
+zaokrąglony środek/start/end nie służy do dopasowania nowego okręgu. Fizyczny
+polygon, właściciel/net i audyt źródłowej osi oraz projektowanych terminali
+pozostają obowiązkowe. Kontakt/intersection używa dotychczasowej aproksymacji
+krzywych importera wyłącznie do predykatów geometrii, nigdy do długości TL.
+LINE↔ARC / ARC↔ARC zachowują source junctions; projekcja nie może ich sklejać.
+
+Sekcje wchodzą do istniejącego grafu TL z analityczną długością i opisanym
+jednorodnym, bezstratnym quasi-TEM przekrojem. Nie dodano korekt impedancji od
+krzywizny ani sprzężeń. **Każdy graf zawierający ARC jest blokowany przed solve**:
+`curved_coupling_audit` wymienia ARC i skośne LINE. Detektor x/y nie przyjmuje
+ARC jako prostych. `parallel_overlap_count=0` nie oznacza braku sprzężeń krzywych.
+Nie używamy arbitralnego progu odległości ani nie produkujemy impedancji spirali.
+
+Odbiór archiwum Git SHA256
+`d94187520eaf519afd6fa3ba8625a3aa43d2b03a9a9178a924ac98586e504132`:
+net A: **5 LINE + 7 ARC, 36.373621555 mm** przed/po projekcji 10 µm.
+Zapis grafu/summary działa, brak impedance.csv jest sprawdzony. Użytkownik ma
+również archiwum o SHA `af91f861...`; tego konkretnego pliku tutaj nie testowano.
+Mały test CMD (bez native/FDTD):
+
+```cmd
+.\.venv\Scripts\python.exe -X utf8 -m unittest discover -s tests -p test_reduced_source_arcs.py -v
+```

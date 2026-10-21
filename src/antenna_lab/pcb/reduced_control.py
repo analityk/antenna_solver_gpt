@@ -119,12 +119,16 @@ def run_reduced(input_path, output_dir, *, pcb_config=None, geometry_resolution_
             omitted_effects=model['omitted_effects'],unsupported_status=model['unsupported_status'],
             extracted_section_count=len(model['line_sections']),
             total_centerline_length_m=model['total_centerline_length_m'],
-            parallel_overlap_count=len(model['coupled_sections']))
+            parallel_overlap_count=len(model['coupled_sections']),
+            curved_coupling_audit=model['curved_coupling_audit'])
         print(f"Model: reduced_quasi_tem (approximate, lossless TL)\n"
               f"Sections: {len(model['line_sections'])}; length: {model['total_centerline_length_m']*1e3:.2f} mm\n"
               f"Width classes [mm]: {[round(w*1e3,6) for w in model['width_classes_m']]}\n"
               f"Parallel overlaps: {len(model['coupled_sections'])}; "
               f"length: {sum(c['overlap_length_m'] for c in model['coupled_sections'])*1e3:.2f} mm\n"
+              f"Curved coupling audit: {model['curved_coupling_audit']['status']}; "
+              f"ARC: {len(model['curved_coupling_audit']['section_ids'])}; "
+              f"oblique LINE: {len(model['curved_coupling_audit']['oblique_section_ids'])}\n"
               f"Ground vias: {len(model['ground_vias'])}\n"
               f"Ground-connected top conductors: {len(model['ground_connected_top_conductors'])}\n"
               f"Ideal components: {len(model['lumped_components'])}; frequencies: {len(result_frequency_hz)}\n"
