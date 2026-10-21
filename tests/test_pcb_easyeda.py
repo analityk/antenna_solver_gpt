@@ -153,6 +153,11 @@ class EasyEdaTests(unittest.TestCase):
         with self.assertRaisesRegex(ConfigurationError,'EasyEDA source ARC unsupported.*right'):
             build_reduced_model(g)
 
+    def test_inner_physical_layer_cannot_be_silently_omitted(self):
+        items=records()+[['LAYER',15,'SIGNAL','Inner1',3],['LAYER_PHYS',15,'',1.378,0,0,1]]
+        with self.assertRaisesRegex(ConfigurationError,'inner stackup unsupported'):
+            build_source_layout(parse_easyeda_source(encoded(items)))
+
     def test_source_short_and_unknown_layers_not_ignored(self):
         items=records()+[['LINE','short',0,'A',1,-400,0,-100,0,10,0]]
         with self.assertRaisesRegex(ConfigurationError,'source short'):

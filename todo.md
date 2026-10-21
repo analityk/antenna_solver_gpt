@@ -172,5 +172,25 @@ viewerów i minimalnej liczby FDTD. Nie mieszać tego z parserem EasyEDA.
 10. Znaczącą pracę commitować i publikować na `origin/main` przed drogimi
     testami. PASS/PARTIAL/FAIL nie blokuje checkpointu/pusha.
 
-Najbliższy krok: **PCB-015D0 — minimalny parser EasyEDA source PCB i jawny,
-deterministyczny semantic IR.** Nie rozwijać teraz Gerber-only Arc reconstruction.
+Najbliższy krok po checkpointach D0/D1: **jawna geometria zewnętrznego footprintu
+CSRC/R1 i adapter kontaktów komponentów**, następnie semantic Arc TL oraz
+pairwise/curved coupling. Nie rekonstruować brakującego footprintu z Gerbera.
+D2 reconciliation pozostaje opcjonalne i nie jest implementowane.
+
+### Checkpoint D0/D1 — 2026-10-21
+
+Działa source-only parser PCB 1.8/editor 2.2.x, neutralny IR i ograniczony
+canonical layout (top / jeden dielektryk / bottom, R/L outline, materializowany
+POURED, absolutne RECT PAD, Line/Arc, VIA z jawną metalizacją). CLI:
+`reduced_control --easyeda-source ... --inspect-source` nie wymaga portu/Gerbera.
+Kompletny syntetyczny source z explicit port przeszedł FAST bez Gerberów;
+11 testów w test_pcb_easyeda.py PASS na pierwszym checkpointcie integracji.
+
+Realny dodany do repo test_spirala.epcb: parser i layout PASS, 198 rekordów,
+6 LINE, 7 ARC, 2 VIA, obrys ~25 mm, substrate ~0.2 mm / epsilon_r=4.5.
+Canonical layout jawnie niekompletny: brak geometrii footprintu o hashu
+`e8bf627583724bdebefbaa0be79b0d2f` dla CSRC/R1. Nie wykonano solve ani native.
+Dla bezpośrednich PADów źródłowych jeden route junction w padzie może być
+idealnym terminalem, bez zgadywania lead length i bez parasitics.
+Opis units/ograniczeń: docs/pcb-easyeda.md. Brak Gerbera = not_requested.
+

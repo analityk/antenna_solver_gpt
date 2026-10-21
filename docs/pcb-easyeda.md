@@ -89,3 +89,15 @@ nie są odzyskiwane z polygonów. Fizyczny audyt projekcji pozostaje obowiązkow
 Nie wdrożono D2 ani publicznego parametru manufacturing tolerance. Nie ma
 ukrytego domyślnego limitu; source-only zapisuje `not_requested`. Gerber ZIP/
 katalog nadal działa przez dotychczasowy argument pozycyjny. Full-wave bez zmian.
+
+
+## Sprawdzenie checkpointu 2026-10-21
+
+11 testów w `test_pcb_easyeda.py` PASS: parser, jednostki, signed sweeps,
+VIA, nietypowy dielektryk, błędy, brak footprintu, source-only FAST z idealnymi
+padami, projekcja/normalizacja i guard Arc. Realny `test_spirala.epcb` dodany
+przez użytkownika do repo: odczyt + canonical layout PASS (198 records,
+6 Line / 7 Arc / 2 Via). Brakuje geometrii footprintu CSRC/R1
+`e8bf627583724bdebefbaa0be79b0d2f`; canonical output zachowuje ten brak,
+nie jest pełnym modelem fizycznym do solve. Pełny source nie był zmieniany.
+Nie sprawdzano `test_spirala.zip`, nie uruchamiano FDTD ani pełnej suite.

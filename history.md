@@ -2086,3 +2086,27 @@ PML, meshera, profili ani fizyki PTH. Testy syntetyczne test_pcb_easyeda.py
 przygotowane, jeszcze nieuruchomione: publikacja checkpointu przed sprawdzeniem.
 Source test_spirala.epcb obecny w repo od użytkownika zachowano bez zmian;
 nie wykonano jeszcze jego parser/canonical diagnostic ani pełnej suite/native.
+
+
+### PCB-015D0/D1 — wynik małych sprawdzeń i ograniczenie zakresu
+
+Opublikowano 7503ac1737dfaa7ae8a85144c110b516bf4bc277 (D0) oraz
+26180121f7e799480b907d80fb3dbb754c48ed38 (D1) przed testami.
+Uruchomiono `python -X utf8 -m unittest test_pcb_easyeda -v`: 11 PASS, bez
+native; source-only run syntetyczny wykonał istniejący FAST, nie importer
+Gerbera. Dodatkowo bez zapisu outcomes odczytano test_spirala.epcb przez
+load_easyeda_source/build_source_layout: 198 records, 6 LINE, 7 ARC, 2 VIA,
+4 dostępne regiony miedzi, board 25.0000008 mm, dielectric 0.1999996 mm,
+epsilon_r=4.5, manufacturing_validation=not_requested. Hash source:
+e528f2a4ac1a1957a45e48806bc93da8b42e4af4a0f1da27cd84ce26714d0c4b.
+
+Realny canonical layout jest jawnie niekompletny: CSRC/R1 odwołują się do
+nieobecnego footprintu e8bf627583724bdebefbaa0be79b0d2f. Nie zgadywano padów,
+nie uruchamiano solve serpentyny ani test_spirala.zip. D2 odłożone zgodnie
+z priorytetem source-only. Następnie potrzebne footprint/component contacts,
+semantic Arc i coupled physics; todo zaktualizowane do rzeczywistego blockera.
+
+Przegląd statyczny dodał precyzyjny guard LAYER_PHYS inner SIGNAL/PLANE,
+żeby ograniczony single-dielectric builder nie pomijał go jako artwork.
+Nowy pojedynczy regression jeszcze nieuruchomiony przed tym checkpointem.
+Pełna suite, FDTD, native openEMS i szerokie prepare-only świadomie pominięte.

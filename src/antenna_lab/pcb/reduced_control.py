@@ -18,7 +18,7 @@ from .simulation import validate_frequency_band
 from .transform import normalize_port_orientation
 
 
-def Polygon_bounds(points):
+def _polygon_bounds(points):
     return (min(p[0] for p in points),min(p[1] for p in points),max(p[0] for p in points),max(p[1] for p in points))
 
 
@@ -71,7 +71,7 @@ def run_reduced(input_path, output_dir, *, pcb_config=None, geometry_resolution_
             if inspect_source:
                 summary.update(status='source_inspected',canonical_status='missing_dependencies' if layout['missing_dependencies'] else 'physical_layout_ready',
                     source_route_count=len(ir.routes),source_via_count=len(ir.vias),
-                    board_bounds_m=list(Polygon_bounds(layout['outline']['vertices_xy_m'])))
+                    board_bounds_m=list(_polygon_bounds(layout['outline']['vertices_xy_m'])))
                 _json(output/'summary.json',summary)
                 return summary
             override={} if source_config is None else json.loads(Path(source_config).read_text(encoding='utf-8-sig'))

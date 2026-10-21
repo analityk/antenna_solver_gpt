@@ -55,6 +55,10 @@ def build_source_layout(source):
     boards=[p for p in data['polygons'] if role[p['layer_id']]=='outline']
     if len(boards)!=1:raise ConfigurationError('EasyEDA source board outline: require one closed POLY R/L contour.')
     board=BoardOutline(tuple(map(tuple,boards[0]['ring_xy_m'])))
+    for entry in data['layer_physics']:
+        typ=layers[entry['layer_id']]['type']
+        if typ in ('SIGNAL','PLANE'):
+            raise ConfigurationError(f"EasyEDA LAYER_PHYS {entry['layer_id']}: inner stackup unsupported by source canonical checkpoint; not omitted.")
     physical=[r for r in data['layer_physics'] if role[r['layer_id']] in ('top','bottom','dielectric')]
     if [role[r['layer_id']] for r in physical]!=['top','dielectric','bottom']:
         raise ConfigurationError('EasyEDA source stackup: require ordered top / one LAYER_PHYS substrate / bottom; no default laminate.')

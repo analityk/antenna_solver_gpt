@@ -159,3 +159,14 @@ To lekcja architektoniczna PCB-012G: fizycznej prawdy nie zastępuje zgodność
 dwóch wtórnych reprezentacji numerycznych. **Nie** przenosi to reguły 1/3–2/3
 z mesha FDTD do FAST i nie dodaje tolerancji q ani q/2. Full-wave, mesh,
 PML i geometria miedzi pozostają niezmienione.
+
+
+### EasyEDA source-first — checkpoint D0/D1
+
+Główna nowa ścieżka: `--easyeda-source PATH`, opcjonalnie `--source-config`
+z jawnymi kontaktami i plating. `--inspect-source` zapisuje neutralny IR oraz
+dostępną fizyczną geometrię bez wymogu portu. Nie ładuje Gerbera. Szczegóły,
+jednostki i ograniczenia w [pcb-easyeda.md](pcb-easyeda.md). Źródłowy ARC
+zachowuje signed sweep i nie staje się TL z długością cięciwy. Dotychczasowe
+Gerber-only i synthetic pozostają kompatybilne. Zewnętrzne COMPONENT footprinty
+nie są obecnie instancjonowane; missing geometry ma jawny diagnostic.
