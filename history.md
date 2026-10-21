@@ -2110,3 +2110,11 @@ Przegląd statyczny dodał precyzyjny guard LAYER_PHYS inner SIGNAL/PLANE,
 żeby ograniczony single-dielectric builder nie pomijał go jako artwork.
 Nowy pojedynczy regression jeszcze nieuruchomiony przed tym checkpointem.
 Pełna suite, FDTD, native openEMS i szerokie prepare-only świadomie pominięte.
+
+Po publikacji 68f7e443ec5800ffbe03457f8cdba4a01f487016 uruchomiono tylko:
+- test_pcb_easyeda.EasyEdaTests.test_inner_physical_layer_cannot_be_silently_omitted
+- test_pcb_routes.RouteTests.test_transform_and_shared_projection_preserve_detached_provenance
+- test_pcb_reduced.ReducedTests.test_straight_L_U_extraction_lengths_and_determinism
+Wynik: 3 PASS. Razem wykonano 11 testów source-only i te 3 wąskie sprawdzenia.
+Nie uruchamiano pełnej suite ani native/FDTD. Blocker realnego source pozostaje
+bez zmian: brak geometrii footprintu CSRC/R1; Arc TL i D2 niezaimplementowane.
