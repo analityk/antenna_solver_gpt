@@ -2327,3 +2327,15 @@ samej numeracji max+1 i atomowego mkdir; jawny `--output` ma pierwszeństwo.
 Nie zmieniono istniejących wyników ani fizyki. Dodano małe testy numeracji,
 równoległego tworzenia i CLI. Checkpoint przed D3; testy opisane po wykonaniu.
 Wykonano `test_pcb_output`: 3/3 PASS. Bez pełnej suite i native/FDTD.
+
+## 2026-10-21 — PCB-015D3: semantic ARC checkpoint
+
+Dodano SourceSection z typem ARC, oryginalnym środkiem/signed sweep i długością
+r*abs(theta). Węzły grafu pozostają projektowane, metryka osi pochodzi z
+oryginalnej semantyki, nie z polygonu/cięciwy ani ponownego dopasowania okręgu.
+Kontrola kontaktów obejmuje LINE/ARC; jawny curved-coupling guard blokuje Z/S11.
+Pierwsze 3 celowane testy: 2 PASS; rzeczywista spirala przeszła ekstrakcję ARC,
+ale zatrzymała się na źródłowej skośnej LINE e40 w detektorze x/y.
+Checkpoint rejestruje też skośne sekcje mieszanego grafu jako niewspierane
+sprzężenia, umożliwiając zapis grafu bez solve. Ta poprawka oczekuje celowanego
+ponowienia. Bez pełnej suite, FDTD, PSU. Archiwum użytkownika nietknięte.

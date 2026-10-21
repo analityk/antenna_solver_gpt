@@ -73,6 +73,33 @@ class LineSection:
         raise ConfigurationError(f'Reduced section {self.id} from {self.feature_ids}: oblique source Line has no Cartesian axis.')
 
 
+@dataclass(frozen=True)
+class SourceSection(LineSection):
+    """Semantic CAD TL: projected graph nodes, original analytic axis metric.
+
+    Independent projection of centre/endpoints need not describe a circle.
+    Never fit a new circle or use that distorted polygon to measure length.
+    Curvature/coupling physics remains guarded before a network solve.
+    """
+    kind: str
+    source_start_xy_m: tuple[float, float]
+    source_stop_xy_m: tuple[float, float]
+    center_xy_m: tuple[float, float] | None
+    signed_sweep_deg: float | None
+    radius_m: float | None
+
+    @property
+    def length_m(self):
+        if self.kind == 'ARC':return self.radius_m * abs(self.signed_sweep_deg) * pi / 180
+        return hypot(*(b-a for a,b in zip(self.source_start_xy_m,self.source_stop_xy_m)))
+
+    @property
+    def axis(self):
+        if self.kind == 'ARC':
+            raise ConfigurationError(f'Reduced source ARC {self.feature_ids}: no Cartesian straight-line axis.')
+        return super().axis
+
+
 def _same_shape(a, b):
     # Only numerical boundary tolerance, never a geometry-resolution allowance.
     return a.difference(b).area + b.difference(a).area <= TOLERANCE_M*(a.length+b.length)
@@ -103,7 +130,7 @@ def extract_trace_sections(geometry, *, active_top_conductor_ids=None):
         raise ConfigurationError('Reduced extraction: unknown active top conductor ID.')
     if geometry.design_source is not None:
         from .reduced_source import extract_source_sections
-        return extract_source_sections(geometry,active_top_conductor_ids,LineSection)
+        return extract_source_sections(geometry,active_top_conductor_ids,SourceSection)
     if geometry.route_provenance_available:
         from .reduced_routes import extract_source_routes
         return extract_source_routes(geometry,active_ids,LineSection)
@@ -235,6 +262,10 @@ def extract_trace_sections(geometry, *, active_top_conductor_ids=None):
 
 def detect_coupled_sections(sections):
     """All separated parallel overlaps need coupling; no arbitrary gap cutoff."""
+    # Arcs cannot be silently passed to the straight parallel-overlap detector.
+    # Retain ordinary LINE diagnostics too; all curved candidates block solve.
+    if any(getattr(s,'kind','LINE')=='ARC' for s in sections):
+        raise ConfigurationError('Reduced curved coupling analysis unsupported; ARC is not a straight line.')
     oblique=[s for s in sections if s.start_xy_m[0]!=s.stop_xy_m[0] and s.start_xy_m[1]!=s.stop_xy_m[1]]
     if oblique:
         s=oblique[0]
@@ -246,7 +277,8 @@ def detect_coupled_sections(sections):
         for b in sections[i+1:]:
             if a.axis!=b.axis:continue
             axis=a.axis;t=1-axis
-            start=max(a.start_xy_m[axis],b.start_xy_m[axis]);stop=min(a.stop_xy_m[axis],b.stop_xy_m[axis])
+            start=max(min(a.start_xy_m[axis],a.stop_xy_m[axis]),min(b.start_xy_m[axis],b.stop_xy_m[axis]))
+            stop=min(max(a.start_xy_m[axis],a.stop_xy_m[axis]),max(b.start_xy_m[axis],b.stop_xy_m[axis]))
             if stop-start<=TOLERANCE_M:continue
             distance=abs(a.start_xy_m[t]-b.start_xy_m[t])
             gap=distance-(a.width_m+b.width_m)/2
@@ -330,7 +362,12 @@ def build_reduced_model(geometry):
                 f'Reduced ground reference: active signal copper {copper.id!r} is not fully above bottom ground.')
     sections,features=extract_trace_sections(geometry,active_top_conductor_ids=active_ids)
     if not sections:raise ConfigurationError('Reduced v1: no resolvable trace sections.')
-    coupled=detect_coupled_sections(sections)
+    curved=[s.id for s in sections if getattr(s,'kind','LINE')=='ARC']
+    straight=tuple(s for s in sections if getattr(s,'kind','LINE')!='ARC')
+    oblique=[s.id for s in straight if s.start_xy_m[0]!=s.stop_xy_m[0] and s.start_xy_m[1]!=s.stop_xy_m[1]]
+    # A mixed curved graph remains inspectable. Every oblique section is also
+    # listed as unresolved, not mistaken for an x/y straight section.
+    coupled=detect_coupled_sections(tuple(s for s in straight if s.id not in oblique) if curved else straight)
     substrate=geometry.dielectrics[0];h=substrate.z_max_m-substrate.z_min_m
     coords=sorted({p for s in sections for p in (s.start_xy_m,s.stop_xy_m)})
     nodes={p:f'n{i:04d}' for i,p in enumerate(coords)}
@@ -386,7 +423,10 @@ def build_reduced_model(geometry):
         na,nb=contact(c.gap_start_xy_m,c.gap_stop_xy_m,max(vs)-min(vs),c.id)
         components.append(dict(asdict(c),node_a=na,node_b=nb))
     return dict(solver_model='reduced_quasi_tem',validation_status='approximate',
-        unsupported_status='coupling_required' if coupled else None,
+        unsupported_status='curved_coupling_required' if curved else ('coupling_required' if coupled else None),
+        curved_coupling_audit=dict(status='unsupported_requires_curved_pairwise_model' if curved else 'not_applicable',
+            section_ids=curved,oblique_section_ids=oblique,
+            meaning='all ARC interactions unresolved; no distance cutoff and no implicit uncoupled result'),
         ground_reference=dict(status='passed',id=ground[0].id,z_m=ground[0].z_m,
             treatment='ideal common reference; finite board edge fields omitted',
             coverage_contract='one continuous hole-free bottom polygon must cover all active signal copper and source/component contact surfaces; board-edge setback is allowed',
@@ -405,7 +445,7 @@ def build_reduced_model(geometry):
         source_port_nodes=list(source),source_port_id=geometry.port.id,
         total_centerline_length_m=sum(s.length_m for s in sections),
         width_classes_m=sorted({s.width_m for s in sections}),omitted_effects=list(OMITTED_EFFECTS)+(
-            ['via_inductance','via_barrel_loss','ground_connected_top_conductor_distributed_impedance'] if ground_vias else []),
+            ['via_inductance','via_barrel_loss','ground_connected_top_conductor_distributed_impedance'] if ground_vias else [])+(['curvature_dependent_impedance','curved_pairwise_coupling'] if curved else []),
         loss_model='lossless_lines; ideal_RLC_resistance_only',
         approximation_contract='quasi-static isolated microstrip; rectilinear centreline sections may retain only width-scale round/chamfered Gerber residue at proven bends/ends, modeled as ideal junction/end parasitics; no full-wave accuracy claim')
 
@@ -462,6 +502,9 @@ def solve_network(nodes, lines, components, source, frequency_hz):
 
 
 def solve_reduced_model(model, frequencies, reference_impedance_ohm=50.):
+    curved=model.get('curved_coupling_audit',{}).get('section_ids',[])
+    if curved:
+        raise ConfigurationError('Reduced PARTIAL: semantic ARC lengths/topology extracted; curved coupling analysis unsupported (PCB-015C): '+', '.join(curved)+'; no Z/S11 emitted.')
     if model['coupled_sections']:
         raise ConfigurationError(f"Reduced PARTIAL: {len(model['coupled_sections'])} parallel overlaps require a pairwise coupling solver; coupling is NOT silently omitted.")
     if not isfinite(reference_impedance_ohm) or reference_impedance_ohm<=0:

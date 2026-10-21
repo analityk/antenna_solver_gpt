@@ -274,3 +274,12 @@ FAST przechodzi na wspólną z Gerber numerację `spirala_NNN`, także dla
 `--inspect-source`; testy w `test_pcb_output.py`. Następny krok to D3
 semantyczne ARC, potem jawna blokada niewymodelowanych sprzężeń. Ostatni
 opublikowany HEAD przed tym checkpointem: `4af79ef1dc3ddfca82cbf13228e84e22db7ff822`.
+
+### D3 checkpoint implementacji (przed ponownym testem spirali)
+
+Nazwy opublikowane: `b9c99872ceb6eb936bbcc666eb10bb2ee78a7de9`, 3 testy PASS.
+SourceSection liczy ARC analitycznie i zapisuje graf przed odmową coupling.
+Pierwszy `test_reduced_source_arcs`: 2 PASS / 1 ERROR — rzeczywista skośna LINE
+`e40` wymagała pozostawienia jawnego oblique guardu obok curved guardu.
+Poprawka jest w checkpointcie, wymaga ponowienia tego samego małego pliku.
+D3 PARTIAL do weryfikacji; brak wyniku Z/S11 jest zamierzony. Nie badać PSU.

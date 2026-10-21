@@ -150,8 +150,9 @@ class EasyEdaTests(unittest.TestCase):
         src=parse_easyeda_source(encoded(r));g=source_layout_geometry(build_source_layout(src),config())
         n,_=normalize_port_orientation(g);g,_,_=apply_geometry_resolution(n,PcbGrid())
         self.assertEqual(g.source_routes[1].signed_sweep_deg,180)
-        with self.assertRaisesRegex(ConfigurationError,'EasyEDA source ARC unsupported.*right'):
-            build_reduced_model(g)
+        model=build_reduced_model(g)
+        with self.assertRaisesRegex(ConfigurationError,'curved coupling analysis unsupported.*right'):
+            solve_reduced_model(model,[1.42e9])
 
     def test_inner_physical_layer_cannot_be_silently_omitted(self):
         items=records()+[['LAYER',15,'SIGNAL','Inner1',3],['LAYER_PHYS',15,'',1.378,0,0,1]]

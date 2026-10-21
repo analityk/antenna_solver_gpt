@@ -158,8 +158,8 @@ class ProjectTests(unittest.TestCase):
         before=g.as_dict();n,t=normalize_port_orientation(g);back=inverse_transform_geometry(n,t)
         self.assertEqual(g.as_dict(),before)
         from antenna_lab.solvers.reduced_pcb import build_reduced_model
-        with self.assertRaisesRegex(ConfigurationError,'EasyEDA source ARC unsupported'):
-            build_reduced_model(n)
+        model=build_reduced_model(n)
+        self.assertEqual(model['unsupported_status'],'curved_coupling_required')
         for a,b in zip(g.source_pads,back.source_pads):
             for v,w in zip(a.vertices_xy_m,b.vertices_xy_m):
                 self.assertAlmostEqual(v[0],w[0],places=14);self.assertAlmostEqual(v[1],w[1],places=14)
