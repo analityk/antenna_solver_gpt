@@ -2049,3 +2049,18 @@ lokalnych sprawdzeń użytkownika. Następna implementacja ma być publikowana n
 `origin/main` checkpointami przed drogimi testami; lokalne testy użytkownika
 pozostają preferowaną szeroką weryfikacją.
 
+
+## 2026-10-21 — PCB-015D0, checkpoint parsera EasyEDA source-first
+
+Dodano neutralny SourceRoutePrimitive/SourceVia i immutable EasyEdaSource,
+parser PCB 1.8/editor 2.2.x oraz centralną konwersję jednostek. Raw record order,
+IDs, SHA256, nets, signed sweep, stackup i dane komponentów pozostają detached.
+Semantyka opiera się na oficjalnych docs V2 oraz implementacji KiCad Pro:
+PCB=mil, POURED paths=10mil, CANVAS=display. Nie inferujemy skali z wymiarów.
+Obsługiwane rekordy i ograniczenia opisuje docs/pcb-easyeda.md. D0 nie wymaga
+Gerbera; canonical D1 i CLI są kolejnym checkpointem. D2 nieimplementowane.
+
+Remote miał nowszy HEAD 459785e niż wskazany w zadaniu; zawiera już dodany
+przez użytkownika test_spirala.epcb. Zachowano go bez zmian. Kanał update_ref
+sprawdzono na aktualnym HEAD przed implementacją. Checkpoint publikowany przed
+testami. Nie uruchomiono suite, FDTD/native ani benchmarków.
