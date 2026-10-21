@@ -2064,3 +2064,25 @@ Remote miał nowszy HEAD 459785e niż wskazany w zadaniu; zawiera już dodany
 przez użytkownika test_spirala.epcb. Zachowano go bez zmian. Kanał update_ref
 sprawdzono na aktualnym HEAD przed implementacją. Checkpoint publikowany przed
 testami. Nie uruchomiono suite, FDTD/native ani benchmarków.
+
+## 2026-10-21 — PCB-015D1, source-only canonical/FAST checkpoint
+
+Po publikacji parsera 7503ac1737dfaa7ae8a85144c110b516bf4bc277 dodano builder
+physical source image bez Gerber round-trip, per-net union i short audit,
+POLY board, POURED reference, jeden source dielektryk, pads RECT oraz VIA
+z jawnym istniejącym plating override. Brak wynikowego POURED nie wypełnia
+POUR boundary. Dostępny partial canonical layout nie wymaga portu.
+
+`reduced_control --easyeda-source --inspect-source` zapisuje IR/model i jawne
+missing dependencies. Solve z `--source-config` korzysta z istniejącego FAST,
+contact/gap audit, PTH i coupling guards. Semantyczne Line/Arc mają osobny IR,
+a nie Gerber PcbRoute. Normalizacja i wspólna projekcja zachowują source
+ID/net/sweep; fizyczny audit ma istniejący receipt. Source RECT pad z jednym
+junction jest jawnym idealnym terminalem bez pad lead/parasitics; nie dopisujemy
+zgadywanej TL. Arc i sprzężenia nadal blokują unsupported physics.
+
+D2 odłożone, manufacturing_validation=not_requested. Nie zmieniono full-wave,
+PML, meshera, profili ani fizyki PTH. Testy syntetyczne test_pcb_easyeda.py
+przygotowane, jeszcze nieuruchomione: publikacja checkpointu przed sprawdzeniem.
+Source test_spirala.epcb obecny w repo od użytkownika zachowano bez zmian;
+nie wykonano jeszcze jego parser/canonical diagnostic ani pełnej suite/native.

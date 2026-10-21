@@ -17,7 +17,7 @@ from shapely import union_all
 from antenna_lab.core.config import ConfigurationError
 from .validation import TOLERANCE_M, validate_pcb_geometry
 from .grid import (PcbGrid, QuantizedPcbGeometry, TickCopper, TickDielectric,
-                   TickCopperLayer, TickPort, TickDrill, TickComponent, TickSource, TickRoute)
+                   TickCopperLayer, TickPort, TickDrill, TickComponent, TickSource, TickRoute, TickSourceRoute, TickSourcePad)
 
 
 class QuantizationError(ConfigurationError):
@@ -153,9 +153,15 @@ def quantize_pcb_geometry(geometry, grid=PcbGrid()):
         tuple(route_ring(h,r.id+'.hole') for h in r.footprint_holes_xy_m)) for r in geometry.routes)
     result=QuantizedPcbGeometry(grid,geometry.model,outline,copper,tuple(dielectrics),layers,port,
         tuple(drills),tuple(components),source,tuple(geometry.assumptions),source_json,routes)
+    result=replace(result,
+        source_routes=tuple(TickSourceRoute(r.id,p.point(r.start_xy_m,r.id+'.start'),
+            p.point(r.stop_xy_m,r.id+'.stop'),p.positive(r.width_m,r.id+'.width'),
+            p.point(r.center_xy_m,r.id+'.center') if r.center_xy_m is not None else None)
+            for r in geometry.source_routes),
+        source_pads=tuple(TickSourcePad(s.id,p.ring(s.vertices_xy_m,s.id+'.pad')) for s in geometry.source_pads))
     _audit(geometry,result,p)
     audit=p.finish()  # raises before any receipt can be issued
-    if result.routes:
+    if result.routes or result.source_routes:
         from .routes import tick_audit_fingerprint
         result=replace(result,topology_audit_sha256=tick_audit_fingerprint(result))
     return result,audit

@@ -2,6 +2,7 @@
 
 from dataclasses import asdict, dataclass, field
 from math import isfinite
+from .source_ir import SourceRoutePrimitive, SourcePad
 
 
 @dataclass(frozen=True)
@@ -182,6 +183,9 @@ class PcbGeometry:
     # Detached source evidence + receipt of the existing physical topology audit.
     # FAST rejects stale receipts; this never changes physical/native geometry.
     route_projection: dict | None = None
+    source_routes: tuple[SourceRoutePrimitive, ...] = ()
+    source_pads: tuple[SourcePad, ...] = ()
+    design_source: dict | None = None
 
     @property
     def dielectrics(self):

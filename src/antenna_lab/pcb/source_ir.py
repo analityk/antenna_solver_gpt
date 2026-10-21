@@ -60,3 +60,13 @@ class EasyEdaSource:
         result['records']=json.loads(result.pop('records_json'))
         result['semantics']=json.loads(result.pop('semantic_json'))
         return json.loads(json.dumps(result,allow_nan=False))
+
+
+@dataclass(frozen=True)
+class SourcePad:
+    id: str
+    net: str
+    layer_role: str
+    vertices_xy_m: tuple[tuple[float, float], ...]
+    conductor_id: str
+    record_index: int

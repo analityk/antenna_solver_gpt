@@ -66,6 +66,14 @@ def materialize_quantized_geometry(value: QuantizedPcbGeometry) -> PcbGeometry:
         center_xy_m=point(r.center) if r.center is not None else None,
         footprint_xy_m=ring(r.footprint),footprint_holes_xy_m=tuple(ring(h) for h in r.holes),
         candidate_conductor_ids=tuple(source_routes[r.id]['candidate_conductor_ids'])) for r in value.routes)
+    from .source_ir import SourceRoutePrimitive, SourcePad
+    cad_routes={r['id']:r for r in source.get('source_routes',())}
+    cad_pads={p['id']:p for p in source.get('source_pads',())}
+    result.source_routes=tuple(replace(SourceRoutePrimitive(**cad_routes[r.id]),
+        start_xy_m=point(r.start),stop_xy_m=point(r.stop),width_m=metre(r.width),
+        center_xy_m=point(r.center) if r.center is not None else None) for r in value.source_routes)
+    result.source_pads=tuple(replace(SourcePad(**cad_pads[p.id]),vertices_xy_m=ring(p.vertices)) for p in value.source_pads)
+    result.design_source=source.get('design_source')
     result.route_provenance_available=source.get('route_provenance_available',False)
     from .routes import (audit_projected_routes, source_records,
                          tick_audit_fingerprint, projection_fingerprint)
@@ -81,6 +89,12 @@ def materialize_quantized_geometry(value: QuantizedPcbGeometry) -> PcbGeometry:
         result.route_projection=dict(source=evidence,quantum_nm=value.grid.quantum_nm,
             physical_topology_audit='passed' if proven else 'missing_or_stale',
             survival_basis='source composition + physical topology audit + modeled centerline ownership')
+        result.route_projection['geometry_sha256']=projection_fingerprint(result)
+    if result.design_source is not None:
+        proven=(bool(value.topology_audit_sha256) and
+                value.topology_audit_sha256==tick_audit_fingerprint(value))
+        result.route_projection=dict(kind='easyeda_source',physical_topology_audit='passed' if proven else 'missing_or_stale',
+            source_routes=source.get('source_routes',()),quantum_nm=value.grid.quantum_nm)
         result.route_projection['geometry_sha256']=projection_fingerprint(result)
     return result
 

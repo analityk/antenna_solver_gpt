@@ -103,7 +103,7 @@ def parse_easyeda_source(raw,*,source_file='<memory>'):
     if not isinstance(editor,str) or not editor.startswith('2.2.'):
         raise ConfigurationError(f'EasyEDA HEAD editorVersion {editor!r}: unsupported 1.8 dialect; units unresolved.')
     layers={};physical=[];nets=[];routes=[];vias=[];polygons=[];pours=[];poured=[]
-    components=[];attrs=[];pad_nets=[];retained=[];unsupported=[];display=None;ids=set()
+    components=[];attrs=[];pad_nets=[];pads=[];retained=[];unsupported=[];display=None;ids=set()
     metadata={'ACTIVE_LAYER','RULE','RULE_TEMPLATE','RULE_SELECTOR','PRIMITIVE','SILK_OPTS',
               'PREFERENCE','PANELIZE_STAMP','PANELIZE_SIDE','ITEM_ORDER','GROUP','FONT'}
     for entry in records:
@@ -125,7 +125,7 @@ def parse_easyeda_source(raw,*,source_file='<memory>'):
                 if min(thickness,er,loss)<0:raise ValueError('negative material value')
                 physical.append(dict(layer_id=r[1],material=r[2],thickness_m=thickness,
                     epsilon_r=er,loss_tangent=loss,record_index=index))
-            elif kind in ('LINE','ARC','VIA','POLY','POUR','POURED','COMPONENT','ATTR'):
+            elif kind in ('LINE','ARC','VIA','POLY','POUR','POURED','COMPONENT','ATTR','PAD'):
                 if not isinstance(r[1],str) or not r[1] or r[1] in ids:raise ValueError('invalid/duplicate primitive ID')
                 ids.add(r[1])
                 if kind in ('LINE','ARC'):
@@ -153,6 +153,18 @@ def parse_easyeda_source(raw,*,source_file='<memory>'):
                     if len(r)!=6 or r[3]!=0 or r[4] not in (True,1):raise ValueError('only filled, unstroked POURED supported')
                     if len(r[5])!=1:raise ValueError('complex POURED fill rule unsupported')
                     poured.append(dict(id=r[1],parent_id=r[2],ring_xy_m=polygon_ring(r[5][0],label,poured=True),record_index=index))
+                elif kind=='PAD':
+                    if len(r)<11 or (r[9] is not None and r[9]!=['ROUND',0,0]):
+                        raise ValueError('only no-hole absolute RECT PAD supported')
+                    shape=r[10]
+                    if not isinstance(shape,list) or len(shape) not in (3,4) or shape[0]!='RECT' or (len(shape)==4 and shape[3]!=0):
+                        raise ValueError('only unrounded RECT PAD supported')
+                    if len(r)>11 and r[11]:raise ValueError('special-layer PAD geometry unsupported')
+                    x,y=(metres(v,label) for v in r[6:8]);w,h=(positive(v,label) for v in shape[1:3])
+                    a=radians(number(r[8],label))
+                    ring=tuple((x+u*cos(a)-v*sin(a),y+u*sin(a)+v*cos(a))
+                               for u,v in ((-w/2,-h/2),(w/2,-h/2),(w/2,h/2),(-w/2,h/2)))
+                    pads.append(dict(id=r[1],net=r[3],layer_id=r[4],pad_number=r[5],ring_xy_m=ring,record_index=index))
                 elif kind=='COMPONENT':
                     if len(r) not in (9,10) or not isinstance(r[7],dict):raise ValueError('unsupported COMPONENT fields')
                     components.append(dict(id=r[1],layer_id=r[3],position_xy_m=[metres(v,label) for v in r[4:6]],
@@ -184,7 +196,7 @@ def parse_easyeda_source(raw,*,source_file='<memory>'):
         if r['layer_id'] not in layers:raise ConfigurationError(f"EasyEDA LAYER_PHYS {r['layer_id']}: undefined layer.")
     semantics=dict(units=UNITS,layers=list(layers.values()),layer_physics=physical,nets=nets,
         polygons=polygons,pours=pours,poured=poured,components=components,attributes=attrs,
-        pad_nets=pad_nets,retained_metadata=retained,unsupported_records=unsupported,
+        pad_nets=pad_nets,pads=pads,retained_metadata=retained,unsupported_records=unsupported,
         design_source='easyeda_source',manufacturing_validation='not_requested')
     return EasyEdaSource(source_file,digest,'1.8',editor,display,routes,tuple(vias),
         json.dumps(records,sort_keys=True,allow_nan=False),json.dumps(semantics,sort_keys=True,allow_nan=False))

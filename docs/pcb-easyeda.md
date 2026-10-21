@@ -39,3 +39,53 @@ Materiał nie jest oceniany jako „typowa PCB”: epsilon_r=1 i gruby dielektry
 są legalne. Zakres przybliżenia microstrip nadal należy do solvera, nie parsera.
 Arc zachowuje signed sweep i mathematically derived center; nie ma jeszcze
 modelu TL łuku ani pairwise/curved coupling. Gerber-only fallback bez zmian.
+
+## Source-only CLI i canonical checkpoint D1
+
+Inspekcja semantyki i dostępnego modelu, bez wymogu portu:
+
+```cmd
+.\.venv\Scripts\python.exe -m antenna_lab.pcb.reduced_control --easyeda-source gerbs\realpcb_microstrip\test_spirala.epcb --inspect-source
+```
+
+Zapisuje `source_ir.json` (w tym raw records), `source_model.json` (obrys,
+stackup, miedź per net/layer, routes, vias, zależności footprintów), `import.json`
+i `summary.json`. `source_inspected` nie oznacza ukończonego solve ani pełnego
+modelu kontaktów. Zależności są wypisane w konsoli i zapisane w metadata.
+
+Solve dla obsługiwanego source z kompletnymi padami i kontaktami:
+
+```cmd
+.\.venv\Scripts\python.exe -m antenna_lab.pcb.reduced_control --easyeda-source projekt.epcb --source-config source-contacts.json
+```
+
+Jawny override opisuje kontakty w źródłowym układzie XY, w mm:
+
+```json
+{"port":{"mode":"explicit","negative_mm":[-2.032,0],"positive_mm":[2.032,0],"width_mm":0.508}}
+```
+
+Opcjonalne `drills` ma istniejące pola `pth_plating_um` i
+`pth_model="solid_pec_equivalent"`. VIA podaje średnicę otworu i pada, **nie**
+grubość metalizacji. Nie zgadujemy jej z annular ring. Model PTH pozostaje
+istniejącą aproksymacją. Inner/blind/buried spans nie są obsługiwane tym adapterem.
+
+D1 obsługuje jeden dielektryk między top/bottom, source LINE/ARC, materializowany
+POURED, absolutne niezaokrąglone SMD PAD RECT i through VIA z jawną metalizacją.
+COMPONENT/PAD_NET/ATTR zachowują intencję; zewnętrzny footprint jest szukany pod
+jawnym hashem w `FOOTPRINT/<hash>.efoo` obok source lub katalogu projektu.
+Brak footprintu blokuje solve precyzyjnym missing-source-dependency; znaleziony
+zewnętrzny footprint również wymaga przyszłego adaptera instancji. Nie udajemy
+obsługi elementów przez pominięcie ich padów lub wartości.
+
+Pad z jednym semantic route junction może być idealnym equipotential terminalem:
+pełny fizyczny contact/gap nadal przechodzi audyt, pad musi należeć do tego samego
+conductora. Pad electrical length i parasitics są jawnie pominięte, nie zgadywane
+jako dodatkowa TL. Wiele junctions w padzie -> błąd. Źródłowe nets kontrolują
+zwarcia; final physical polygons kontrolują ownership. Source routes i pady
+przechodzą istniejącą normalizację i geometry resolution; ID/net/signed sweep
+nie są odzyskiwane z polygonów. Fizyczny audyt projekcji pozostaje obowiązkowy.
+
+Nie wdrożono D2 ani publicznego parametru manufacturing tolerance. Nie ma
+ukrytego domyślnego limitu; source-only zapisuje `not_requested`. Gerber ZIP/
+katalog nadal działa przez dotychczasowy argument pozycyjny. Full-wave bez zmian.

@@ -101,6 +101,9 @@ def extract_trace_sections(geometry, *, active_top_conductor_ids=None):
     active_ids=top_ids if active_top_conductor_ids is None else set(active_top_conductor_ids)
     if not active_ids.issubset(top_ids):
         raise ConfigurationError('Reduced extraction: unknown active top conductor ID.')
+    if geometry.design_source is not None:
+        from .reduced_source import extract_source_sections
+        return extract_source_sections(geometry,active_top_conductor_ids,LineSection)
     if geometry.route_provenance_available:
         from .reduced_routes import extract_source_routes
         return extract_source_routes(geometry,active_ids,LineSection)
@@ -341,6 +344,9 @@ def build_reduced_model(geometry):
         if owners[0].id in grounded_ids:return 'ground'
         matches=[q for q in coords if hypot(q[0]-p[0],q[1]-p[1])<=TOLERANCE_M and
                  any(s.owner==owners[0].id and q in (s.start_xy_m,s.stop_xy_m) for s in sections)]
+        if not matches and geometry.design_source is not None:
+            from .reduced_source import pad_terminal_node
+            matches=pad_terminal_node(geometry,p,owners[0].id,sections)
         if len(matches)!=1:raise ConfigurationError(f'{label}: terminal must coincide with one physical trace centerline end/junction; no guessed lead length.')
         return nodes[matches[0]]
     contact_surfaces=[]
@@ -392,8 +398,9 @@ def build_reduced_model(geometry):
         material_provenance=dict(loss_tangent=substrate.loss_tangent,
                                  copper_layers=[asdict(c) for c in geometry.copper_layers]),
         nodes=[dict(id=nodes[p],xy_m=p) for p in coords],line_sections=lines,
-        extraction_method='gerber_source_routes' if geometry.route_provenance_available else 'legacy_synthetic_polygon',
-        source_routes=[asdict(r) for r in geometry.routes],
+        extraction_method='easyeda_source_routes' if geometry.design_source is not None else ('gerber_source_routes' if geometry.route_provenance_available else 'legacy_synthetic_polygon'),
+        design_source=geometry.design_source,
+        source_routes=[asdict(r) for r in (geometry.source_routes if geometry.design_source is not None else geometry.routes)],
         physical_features=features,coupled_sections=coupled,lumped_components=components,
         source_port_nodes=list(source),source_port_id=geometry.port.id,
         total_centerline_length_m=sum(s.length_m for s in sections),
