@@ -1,8 +1,40 @@
 # Instrukcje pracy nad antenna_solver_gpt
 
+
+## Przejmowanie projektu między czatami — obowiązkowy punkt wejścia
+
+Repozytorium jest trwałą pamięcią projektu. Historia rozmowy, pamięć modelu
+ani stan lokalnego, efemerycznego środowiska nie są warunkiem kontynuacji.
+`migracja.md` jest **samodzielnym punktem wejścia i bieżącą kartą przekazania**.
+Użytkownik może wskazać w nowym czacie wyłącznie ten plik i polecić
+kontynuowanie pracy; agent ma sam odczytać wskazane w nim źródła.
+
+Przy rozpoczęciu nowego zadania lub przejmowaniu projektu:
+
+1. Odczytaj **cały** `migracja.md` i wykonaj jego sekcję „Instrukcja dla nowego
+   czatu”; następnie przeczytaj `AGENTS.md` (w tym lokalne instrukcje katalogów).
+2. Zweryfikuj bieżącą gałąź i HEAD, historię najnowszych commitów oraz stan
+   plików użytkownika. Przeczytaj `todo.md`, adekwatną końcówkę `history.md`,
+   `goal.md` i odpowiednie dokumenty `docs/*.md`, zgodnie z mapą w
+   `migracja.md`. W razie potrzeby obejrzyj implementację i testy.
+3. Rozdziel stan udokumentowany od stanu potwierdzonego kodem i sprawdzeniami.
+   Gdy dokument przekazania jest starszy niż repozytorium lub sprzeczny z nim,
+   ustal aktualne fakty z kodu/commitów i zapisz rozbieżność; nie zakładaj,
+   że starsze PASS oznacza nowy PASS.
+4. Ustal aktualny blocker i najbliższe jednoznaczne zadanie. Jeżeli użytkownik
+   polecił kontynuację, działaj według aktualnych priorytetów bez żądania
+   ponownego opisu poprzednich rozmów; nowsze polecenie użytkownika ma
+   pierwszeństwo.
+
+Nie przenoś pełnych transkryptów czatu do repozytorium: zapisuj decyzje,
+przesłanki, rzeczywisty stan, dowody, ograniczenia i następne działania.
+Nie odczytuj bez potrzeby całej wieloletniej historii; używaj najnowszych
+wpisów i sięgaj do wcześniejszych decyzji, gdy są istotne.
+
 ## Cel i stan pracy
 
-Najpierw przeczytaj `goal.md`, `history.md` i `docs/architecture.md`.
+Po odczytaniu `migracja.md` zapoznaj się z `goal.md`, adekwatną częścią
+`history.md` i `docs/architecture.md` zgodnie z protokołem przejęcia.
 `goal.md` jest źródłem wymagań; parametry maszynowe znajdują się w `parameters/`.
 Bieżący cel: parametryczna symulacja Quadosa 8 przy 1420 MHz, z możliwością
 dodania innych anten bez zmiany zasad działania rdzenia.
@@ -142,3 +174,40 @@ Pełny zestaw testów na docelowym Windows uruchamiaj poleceniem:
 `.\.venv\Scripts\python.exe -X utf8 -m unittest discover -s tests -v`.
 Projekt używa `unittest`; nie instaluj pytest tylko po to, aby uruchomić testy.
 
+## Obowiązkowe zamknięcie zadania: inspekcja dokumentacji i przekazanie stanu
+
+**Ten krok wykonuj samodzielnie na końcu każdej pracy dotyczącej repozytorium,
+również wtedy, gdy użytkownik nie wspomni o dokumentacji ani migracji.**
+Nie odkładaj go do końca czatu, bo czat może zakończyć się bez ostrzeżenia.
+Dla dłuższych prac powtarzaj checkpoint po samodzielnych, istotnych etapach.
+
+1. Przejrzyj zmiany i aktualność powiązanych plików `*.md`: co najmniej
+   `migracja.md`, `todo.md`, właściwy fragment `history.md` oraz te pliki
+   `docs/*.md`, `README.md`, `goal.md` i lokalne `AGENTS.md`, które dotyczą
+   zmienianego zachowania. Nie czytaj i nie przepisuj wszystkich dokumentów
+   bez związku z zadaniem.
+2. Jeżeli stan, blocker, następny krok, wynik testów, decyzja, CLI, format,
+   ograniczenie lub kontrakt uległy zmianie, **zaktualizuj `migracja.md`**
+   i odpowiednie dokumenty źródłowe w tym samym etapie pracy. Dla większych
+   zmian uzupełnij `history.md` według istniejących zasad; `todo.md` ma
+   odzwierciedlać realny priorytet. `migracja.md` ma pozostać czytelnym,
+   aktualnym punktem startowym, nie dziennikiem wszystkich zdarzeń.
+3. Jeśli nie ma merytorycznej zmiany dokumentacji, pozostaw pliki bez zmian;
+   nie twórz sztucznych commitów ani aktualizacji samych dat. Jeżeli użytkownik
+   wprost ograniczył zakres modyfikowanych plików lub zlecił tylko odczyt,
+   respektuj to i opisz zauważone rozbieżności bez zapisu zabronionych plików.
+4. Utrwal istotne zmiany checkpointem `git commit` i opublikuj zgodnie z
+   zasadami powyżej. Nie wstrzymuj publikacji ze względu na PARTIAL/FAIL;
+   odróżniaj testy wykonane teraz od testów historycznych. Nie wpisuj do
+   `migracja.md` SHA commita, który dopiero powstanie: podaj SHA ostatniej
+   **już opublikowanej** wersji przed checkpointem, a SHA nowego commita
+   potwierdź po pushu w odpowiedzi.
+5. W odpowiedzi końcowej podaj, co wykonano, co pozostało otwarte, faktyczne
+   testy i ich status, zakres aktualizacji dokumentacji oraz SHA, gałąź i
+   wynik publikacji. Gdy publikacja jest niedostępna, jasno zgłoś ten fakt;
+   nie zapewniaj o zachowaniu stanu bez trwałego zapisu.
+
+**Ostatnie obowiązkowe pytanie kontrolne agenta przed zamknięciem pracy:**
+„Czy nowy czat, znając tylko `migracja.md`, potrafi ustalić aktualny stan,
+przyczynę bieżącej przeszkody, najbliższe zadanie oraz źródła weryfikacji?”.
+Jeśli nie — popraw przekazanie stanu przed zakończeniem.

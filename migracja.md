@@ -1,136 +1,289 @@
-# Raport stanu i przekazania projektu — migracja
+# Migracja kontekstu — trwała pamięć i instrukcja przejęcia projektu
 
-**Data przeglądu:** 2026-10-21 (Europe/Warsaw)  
+> **Ten plik jest punktem wejścia do repozytorium.** Jeżeli nowy czat dostał
+> tylko wskazanie `migracja.md` i polecenie pracy nad projektem, poniższe
+> instrukcje wystarczają do samodzielnego odtworzenia kontekstu. Nie trzeba
+> wklejać historii wcześniejszych rozmów ani wymieniać pozostałych dokumentów.
+
 **Repozytorium:** `analityk/antenna_solver_gpt`  
-**Gałąź:** `main`  
-**Punkt odniesienia przed dodaniem raportu:** `76d8e51bb3fd291386c88db45f4d7052b916b04d`  
-**Status projektu:** rozwijany; implementacje częściowe i niezweryfikowane fizycznie należy odróżniać od zakończonych checkpointów kodu.
+**Docelowa gałąź:** `main` (chyba że użytkownik jawnie wskaże inną)  
+**Ostatnia inspekcja dokumentów:** 2026-10-21, Europe/Warsaw  
+**HEAD potwierdzony przed ustanowieniem tego protokołu:** `f350cb5b92dcfdb69615226e78ea9031fa3af5ab`  
+**Uwaga:** ten SHA jest punktem historycznym, nie obietnicą, że nadal jest HEAD. Każde wznowienie rozpoczyna się sprawdzeniem Git.
 
-## Streszczenie
+## 1. Instrukcja dla nowego czatu — wykonaj po wskazaniu tego pliku
 
-Projekt `antenna_lab` rozpoczął się od parametrycznego modelowania anten (Quados 8 i biquad przy 1420 MHz) z wykorzystaniem natywnego openEMS na Windows 11. Ten tor nadal istnieje, ale **aktualny ciężar rozwoju przeniósł się na analizę PCB**, w szczególności szybki, przybliżony solver `FAST / reduced quasi-TEM`.
+Jesteś kolejnym wykonawcą prac nad tym samym repozytorium. **Nie polegaj na
+pamięci poprzedniego czatu.** Repozytorium jest źródłem trwałego stanu, a
+niniejszy plik jego indeksem operacyjnym.
 
-Kluczową decyzją z 2026-10-21 jest **EasyEDA source-first**: oryginalny projekt PCB dostarcza semantyki linii, łuków, sieci, warstw, przelotek i komponentów; eksporty Gerber/Excellon są opcjonalnym materiałem do weryfikacji produkcyjnej, nie nadrzędnym źródłem topologii. Parser EasyEDA (PCB-015D0) oraz częściowa ścieżka source-only do modelu FAST (PCB-015D1) zostały opublikowane. Na syntetycznym, kompletnym projekcie source-only solver wykonał obliczenie bez Gerberów. **Rzeczywista serpentyna nie ma jeszcze wiarygodnego wyniku FAST**: najpierw brakuje geometrii footprintu komponentów CSRC/R1, a później blokują niezaimplementowany model Arc TL i sprzężenia mikropaskowe.
+1. **Połącz się z repozytorium i sprawdź rzeczywisty stan:** `main`/HEAD,
+   ostatnie commity, ewentualne nieopublikowane lub cudze zmiany. Nie używaj
+   zapisanego tu SHA jako docelowego commita.
+2. **Przeczytaj `AGENTS.md` w całości** i zastosuj jego reguły (wraz z
+   ewentualnymi lokalnymi `AGENTS.md`). Dalej przeczytaj `todo.md`, końcówkę
+   `history.md`, `goal.md` i wskazane poniżej dokumenty `docs/`. Gdy kod
+   dotyczy określonego modułu, odczytaj właściwą implementację i testy.
+3. **Zweryfikuj checkpoint z sekcji 4–7:** porównaj go z aktualnym kodem,
+   zmianami na `main`, wynikami testów i dokumentami. Jeśli od czasu tego
+   zapisu powstały nowsze commity, najpierw ustal ich zakres. Nie przyjmuj
+   opisu ze starszego checkpointu za dowód aktualnego działania.
+4. **Odtwórz kontekst zadania:** sprecyzuj: co działa, co jest PARTIAL,
+   rzeczywisty blocker, priorytet i kryterium ukończenia kolejnego kroku.
+   Rozróżniaj testy historyczne od uruchomionych przez siebie.
+5. **Działaj zgodnie z poleceniem użytkownika.** Jeśli prosi o kontynuowanie
+   rozwoju, podejmij najwyższy aktualny, odblokowany priorytet z `todo.md`
+   (obecny punkt wskazano w sekcji 5), po sprawdzeniu dostępności zapisu na
+   GitHub. Nie domagaj się rekonstrukcji poprzednich rozmów. Jeśli polecenie
+   dotyczy tylko diagnozy/odczytu, przedstaw stan i plan bez niezamówionych
+   zmian kodu. Nowa dyspozycja użytkownika ma pierwszeństwo.
+6. **Nie kończ bez przekazania pałeczki:** zastosuj końcową inspekcję
+   dokumentacji z `AGENTS.md`, zaktualizuj ten plik i powiązane `*.md`
+   **jeśli zmieniły się fakty**, utrwal i opublikuj dozwolone zmiany, a w
+   odpowiedzi podaj commit, push, testy i ograniczenia.
 
-Przegląd opiera się na treści repozytorium i zapisanych wynikach wcześniejszych sprawdzeń; **podczas tworzenia niniejszego raportu nie uruchamiano testów, obliczeń ani benchmarków**.
+Jeśli brak uprawnień do odczytu repozytorium, powiedz o blokadzie dostępu.
+Jeśli brak kanału zapisu, nie rozpoczynaj kosztownej implementacji, której
+nie da się opublikować; stosuj regułę z `AGENTS.md`. **Ten dokument nie
+upoważnia do obchodzenia instrukcji użytkownika ani do fabrykowania wyników.**
 
-## 1. Architektura i dwa tory obliczeniowe
+## 2. Minimalny prompt użytkownika i „prompt do prompta”
 
-- Jeden pakiet Pythona `antenna_lab`, rozdzielający konfigurację i geometrię, modele anten, adaptery solverów, zapis wyników i wizualizację. Rdzeń nie ma zależeć od konkretnej anteny, openEMS ani GUI.
-- **Antena / full-wave:** generatory Quados 8 i biquad; adapter openEMS, FDTD, siatka/PML, diagnostyka źródła i mocy, impedancja, pole dalekie, przekroje E/H, raport HTML offline. M1 (generator, edytor, eksport i walidacja geometrii) jest zaimplementowany. Integracja obliczeniowa i jej walidacja fizyczna nie są zamknięte.
-- **PCB / FAST:** odrębny solver `antenna_lab.pcb.reduced_control`, bez uruchamiania openEMS, 3-D FDTD i PML. Korzysta z grafu linii transmisyjnych oraz idealnych R/L/C. Jest szybkim modelem przybliżonym, **nie zamiennikiem zweryfikowanego full-wave**.
-- Wyniki, parametry i manifesty mają zachowywać pochodzenie danych. Nie wolno utożsamiać statusu `completed` ze zweryfikowaną fizyką, korygować bilansu sztuczną renormalizacją ani przedstawiać braku danych jako zera.
-- Platformą docelową jest natywny Windows 11, CPython 3.14 i projektowe `.venv`. Nie wymagamy WSL ani `uv`.
+### Prompt otwierający kolejny czat (wystarczy ten jeden)
 
-## 2. Co zostało zrobione w module PCB
+```text
+Pracujesz nad repozytorium analityk/antenna_solver_gpt, gałąź main.
+Przeczytaj migracja.md i wykonaj zapisany w nim protokół przejęcia projektu.
+Odtwórz stan z GitHub, zastosuj AGENTS.md i kontynuuj najbliższe zadanie
+według aktualnego todo.md. Na koniec utrwal kontekst dla kolejnego czatu.
+```
 
-### Wcześniejszy tor Gerber — PCB-015C0/C0.1
+Właściwa treść poleceń, lista źródeł i punkt wznowienia znajdują się **w
+tym pliku**, nie w pamięci użytkownika. W innych zadaniach użytkownik może
+napisać tylko „Przeczytaj migracja.md i przejmij projekt”.
 
-Importer zachowuje źródłowe trasy Line/Arc i ich provenance, a po projekcji geometrii weryfikuje ich własność i obecność w końcowej miedzi. Usunięto fałszywe `stroke_not_preserved`, które wynikało z porównania niezależnie skwantyzowanych reprezentacji. W lokalnym `test_spirala.zip` po tej poprawce następną rzeczywistą przeszkodą stał się jawny komunikat:
+### Prompt, który ten dokument przekazuje nowemu asystentowi
 
-`Reduced source route Arc unsupported: top:route_000009 ...; no guessed TL arc.`
+```text
+Nie kontynuujesz poprzedniej rozmowy — kontynuujesz repozytorium.
+Zweryfikuj HEAD i zmiany, przeczytaj AGENTS.md, todo.md, końcówkę history.md,
+goal.md i właściwe docs. Potwierdź stan przez kod/testy lub jawnie zaznacz,
+że opierasz się na historii. Ustal pierwszą blokadę i wykonaj zadanie
+dozwolone przez najnowsze polecenie użytkownika. Zapisuj checkpointy
+przed kosztownymi etapami. Nie zgaduj brakującej fizyki, geometrii ani PASS.
+Przy zamykaniu każdej pracy skontroluj odpowiednie pliki .md, odśwież
+migracja.md i dokumentację, jeśli stan faktycznie się zmienił, commituj
+i publikuj do origin/main. Raportuj zakres, SHA, testy i ograniczenia.
+```
 
-Tor Gerber-only nadal funkcjonuje jako fallback i diagnostyka, ale nie jest już priorytetem rozwoju.
+### Prompt awaryjny do użycia jeszcze w trwającym czacie
 
-### PCB-015D0 — parser EasyEDA source-first
+```text
+Zrób checkpoint przekazania projektu. Sprawdź zmiany i aktualny HEAD,
+zweryfikuj AGENTS.md, todo.md, ostatnie history.md i istotne docs/*.md.
+Zaktualizuj migracja.md tak, aby nowy czat mógł zacząć od samego tego pliku:
+stan, decyzje, blocker, następny krok, dowody, testy i ograniczenia.
+Zapisz i opublikuj dozwolone zmiany. Podaj SHA i to, co pozostaje otwarte.
+```
 
-Wdrożono parser ograniczonego profilu EasyEDA Pro: `DOCTYPE PCB 1.8`, `editorVersion 2.2.x`, rekordy m.in. `HEAD`, `LAYER`, `LAYER_PHYS`, `NET`, `LINE`, `ARC`, `VIA`, `PAD_NET`, `COMPONENT` i `ATTR`, wybrane `POLY/POUR/POURED`. Powstaje deterministyczny, niezależny semantic IR.
+Ten dodatkowy prompt jest opcjonalny: `AGENTS.md` nakazuje taki audyt
+automatycznie po każdej pracy. Nie jest potrzebny, jeśli checkpointy
+są wykonywane poprawnie na bieżąco.
 
-Zachowane są surowe rekordy, indeksy, identyfikatory, SHA256 pliku, nety, szerokości, kierunek/signed sweep łuku i informacja o stackupie. Konwersja jednostek następuje na granicy parsera: wartości PCB w mil (25,4 µm), materializowane ścieżki POURED w 10 mil (254 µm); `CANVAS` oznacza jednostki wyświetlania. Nie ma dopasowywania skali „na oko”. Nieobsługiwane istotne rekordy lub niejednoznaczne znaczenie danych muszą zgłaszać ograniczenie, a nie zostać milcząco zignorowane.
+## 3. Jak zachowywać stan między sesjami
 
-### PCB-015D1 — częściowy model canonical/source-only i integracja FAST
+**Model trwałości:** Git + jawne dokumenty; nie pamięć czatu, prywatne
+notatki agenta, lokalny stan terminala, archiwum transkryptów ani
+nieopublikowany patch.
 
-Zaimplementowano budowę obrazu fizycznego PCB bez rundy eksport/import Gerbera: obrys, ograniczony stackup top–jeden dielektryk–bottom, per-net miedź, materializowany POURED, wybrane RECT pads, VIA z jawną metalizacją, provenance linii/łuków, kontrolę zwarć i audyt geometrii.
+| Dokument | Właściciel informacji |
+| --- | --- |
+| `AGENTS.md` | Trwałe zasady, procedura przejęcia, audyt na zakończenie, Git i testy. |
+| `migracja.md` | **Bieżący punkt wznowienia**: kierunek, co zrobione, blocker, następny krok, poziom potwierdzenia i instrukcja dla nowego czatu. |
+| `todo.md` | Aktualna kolejność pracy, kryteria i rozpisane etapy. |
+| `history.md` | Chronologiczny, nieprzepisywany do migracji zapis decyzji i rezultatów większych zmian. |
+| `goal.md`, `parameters/` | Wymagania i parametry źródłowe projektu. |
+| `docs/*.md` | Techniczne kontrakty, formaty, ograniczenia i procedury. |
+| Kod, testy, commity | Faktyczna implementacja, weryfikacja i dowód, co trafiło na `main`. |
 
-Dostępne CLI:
+**Początek pracy:** Git HEAD → ten plik → `AGENTS.md` → `todo.md`,
+`history.md` (najnowszy istotny fragment) → `goal.md`/właściwe `docs`
+→ kod i testy. Nie wystarczy pobieżna lektura niniejszego raportu.
+
+**W trakcie:** gdy etap jest istotny lub grozi utratą postępu, zrób
+checkpoint i push. Odróżniaj trwały stan kodu od jeszcze nieuruchomionych
+testów. Nie czekaj na zakończenie rozmowy.
+
+**Na końcu każdego zadania:** bez oczekiwania na prośbę użytkownika porównaj
+zmiany z powiązaną dokumentacją `*.md`. Zaktualizuj `migracja.md`, `todo.md`,
+`history.md` i odpowiednie `docs/*.md` **tylko tam, gdzie fakty tego
+wymagają**. Nie twórz zmian samych dat lub kosmetycznych przepisań;
+nie modyfikuj plików spoza zakresu dozwolonego przez użytkownika.
+Sprawdź spójność i commituj/publikuj istotne zmiany zgodnie z `AGENTS.md`.
+
+Przy aktualizacji `migracja.md` utrzymuj kolejno: (a) aktualny kierunek,
+(b) dokładny punkt zatrzymania, (c) rozdzielenie DONE/PARTIAL/OPEN,
+(d) jawne dowody, komendy i status testów, (e) pierwsze zadanie i warunek
+zakończenia, (f) istotne decyzje/ryzyka, (g) odnośniki do dokumentów.
+Aktualizuj zawartość zamiast dopisywać niekończący się dziennik.
+Nie zapisuj tu sekretów, danych kont ani dużych wyników obliczeń.
+
+**Uwaga o SHA:** commit nie może zawierać wiarygodnego własnego SHA przed
+utworzeniem. W nagłówku zapisuj SHA ostatniego *już potwierdzonego*
+commita bazowego, a opublikowany SHA nowego commita podawaj po publikacji
+w raporcie końcowym. Nowy czat zawsze sam sprawdza HEAD.
+
+## 4. Punkt wznowienia — stan na 2026-10-21
+
+**Kierunek rozwoju:** `antenna_lab` jest pakietem Pythona dla modelowania
+anten i PCB. Pierwotny projekt obejmuje Quados 8 i biquad przy 1420 MHz
+oraz natywny openEMS na Windows 11. **Aktualny priorytet to PCB FAST,
+reduced quasi-TEM, oparty na oryginalnym EasyEDA source PCB.**
+
+- **DONE (zakres checkpointów kodu):** M1 generowania/edycji geometrii
+  anten; PCB-015D0 — parser semantyczny EasyEDA Pro PCB 1.8/editor 2.2.x;
+  PCB-015D1 — ograniczona ścieżka source-only: neutralny IR, canonical
+  layout, inspekcja i możliwość FAST bez Gerbera dla wspieranych projektów.
+  Zachowane są jednostki, nets, Line/Arc/signed sweep, VIA i provenance.
+- **PARTIAL:** PCB FAST obsługuje jednoznaczne odcinki microstrip, wybrane
+  idealne R/L/C i ground-PTH, nie całe sprzężone PCB. Model EasyEDA
+  obsługuje określone top/bottom, jeden dielektryk, RECT PAD,
+  materializowany POURED i VIA z jawną metalizacją; nie pełny format CAD.
+  Adapter openEMS dla anten i pola E/H istnieją, ale bez kompletnej
+  walidacji fizycznej.
+- **OPEN:** instancje zewnętrznych footprintów i kontakty komponentów;
+  semantyczny Arc jako linia transmisyjna; sprzężenia pairwise microstrip;
+  opcjonalne source↔Gerber/Excellon reconciliation (D2); fizyczna walidacja
+  antenowego portu, impedancji, zysku i zbieżności.
+
+Kluczowa decyzja z 2026-10-21: **source-first**. Oryginalny plik EasyEDA jest
+nadrzędnym źródłem topologii i intencji projektowej. Gerber/Excellon służy
+opcjonalnie do sprawdzania eksportu, nie do rekonstrukcji znanych netów,
+łuków i komponentów. Brak Gerbera sam w sobie nie blokuje source-only FAST.
+D2 będzie mieć tolerancję produkcyjną podawaną przez użytkownika; 10 µm
+nie jest globalnym defaultem ani tolerancją siatki czy FAST.
+
+## 5. Najbliższe zadanie i warunek przejścia dalej
+
+**Pierwszy aktualnie udokumentowany blocker:** na
+`gerbs/realpcb_microstrip/test_spirala.epcb` parser i częściowy canonical
+layout działają, ale komponenty `CSRC/R1` odwołują się do zewnętrznego
+footprintu o hashu `e8bf627583724bdebefbaa0be79b0d2f`, którego
+geometrii nie ma w zbudowanym modelu. Nie zgaduj padów/połączeń i nie
+odtwarzaj ich z Gerbera.
+
+**Najbliższe zadanie:** zweryfikować aktualne pliki źródłowe i zależności,
+następnie zaprojektować/zaimplementować obsługę instancji zewnętrznego
+footprintu EasyEDA i adapter kontaktów komponentów; uwzględnić jawne
+przypisania pin↔pad↔net, transformacje oraz fizyczny audyt zwarć i kontaktów.
+Jeśli wymagany plik `.efoo` nie jest dostępny, zachowaj jawny
+`missing-source-dependency` i wskaż dokładną brakującą zależność zamiast
+udawać udany solve.
+
+**Kryterium gotowości do następnego etapu:** źródłowy model z kompletną
+dostępną geometrią/pinami dla CSRC/R1 przechodzi jawne kontrole geometryczne
+i semantyczne bez wymyślania elementów. Nie oznacza to jeszcze, że obliczono
+serpentynę: aktywne `ARC` i coupling nadal mogą kończyć FAST błędem.
+
+**Potem:** (1) PCB-015D3 — fizyczna długość łuku z promienia i signed sweep,
+bez chordy lub tessellacji Gerbera; (2) PCB-015C — pairwise/curved coupling
+z fizycznym modelem C/C0 lub even/odd i fail-closed; (3) opcjonalnie D2 —
+feature-aware reconciliation z jawną tolerancją użytkownika; (4) optymalizacja
+pełnej fali. Numer P2 w starszej liście nie oznacza aktualnego priorytetu D2.
+Przed podjęciem działań zawsze ponownie przeczytaj końcówkę `todo.md`.
+
+**Punkty do inspekcji w kodzie:** `src/antenna_lab/pcb/easyeda.py`,
+`src/antenna_lab/pcb/easyeda_model.py`,
+`src/antenna_lab/pcb/source_ir.py`,
+`src/antenna_lab/pcb/reduced_control.py`,
+`src/antenna_lab/solvers/reduced_source.py`,
+`tests/test_pcb_easyeda.py`. Kieruj się stanem kodu, nie samą listą plików.
+
+## 6. Dowody, dostępne komendy i niewykonane sprawdzenia
+
+**Dotychczas potwierdzone historycznie:**
+
+- `test_spirala.epcb`: 198 rekordów, 6 LINE, 7 ARC, 2 VIA,
+  4 dostępne regiony miedzi; obrys około 25 mm, dielektryk około
+  0,2 mm, epsilon_r = 4,5. Parser i ograniczony canonical PASS,
+  nie pełny solve. SHA256 danych:
+  `e528f2a4ac1a1957a45e48806bc93da8b42e4af4a0f1da27cd84ce26714d0c4b`.
+- 11 testów `test_pcb_easyeda.py` PASS dla checkpointu D0/D1, w tym
+  syntetyczny source-only FAST bez Gerbera. Następne 3 wąskie regresje
+  PASS, zapisane na końcu `history.md`. Są to wyniki **historyczne**,
+  nie testy uruchomione podczas odczytu tego dokumentu.
+- Brak potwierdzonego full solve rzeczywistej serpentyny; nie uruchamiano
+  w tych checkpointach pełnego zestawu testów ani natywnego FDTD.
+- 2026-10-21 do repo dodano także `gerbs/test_psu/test_psu.epcb` i
+  `gerbs/test_psu/psu.zip`. Ich obecność nie dowodzi jeszcze działania FAST.
+- Zakończone natywne przebiegi antenowe na Windowsie potwierdziły poprawkę
+  granic zasilania `aligned_feed` (450 dodatnich wkładów). Lokalna praca
+  0,949145539 W i strumień 0,948187885 W różnią się o około 0,10090%,
+  ale pojedyncze odniesienie U·I=1 W różni się od lokalnej pracy o
+  5,085%. **Nie zatwierdza to impedancji ani zysku**; M2/M3 otwarte.
+
+**Inspekcja source bez portu/Gerbera (CMD Windows):**
+
 ```cmd
 .\.venv\Scripts\python.exe -m antenna_lab.pcb.reduced_control --easyeda-source gerbs\realpcb_microstrip\test_spirala.epcb --inspect-source
 ```
 
-Tryb `--inspect-source` zapisuje m.in. `source_ir.json`, `source_model.json`, `import.json` i `summary.json`, także przy niekompletnym modelu i bez portu. To inspekcja, **nie zakończone obliczenie**. Dla kompletnego obsługiwanego projektu istnieje ścieżka `--easyeda-source ... --source-config ...` z jawnym opisem kontaktów. Brak Gerberów oznacza `manufacturing_validation=not_requested`, nie błąd.
+**Obsługiwany solve z kompletnymi kontaktami:**
 
-D1 świadomie nie instancjonuje zewnętrznych footprintów COMPONENT. Jeśli komponent wymaga `FOOTPRINT/<hash>.efoo`, brak tego pliku jest zgłaszany jako brak zależności. Nawet znalezienie pliku wymaga przyszłego adaptera jego instancji. Nie są zgadywane brakujące kontakty, lead length ani pasożyty.
+```cmd
+.\.venv\Scripts\python.exe -m antenna_lab.pcb.reduced_control --easyeda-source projekt.epcb --source-config source-contacts.json
+```
 
-### Aktualna fizyka i jej granice
+**Pełne testy na docelowym Windows, tylko gdy zasadne:**
 
-Reduced solver obsługuje wspierane, jednoznaczne odcinki microstrip (model Hammerstad–Jensen), idealne R/L/C, zweryfikowaną miedź bottom jako odniesienie, setback i określony model ground-PTH jako **idealne połączenie z masą**. Sieć jest częstotliwościowa i w przyjętym przybliżeniu bezstratna poza jawnymi rezystorami.
+```cmd
+.\.venv\Scripts\python.exe -X utf8 -m unittest discover -s tests -v
+```
 
-Nie uwzględniono m.in. strat laminatu i przewodnika, promieniowania, efektów 3-D zakrętów, pasożytów padów/obudów, dyspersji i ogólnego sprzężenia nieoddzielonych sekcji. **Pairwise coupled microstrip pozostaje niezaimplementowane**. Zbliżone równoległe odcinki i inne niewspierane topologie powodują fail-closed; nie generuje się pozornie poprawnego CSV przy pominiętej istotnej fizyce. Semantyka Arc jest przechowywana, lecz **nie ma modelu elektrycznej długości łuku w FAST**.
+Projekt używa `unittest`, nie wymaga `pytest`. Benchmarki są wykluczone
+bez osobnej instrukcji użytkownika. Dla zmiany samej dokumentacji wystarczy
+kontrola spójności treści i commitów; nie przedstawiaj jej jako testu EM.
 
-## 3. Wynik dla rzeczywistej serpentyny i aktualny blocker
+## 7. Dokumenty, decyzje i ograniczenia wymagające zachowania
 
-Dla pliku `gerbs/realpcb_microstrip/test_spirala.epcb` dotychczas potwierdzono:
+- [`AGENTS.md`](AGENTS.md): obowiązkowe zasady, Windows, Git, checkpointy,
+  testy i końcowa inspekcja dokumentacji.
+- [`todo.md`](todo.md): **nadrzędna operacyjna kolejność** aktualnych prac.
+- [`history.md`](history.md): chronologia zmian, ostatnie wpisy PCB-015D0/D1
+  i wyniki ich testów; sprawdzaj końcówkę po każdej sesji.
+- [`docs/pcb-easyeda.md`](docs/pcb-easyeda.md): dialekt, jednostki,
+  source IR, ograniczenia footprintów, source-only CLI.
+- [`docs/pcb-reduced.md`](docs/pcb-reduced.md): zakres fizyczny FAST,
+  metoda quasi-TEM i warunki fail-closed.
+- [`docs/architecture.md`](docs/architecture.md): separacja rdzenia,
+  solverów, geometrii i GUI.
+- [`goal.md`](goal.md), [`docs/power-audit.md`](docs/power-audit.md),
+  [`docs/fields.md`](docs/fields.md): wymagania antenowe i obszary
+  jeszcze niezweryfikowane fizycznie.
 
-- 198 rekordów, w tym 6 LINE, 7 ARC i 2 VIA;
-- 4 dostępne regiony miedzi;
-- rozmiar płytki około 25,0000008 mm;
-- dielektryk około 0,1999996 mm, `epsilon_r=4.5`;
-- parser i budowa **częściowego** canonical layout zakończyły się powodzeniem.
+Nienaruszalne założenia: source EasyEDA > Gerber w semantyce CAD;
+brak danych oznacza brak, nie zero; nie zgaduj jednostek, metalizacji via,
+geometrii footprintów ani sprzężeń; tolerancja produkcyjna ≠
+geometry-resolution ≠ siatka EM; `POUR` bez materializowanego `POURED` nie
+daje automatycznie miedzi. Symulacja ukończona ≠ fizycznie zweryfikowana.
+Pracuj natywnie na Windows 11 w `.venv`, bez obowiązku WSL/uv.
 
-SHA256 tego źródła zapisany w historii:
-`e528f2a4ac1a1957a45e48806bc93da8b42e4af4a0f1da27cd84ce26714d0c4b`.
+## 8. Protokół aktualizacji tego pliku — kontrola jakości przekazania
 
-**Bezpośrednia przeszkoda:** CSRC/R1 odwołują się do nieobecnej geometrii footprintu `e8bf627583724bdebefbaa0be79b0d2f`. Nie ma bezpiecznej podstawy do odtworzenia tych padów i kontaktów przez zgadywanie lub rekonstrukcję z Gerbera. Nie wykonano pełnego solve serpentyny ani natywnego FDTD dla tego przypadku w opisanych checkpointach. Po rozwiązaniu footprintów trzeba jeszcze obsłużyć Arc TL oraz sprzężenia; obecny brak wyniku nie oznacza niepowodzenia parsera.
+Po ukończonym zadaniu agent ma odpowiedzieć sobie:
 
-Na `main` dodano także 2026-10-21 w commicie `bc886490909bcac2914224c555bc597d8d469820` nowy zestaw `gerbs/test_psu/test_psu.epcb` i `gerbs/test_psu/psu.zip`. Jest to **nowy materiał wejściowy w repozytorium**, ale w przeczytanych raportach nie ma jeszcze potwierdzenia jego analizy ani wyniku FAST; nie należy domniemywać jego obsługi.
+1. Czy nowy czat rozpozna aktualny HEAD i nie pomyli historycznego SHA
+   z najnowszym? Czy opisuje zmianę dokonującą się **naprawdę**, a nie plan?
+2. Czy najbliższy krok jest konkretny, ma blocker oraz mierzalne kryterium
+   ukończenia, a priorytet jest zgodny z `todo.md`?
+3. Czy status DONE/PARTIAL/OPEN i wynik testów są udokumentowane bez
+   przypisywania sobie cudzych lub nieuruchomionych sprawdzeń?
+4. Czy zmiany istotne dla użytkownika znalazły się także w właściwych
+   `docs/*.md`, `history.md` i `todo.md` (o ile zakres zadania pozwala)?
+5. Czy checkpoint został opublikowany na właściwej gałęzi i czy
+   odpowiedź zawiera SHA, wynik pushu, testy i ograniczenia?
 
-## 4. Najbliższy plan rozwoju
-
-1. **Teraz — adapter zewnętrznych footprintów i kontaktów komponentów:** wczytywanie jawnie wskazanej geometrii `.efoo` dla CSRC/R1, przypisanie padów/pinów do netów i fizycznych conductorów, transformacje instancji, weryfikacja kontaktów i zwarć, jawne błędy brakujących danych. To obecny blocker realnego source.
-2. **Następnie — PCB-015D3, semantyczny graf Line/Arc TL:** zachowanie topologii i liczenie długości łuków z promienia oraz signed sweep, bez zastępowania łuku cięciwą lub tessellacją z Gerbera.
-3. **Dalej — PCB-015C, pairwise coupled microstrip:** fizyczny model sprzężonych linii (np. parametry macierzy C/C0 lub udokumentowany even/odd), właściwy podział sekcji i kontrola topologii; dla rzeczywistej serpentyny to podstawowy nierozwiązany element fizyki FAST.
-4. **Osobno — PCB-015D2, opcjonalne EasyEDA ↔ Gerber/Excellon reconciliation:** feature-aware kontrola zgodności eksportu z source. Limit `manufacturing_tolerance_um` ma podawać użytkownik dla konkretnego workflow; przykładowe 10 µm nie jest globalną stałą ani tolerancją FAST/mesha.
-5. **Po uzyskaniu użytecznego FAST:** prace nad kosztem preparation, siatką/domeną, viewerami i oszczędnym użyciem full-wave DESIGN/VERIFY.
-
-Kolejność opiera się na końcowym, aktualnym wpisie `todo.md`: footprint/contact → Arc → sprzężenia. D2 jest odłożone i opcjonalne, mimo że w starszej liście priorytetów ma numer P2.
-
-## 5. Stan starszego toru antenowego i openEMS
-
-- Quados 8 i biquad przy 1420 MHz mają generatory, parametry, edytor i eksport; istnieją adapter openEMS, diagnostyka mocy, pola E/H w przekrojach oraz statyczne diagramy fazowe i raport HTML offline.
-- Na natywnym Windowsie użytkownika potwierdzono import openEMS 0.37.0rc3/CSXCAD i wykonano przebiegi FDTD. Adapter pozostaje jednak eksperymentalny.
-- Pierwotny audyt źródła wykazał niezgodne zaokrąglenie granic siatki/portu: opór obejmował 450 krawędzi, wymuszenie 270. W wariancie `aligned_feed` uzyskano 450 dodatnich wkładów.
-- W `aligned_feed` lokalna praca netto wynosi **0,949145539 W**, strumień zewnętrzny **0,948187885 W**; ich względna różnica to około **0,10090%**. Pojedyncze odniesienie `U·I = 1 W` nadal różni się od lokalnej pracy o **5,085%** tego odniesienia.
-- Te pomiary potwierdzają poprawę granic źródła i bilansu lokalnej pracy, **nie stanowią walidacji impedancji, SWR ani zysku**. Pozostają: lepsza definicja i pomiar portu, kontrola zbieżności i przypadek referencyjny. Wyników nie wolno poprawiać współczynnikiem bilansu.
-- Prądy promiennika i pełnookresowa animacja nie są zaimplementowane. Dostępne statyczne pola E/H także wymagają natywnej walidacji. M2/M3 nie należy ogłaszać jako ukończonych.
-
-## 6. Testy i poziom pewności
-
-**Wyniki historyczne z `history.md` (nie uruchamiane podczas tego przeglądu):**
-
-- `python -X utf8 -m unittest test_pcb_easyeda -v`: **11 PASS**. Wśród nich syntetyczny source-only FAST bez Gerbera.
-- Trzy wybrane regresje po dalszych poprawkach: **3 PASS**, dotyczące guardu inner physical layer, zachowania detached provenance w projekcji i deterministycznego wyznaczania długości L/U.
-- Brak potwierdzenia pełnej suite, natywnego openEMS/FDTD, rozległych prób prepare-only i pełnego solve realnej serpentyny w tych checkpointach.
-- Testy 11+3 nie dowodzą pełnej poprawności elektromagnetycznej realnej płytki.
-
-**Sprawdzenia w tym zadaniu:** odczyt i porównanie aktualnej dokumentacji, historii oraz metadanych ostatnich commitów/gałęzi. Nie wykonywano lokalnego kodu, testów, benchmarków ani FDTD. Ocena jest audytem stanu zapisów i repozytorium, nie nową walidacją numeryczną.
-
-## 7. Zasady dalszej pracy / ryzyka przekazania
-
-- **Source EasyEDA jest nadrzędny dla intencji projektowej; Gerber jest opcjonalnym świadectwem produkcyjnym.** Nie nadpisuj source ani nie rekonstruuj znanej semantyki z tessellacji.
-- **Fail-closed:** brak komponentów, materiału, topologii, nieobsługiwany Arc/coupling lub niejednoznaczna skala mają być jawnym ograniczeniem, a nie szacowaną geometrią lub cichym pominięciem.
-- Rozdzielaj trzy różne pojęcia: `geometry-resolution`, `manufacturing_tolerance` i rozdzielczość siatki FDTD. Nie wprowadzaj ukrytej uniwersalnej tolerancji 10 µm.
-- Preserve provenance: wersję dialektu, rekordy, ID, net, źródłowy hash, jednostki, kopię rozstrzygniętych parametrów i przyczyny braków.
-- Nie uznawaj źródłowego `POUR` boundary za rzeczywiste wypełnienie bez `POURED`; nie wyprowadzaj metalizacji VIA z samego annular ring; nie dodawaj „idealnych” elementów poza jawnym zakresem przybliżenia.
-- Uruchomienia na docelowym Windows używają `.venv`; repo stosuje `unittest`. Pełne polecenie testowe wskazane w `AGENTS.md` to `.\.venv\Scripts\python.exe -X utf8 -m unittest discover -s tests -v`. Benchmarki są wykluczone bez osobnego polecenia.
-- Znaczącą pracę dokumentuj i publikuj na `origin/main`, ale nie utożsamiaj publikacji checkpointu z PASS wszystkich testów. Nie ruszaj niepowiązanej pracy użytkownika.
-
-## 8. Niedawna historia na `main`
-
-- `13c927675f9a0b8793957e6001c3ceebc14a9b18` / `19a714db9fb0ac19a0336608a085c981bf4ceacf` — zmiana roadmapy i kontraktu na EasyEDA source-first.
-- `7503ac1737dfaa7ae8a85144c110b516bf4bc277` — D0, parser semantyczny.
-- `26180121f7e799480b907d80fb3dbb754c48ed38` — D1, połączenie source-only z FAST.
-- `68f7e443ec5800ffbe03457f8cdba4a01f487016` / `edd572a146152c81ed33039a9dc0bcc36fa652f8` — zapis wąskiej weryfikacji i guardów.
-- `bc886490909bcac2914224c555bc597d8d469820` — dodanie testowego źródła PCB i ZIP dla `test_psu`.
-- `76d8e51bb3fd291386c88db45f4d7052b916b04d` — HEAD `main` w chwili przeglądu, merge.
-
-## Dokumenty źródłowe
-
-- [`AGENTS.md`](AGENTS.md) — reguły pracy, architektura, granice walidacji i publikacja.
-- [`todo.md`](todo.md) — bieżący priorytet i konkretny blocker po D0/D1.
-- [`history.md`](history.md) — wyniki kolejnych checkpointów i 11+3 testów.
-- [`docs/pcb-reduced.md`](docs/pcb-reduced.md) — kontrakt i ograniczenia FAST.
-- [`docs/pcb-easyeda.md`](docs/pcb-easyeda.md) — profil parsera, jednostki, CLI i zależności footprintów.
-- [`docs/architecture.md`](docs/architecture.md) — architektura pakietu i tor openEMS.
-- [`goal.md`](goal.md) — pierwotne wymagania, stan symulacji anten i ograniczenia fizyczne.
-
-**Zakres zapisu tego zadania:** wyłącznie nowy plik `migracja.md`. Nie zmieniano `history.md`, `todo.md`, kodu, testów, parametrów ani pozostałych plików. Jest to stan na wskazanym HEAD przed zapisaniem niniejszego raportu.
+Jeśli odpowiedź brzmi „nie”, uzupełnij przekazanie przed końcem pracy
+zamiast liczyć, że następnym razem użytkownik pamięta brakujące fakty.
+Unikaj rutynowych aktualizacji bez zmian merytorycznych. Ten mechanizm
+powinien działać niezależnie od czasu życia, liczby i modelu kolejnych czatów.
