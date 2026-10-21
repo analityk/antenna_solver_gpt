@@ -72,7 +72,7 @@ def materialize_quantized_geometry(value: QuantizedPcbGeometry) -> PcbGeometry:
     result.source_routes=tuple(replace(SourceRoutePrimitive(**cad_routes[r.id]),
         start_xy_m=point(r.start),stop_xy_m=point(r.stop),width_m=metre(r.width),
         center_xy_m=point(r.center) if r.center is not None else None) for r in value.source_routes)
-    result.source_pads=tuple(replace(SourcePad(**cad_pads[p.id]),vertices_xy_m=ring(p.vertices)) for p in value.source_pads)
+    result.source_pads=tuple(replace(SourcePad(**cad_pads[p.id]),vertices_xy_m=ring(p.vertices),holes_xy_m=tuple(ring(h) for h in p.holes)) for p in value.source_pads)
     result.design_source=source.get('design_source')
     result.route_provenance_available=source.get('route_provenance_available',False)
     from .routes import (audit_projected_routes, source_records,

@@ -43,6 +43,12 @@ def extract_source_sections(geometry,active_ids,section_type):
             overlap=route_shape(a).intersection(route_shape(b)).difference(allowed)
             if overlap.area>TOLERANCE_M*(route_shape(a).length+route_shape(b).length):
                 raise ConfigurationError(f'Reduced EasyEDA {a.id}/{b.id}: nonlocal source stroke contact unsupported.')
+    # CAD component copper is not an implicit electrical two-terminal model.
+    # Arc retains its precise guard; for LINE-only projects never silently omit RLC.
+    unresolved=[c['designator'] for c in geometry.design_source.get('resolved_components',())
+                if c['role']!='source' and c['designator'] not in {p.id for p in geometry.components}]
+    if unresolved and not any(r.kind=='ARC' for r in selected):
+        raise ConfigurationError('Reduced EasyEDA explicit component electrical model/contact mapping required: '+', '.join(unresolved))
     sections=[];seen=set();evidence=[]
     for r in geometry.source_routes:
         if r.layer_role!='top' or r.conductor_id not in active_ids:continue
@@ -89,9 +95,9 @@ def extract_source_sections(geometry,active_ids,section_type):
 def pad_terminal_node(geometry,point,owner,sections):
     """An explicitly modeled pad is equipotential, not an inferred lead length."""
     pads=[p for p in geometry.source_pads if p.conductor_id==owner and
-          Polygon(p.vertices_xy_m).buffer(TOLERANCE_M).covers(Point(point))]
+          Polygon(p.vertices_xy_m,p.holes_xy_m).buffer(TOLERANCE_M).covers(Point(point))]
     if len(pads)!=1:return []
-    pad=Polygon(pads[0].vertices_xy_m)
+    pad=Polygon(pads[0].vertices_xy_m,pads[0].holes_xy_m)
     metal=next(copper_shape(c) for c in geometry.top_copper if c.id==owner)
     if not metal.buffer(TOLERANCE_M).covers(pad):
         raise ConfigurationError(f'Reduced EasyEDA PAD {pads[0].id}: modeled pad leaves its physical conductor.')

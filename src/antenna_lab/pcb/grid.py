@@ -173,6 +173,7 @@ class TickSourceRoute:
 class TickSourcePad:
     id: str
     vertices: Ring
+    holes: tuple[Ring, ...] = ()
 
 
 @dataclass(frozen=True)

@@ -133,6 +133,16 @@ utworzeniem. W nagłówku zapisuj SHA ostatniego *już potwierdzonego*
 commita bazowego, a opublikowany SHA nowego commita podawaj po publikacji
 w raporcie końcowym. Nowy czat zawsze sam sprawdza HEAD.
 
+## Bieżący checkpoint PCB-015D4 (implementacja przed testami)
+
+Baza b7626f36bd582d678893b7f587f89f59cc745d50: oba archiwa są już w Git
+(`gerbs/emtest4/spirala.epro`, `gerbs/test_psu/test_psu.epro`). Starsze uwagi
+poniżej o plikach tylko w rozmowie są nieaktualne. Implementacja archive/resolver/
+PAD instantiation i CLI jest zapisana; jeszcze nie sprawdzona wykonaniem.
+Następny krok: wąski test `test_pcb_easyeda_project.py`, fizyczny audyt
+serpentyny i raport ograniczeń PSU. Nie uruchamiać pełnej suite ani FDTD.
+D3 Arc TL i coupling pozostają OPEN. Nie zgłaszać pełnego FAST jako PASS.
+
 ## 4. Punkt wznowienia — stan na 2026-10-21
 
 **Kierunek rozwoju:** `antenna_lab` jest pakietem Pythona dla modelowania

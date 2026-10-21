@@ -158,7 +158,7 @@ def quantize_pcb_geometry(geometry, grid=PcbGrid()):
             p.point(r.stop_xy_m,r.id+'.stop'),p.positive(r.width_m,r.id+'.width'),
             p.point(r.center_xy_m,r.id+'.center') if r.center_xy_m is not None else None)
             for r in geometry.source_routes),
-        source_pads=tuple(TickSourcePad(s.id,p.ring(s.vertices_xy_m,s.id+'.pad')) for s in geometry.source_pads))
+        source_pads=tuple(TickSourcePad(s.id,p.ring(s.vertices_xy_m,s.id+'.pad'),tuple(p.ring(h,s.id+'.pad_hole') for h in s.holes_xy_m)) for s in geometry.source_pads))
     _audit(geometry,result,p)
     audit=p.finish()  # raises before any receipt can be issued
     if result.routes or result.source_routes:

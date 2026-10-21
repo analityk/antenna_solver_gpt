@@ -83,7 +83,7 @@ def build_source_layout(source):
         if role[p['layer_id']]!='outline':
             raise ConfigurationError(f"EasyEDA POLY {p['id']}: only board-outline POLY supported, not implicit copper fill.")
     for p in data['pads']:
-        add(p['id'],p['net'],p['layer_id'],Polygon(p['ring_xy_m']),'pad')
+        add(p['id'],p['net'],p['layer_id'],Polygon(p['ring_xy_m'],p.get('holes_xy_m',())),'pad')
     parents={p['id']:p for p in data['pours']}
     for p in data['poured']:
         if p['parent_id'] not in parents:raise ConfigurationError(f"EasyEDA POURED {p['id']}: missing parent POUR.")
@@ -121,10 +121,12 @@ def build_source_layout(source):
                 if len(matches)!=1:raise ConfigurationError(f'EasyEDA {id}: source primitive has ambiguous physical conductor ownership.')
                 owners[id]=matches[0]
     routes=tuple(replace(r,conductor_id=owners[r.id]) for r in source.routes)
-    pads=tuple(SourcePad(p['id'],p['net'],role[p['layer_id']],tuple(map(tuple,p['ring_xy_m'])),owners[p['id']],p['record_index'])
+    pads=tuple(SourcePad(p['id'],p['net'],role[p['layer_id']],tuple(map(tuple,p['ring_xy_m'])),owners[p['id']],p['record_index'],tuple(tuple(map(tuple,h)) for h in p.get('holes_xy_m',())))
                for p in data['pads'])
     dependencies=[]
+    resolved_ids={c['component_id'] for c in data.get('resolved_components',())}
     for c in data['components']:
+        if c['id'] in resolved_ids:continue
         attrs={a['key']:a['value'] for a in data['attributes'] if a['parent_id']==c['id']}
         footprint=attrs.get('Footprint');name=attrs.get('Designator',c['id'])
         candidate=None
@@ -146,7 +148,26 @@ def build_source_layout(source):
         copper=[asdict(c) for c in copper],routes=[asdict(r) for r in routes],pads=[asdict(p) for p in pads],
         vias=[asdict(v) for v in source.vias],conductor_nets=conductor_nets,
         feature_owners=owners,feature_kinds={id:kind for id,_,_,_,kind in shapes},source_semantics=data,assumptions=assumptions,
-        missing_dependencies=dependencies,source_file=source.source_file,source_sha256=source.source_sha256)
+        missing_dependencies=dependencies,source_file=source.source_file,source_sha256=source.source_sha256,
+        resolved_components=data.get('resolved_components',[]),footprint_drills=data.get('footprint_drills',[]),
+        project_provenance=data.get('project_provenance'),
+        contact_audit=_contact_audit(shapes,owners,data,source))
+
+
+def _contact_audit(shapes, owners, data, source):
+    """Physical same-layer contacts, after exact net-short and ownership checks.
+
+    Open/unconnected pads are recorded as such, never promoted to connections.
+    Via annuli must belong to their declared net on both physical layers.
+    """
+    pads=[]
+    for id,net,role,shape,kind in shapes:
+        if kind!='pad':continue
+        contacts=[oid for oid,on,orr,other,ok in shapes if oid!=id and orr==role and shape.intersects(other)]
+        pads.append(dict(pad_id=id,net=net,layer_role=role,conductor_id=owners[id],
+                         physical_contacts=sorted(contacts),ownership_status='passed'))
+    return dict(status='passed',meaning='physical ownership/short audit, not electromagnetic validation',
+                pads=pads,via_pad_owners={v.id:{r:owners[v.id+':'+r] for r in ('top','bottom')} for v in source.vias})
 
 
 def source_layout_geometry(layout,override):
@@ -180,8 +201,9 @@ def source_layout_geometry(layout,override):
         source_pads=tuple(SourcePad(**p) for p in layout['pads']),
         design_source=dict(kind='easyeda_source',source_file=layout['source_file'],source_sha256=layout['source_sha256'],
             conductor_nets=layout['conductor_nets'],feature_owners=layout['feature_owners'],
-            feature_kinds=layout['feature_kinds'],manufacturing_validation='not_requested',override=override))
-    if layout['vias']:
+            feature_kinds=layout['feature_kinds'],resolved_components=layout.get('resolved_components',[]),
+            project_provenance=layout.get('project_provenance'),contact_audit=layout.get('contact_audit'),manufacturing_validation='not_requested',override=override))
+    if layout['vias'] or layout.get('footprint_drills'):
         settings=override.get('drills',{})
         plating=settings.get('pth_plating_um')
         if settings.get('pth_model')!='solid_pec_equivalent' or isinstance(plating,bool) or not isinstance(plating,(int,float)) or not isfinite(plating) or plating<=0:
@@ -192,6 +214,18 @@ def source_layout_geometry(layout,override):
             x,y=v['centre_xy_m'];radius=v['drill_diameter_m']/2+plating*1e-6
             if radius>v['pad_diameter_m']/2:raise ConfigurationError(f'EasyEDA VIA {v["id"]}: plating exceeds source pad radius.')
             drills.append(PcbDrill(v['id'],x,y,v['drill_diameter_m'],True,'PTH','EasyEDA VIA',v['source_sha256'],
+                plating*1e-6,radius,connected_layers(geometry,x,y,radius)))
+        for v in layout.get('footprint_drills',()):
+            x,y=v['centre_xy_m'];diameter=v['drill_diameter_m']
+            radius=diameter/2+plating*1e-6 if v['plated'] else None
+            if not v['plated']:
+                raise ConfigurationError(f"EasyEDA PAD {v['id']}: NPTH solver installation unsupported by source checkpoint.")
+            # Annular pads are actual copper; prove barrel contact and net on each layer.
+            for role in ('top','bottom'):
+                touched=[c for c in geometry.copper if c.layer_role==role and copper_shape(c).distance(Point(x,y))<=radius]
+                if not touched or any(layout['conductor_nets'][c.id]!=v['net'] for c in touched):
+                    raise ConfigurationError(f"EasyEDA PAD {v['id']}: PTH plating/contact conflicts with net {v['net']} on {role}.")
+            drills.append(PcbDrill(v['id'],x,y,diameter,True,'PTH','EasyEDA PAD',v['source_sha256'],
                 plating*1e-6,radius,connected_layers(geometry,x,y,radius)))
         geometry.drills=tuple(drills)
     validate_pcb_geometry(geometry)

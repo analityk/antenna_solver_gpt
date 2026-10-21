@@ -70,3 +70,4 @@ class SourcePad:
     vertices_xy_m: tuple[tuple[float, float], ...]
     conductor_id: str
     record_index: int
+    holes_xy_m: tuple[tuple[tuple[float, float], ...], ...] = ()

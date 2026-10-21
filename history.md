@@ -2258,3 +2258,18 @@ nie dodano plików użytkownika**, nie uruchamiano
 testów, FDTD ani benchmarków. Sprawdzenie dotyczy
 zgodności i publikacji dokumentacji.
 
+
+## 2026-10-21 — PCB-015D4 checkpoint importu .epro przed testami
+
+Bazą jest b7626f3. Potwierdzono w Git oba archiwa spirala.epro i test_psu.epro;
+wcześniejsze notatki o ich niedostępności są historyczne. Kanał GitHub zapisu
+sprawdzony. Dodano ograniczony bezpieczny ZIP/CRC/limity, project.json/wybór PCB,
+bibliotekę i embedded FOOTPRINT, nadrzędność footprintu PCB, kontrolę numer+ID
+PAD_NET, rolę CSRC/Value, instancjonowanie SMD/round THT oraz detached provenance.
+Bottom: odbicie lokalnego Y przed obrotem, SI wg dotychczasowego profilu mil.
+Otwór i metalizacja pozostają odrębne; brak plating nie otrzymuje defaultu.
+CLI --easyeda-project/--source-pcb-id przechodzi do istniejącego canonical/FAST;
+nie dodano Arc TL ani coupling. Nieobsługiwane modele elektryczne komponentów
+nie mogą być cicho pominięte. Pad holes przechodzą tę samą transformację/projekcję.
+Testy test_pcb_easyeda_project przygotowane, jeszcze nieuruchomione; checkpoint
+przed weryfikacją. Pełna suite/native/FDTD nie są planowane w tym etapie.

@@ -58,7 +58,7 @@ def _map_xy(geometry, point):
         source_routes=tuple(replace(r,start_xy_m=point(r.start_xy_m),stop_xy_m=point(r.stop_xy_m),
             center_xy_m=point(r.center_xy_m) if r.center_xy_m is not None else None)
             for r in geometry.source_routes),
-        source_pads=tuple(replace(p,vertices_xy_m=tuple(point(v) for v in p.vertices_xy_m)) for p in geometry.source_pads),
+        source_pads=tuple(replace(p,vertices_xy_m=tuple(point(v) for v in p.vertices_xy_m),holes_xy_m=tuple(tuple(point(v) for v in h) for h in p.holes_xy_m)) for p in geometry.source_pads),
         source_port=(replace(geometry.source_port,
             pin1_xy_m=point(geometry.source_port.pin1_xy_m),
             pin2_xy_m=point(geometry.source_port.pin2_xy_m)) if geometry.source_port else None),
