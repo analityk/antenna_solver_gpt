@@ -172,10 +172,14 @@ footprintu o hashu `e8bf627583724bdebefbaa0be79b0d2f`, którego
 geometrii nie ma w zbudowanym modelu. Nie zgaduj padów/połączeń i nie
 odtwarzaj ich z Gerbera.
 
-**Najbliższe zadanie:** zweryfikować aktualne pliki źródłowe i zależności,
-następnie zaprojektować/zaimplementować obsługę instancji zewnętrznego
-footprintu EasyEDA i adapter kontaktów komponentów; uwzględnić jawne
-przypisania pin↔pad↔net, transformacje oraz fizyczny audyt zwarć i kontaktów.
+**Najbliższe zadanie (skorygowane audytem 2026-10-21):** najpierw pozyskać
+pełny lokalny eksport projektu EasyEDA (projekt/archiwum z `project.json`
+oraz `FOOTPRINT/*.efoo`), zinwentaryzować identyfikatory footprintów
+i ich brakujące definicje; następnie zaprojektować/zaimplementować
+resolver i adapter instancji `COMPONENT → FOOTPRINT → PAD → PAD_NET`,
+z transformacjami oraz fizycznym audytem zwarć i kontaktów. Nie zakładać,
+że pojedyncze `.epcb` zawiera bibliotekę projektu. Jeśli pełny eksport jest
+niedostępny, zachować jawne `missing-source-dependency`.
 Jeśli wymagany plik `.efoo` nie jest dostępny, zachowaj jawny
 `missing-source-dependency` i wskaż dokładną brakującą zależność zamiast
 udawać udany solve.
@@ -198,6 +202,17 @@ Przed podjęciem działań zawsze ponownie przeczytaj końcówkę `todo.md`.
 `src/antenna_lab/pcb/reduced_control.py`,
 `src/antenna_lab/solvers/reduced_source.py`,
 `tests/test_pcb_easyeda.py`. Kieruj się stanem kodu, nie samą listą plików.
+
+**Nowe rozpoznanie zależności (statyczna inspekcja 2026-10-21):**
+`test_spirala.epcb` zawiera 2 `COMPONENT`, 4 `PAD_NET` i 0 `PAD`/`FOOTPRINT`;
+nie dostarcza więc sam geometrii CSRC/R1. `test_psu.epcb` jest nietypowym
+złożeniem 34 dokumentów `FOOTPRINT` i jednego `PCB`; dokument PCB zawiera
+291 komponentów, a po dopasowaniu `HEAD.uuid`/`HEAD.source` do atrybutu
+`Footprint` 119 instancji ma odpowiadającą definicję, 169 jej nie ma,
+zaś 3 nie mają rozpoznanego atrybutu. Obecne definicje obejmują
+`R0603`, `G0603`, testpointy i przewlekane złącze; nie jest to reguła
+SMD/THT ani dowód definicji 0805. Samo dopasowanie identyfikatora
+nie jest jeszcze udanym importem modelu. Szczegóły: `docs/pcb-easyeda.md`.
 
 ## 6. Dowody, dostępne komendy i niewykonane sprawdzenia
 

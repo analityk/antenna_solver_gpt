@@ -177,6 +177,15 @@ CSRC/R1 i adapter kontaktów komponentów**, następnie semantic Arc TL oraz
 pairwise/curved coupling. Nie rekonstruować brakującego footprintu z Gerbera.
 D2 reconciliation pozostaje opcjonalne i nie jest implementowane.
 
+**Wstępny krok zależności (audyt source 2026-10-21):** najpierw pozyskać
+pełny lokalny eksport projektu EasyEDA z `project.json` i biblioteką
+`FOOTPRINT/*.efoo`, sprawdzić kompletność powiązań po UUID/source i
+ustalić rzeczywisty zakres braków. Pojedynczy `.epcb` nie musi zawierać
+footprintów; w `test_psu.epcb` 34 dołączone definicje obejmują także THT,
+a jednocześnie brakuje definicji wielu R/C SMD. To nie jest reguła THT/SMD.
+Dopiero potem implementować instancjonowanie i audyt kontaktów;
+szczegóły `docs/pcb-easyeda.md`. Nie zmienia to kolejności Arc/coupling.
+
 ### Checkpoint D0/D1 — 2026-10-21
 
 Działa source-only parser PCB 1.8/editor 2.2.x, neutralny IR i ograniczony

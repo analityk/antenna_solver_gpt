@@ -101,3 +101,59 @@ przez użytkownika do repo: odczyt + canonical layout PASS (198 records,
 `e8bf627583724bdebefbaa0be79b0d2f`; canonical output zachowuje ten brak,
 nie jest pełnym modelem fizycznym do solve. Pełny source nie był zmieniany.
 Nie sprawdzano `test_spirala.zip`, nie uruchamiano FDTD ani pełnej suite.
+
+## Audyt brakujących footprintów w plikach source — 2026-10-21
+
+**Wniosek:** brak geometrii w pojedynczym `.epcb` nie dowodzi uszkodzenia
+projektu ani związku z rodzajem montażu SMD/THT. Dokument PCB zapisuje
+`COMPONENT` (pozycja, warstwa, obrót), atrybut `Footprint` (identyfikator)
+oraz `PAD_NET` (numer pada, net i opcjonalny lokalny ID), lecz definicje
+kształtów padów mogą być osobnymi dokumentami `FOOTPRINT/*.efoo`.
+Format projektu EasyEDA Pro wiąże je przez `project.json`. Oficjalna
+instrukcja **File → Project Save as (local)** opisuje lokalny eksport
+archiwum projektu zawierającego biblioteki. Z tego powodu przed tworzeniem
+adaptera należy najpierw uzyskać i zinwentaryzować pełny eksport projektu
+EasyEDA, nie tylko pojedyncze `.epcb` czy ZIP z Gerberami.
+
+Źródła formatu i eksportu:
+- https://github.com/easyeda/easyeda-file-format-v2/blob/main/docs/en/general/project-json.md
+- https://github.com/easyeda/easyeda-file-format-v2/blob/main/docs/en/pcb/package/component.md
+- https://prodocs.easyeda.com/en/import-export/export-easyeda-pro/
+
+**Dowody z plików repozytorium (statyczna inspekcja, nie test solvera):**
+
+- `gerbs/realpcb_microstrip/test_spirala.epcb`: 1 dokument PCB,
+  2 `COMPONENT` (CSRC/R1), 4 `PAD_NET`, zero rekordów `PAD`
+  i zero `DOCTYPE FOOTPRINT`. Oba komponenty odsyłają do
+  `e8bf627583724bdebefbaa0be79b0d2f`; geometria footprintu nie jest
+  dostępna w samym pliku ani w katalogu tego przypadku w repo.
+- `gerbs/test_psu/test_psu.epcb`: **nietypowy dokument złożony**:
+  34 bloki `DOCTYPE FOOTPRINT` przed jednym `DOCTYPE PCB`.
+  Bloki mają nazwy: 31 × `Test-Point-0.5mm`, 1 × złącze przewlekane
+  `HDR-TH_2P-P2.54-V-F`, 1 × `R0603`, 1 × `G0603`.
+  PCB zawiera 291 `COMPONENT`, 906 `PAD_NET` i 9 samodzielnych `PAD`.
+  Po dopasowaniu zarówno `HEAD.uuid`, jak i `HEAD.source` 119 instancji
+  wskazuje dostępną definicję, 169 wskazuje identyfikatory bez definicji
+  w tym pliku, 3 nie mają rozpoznanego atrybutu `Footprint`.
+  Istnienie bloku footprintu **nie oznacza jeszcze**, że obecny parser
+  potrafi go przetworzyć i zinstancjonować.
+- W tym pliku nazwane definicje pasywne to `R0603` i `G0603`,
+  nie `0805`. Nie wyciągać wniosków o dostępności definicji 0805
+  z samych rysunków/śladów miedzi ani z przykładowej nazwy w dokumentacji.
+  Widać równocześnie definicję THT i braki wśród dwupadowych R/C, więc
+  **SMD/THT nie jest regułą kompletności**.
+
+**Kontrakt następnego etapu:** przyjmować albo pojedyncze PCB + katalog
+zależności footprintów, albo pełny archiwalny projekt z `project.json`
+i `FOOTPRINT/<uuid>.efoo` (po zbadaniu rzeczywistego układu eksportu).
+Rejestrować i weryfikować mapowanie `COMPONENT → Footprint UUID/source →
+PAD (ID i numer) → PAD_NET`, uwzględnić transformację instancji, stronę
+płytki, pady SMD oraz pady przewlekane z wierceniem i metalizacją. Nigdy
+nie nadawać miedzi zarysowi obudowy lub silkscreenowi ani nie wytwarzać
+brakujących padów z Gerbera. Sam preambułowy `FOOTPRINT` w nietypowym pliku
+złożonym nie może być automatycznie uznany za standardowe `.epcb`.
+
+**Stan implementacji po audycie:** bez zmian. Parser D0 obsługuje pojedyncze
+`DOCTYPE PCB`; D1 jedynie wykrywa zależności i odmawia solve bez geometrii.
+Nie dodano obsługi archiwów projektu, parsera `.efoo` ani nowej fizyki.
+

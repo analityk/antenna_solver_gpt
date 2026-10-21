@@ -2118,3 +2118,31 @@ Po publikacji 68f7e443ec5800ffbe03457f8cdba4a01f487016 uruchomiono tylko:
 Wynik: 3 PASS. Razem wykonano 11 testów source-only i te 3 wąskie sprawdzenia.
 Nie uruchamiano pełnej suite ani native/FDTD. Blocker realnego source pozostaje
 bez zmian: brak geometrii footprintu CSRC/R1; Arc TL i D2 niezaimplementowane.
+
+## 2026-10-21 — audyt struktury zależności EasyEDA FOOTPRINT/COMPONENT (dokumentacja)
+
+Bez zmian solvera, adapterów, formatu wyników, siatki i fizyki.
+Porównano dwa repozytoryjne pliki source z oficjalnym kontraktem EasyEDA Pro:
+osobny dokument PCB zapisuje instancje `COMPONENT`, referencję `Footprint`
+i mapę `PAD_NET`, natomiast geometria padów należy do biblioteki
+`FOOTPRINT` (w projekcie eksportowanym także jako `.efoo`).
+
+`test_spirala.epcb`: 2 COMPONENT, 4 PAD_NET, 0 PAD/FOOTPRINT. Wciąż brak
+referencyjnej geometrii CSRC/R1 (`e8bf627583724bdebefbaa0be79b0d2f`).
+
+`test_psu.epcb`: 34 bloków FOOTPRINT przed PCB — 31 Test-Point-0.5mm,
+jedno HDR-TH_2P-P2.54-V-F, jedno R0603 i jedno G0603. W części PCB
+291 COMPONENT, 906 PAD_NET i 9 samodzielnych PAD. Porównanie identyfikatora
+Footprint z HEAD.uuid oraz HEAD.source wykazało 119 instancji z dostępną
+definicją, 169 referencji bez lokalnej definicji i 3 bez rozpoznanego
+atrybutu Footprint. To zgodność identyfikatora, **nie** sukces parsera/solver.
+Braki nie zależą po prostu od montażu THT/SMD. Nie znaleziono nazwanej
+definicji 0805; dostępne pasywne nazwy to R0603/G0603.
+
+Wniosek operacyjny: przed adapterem footprintów zdobyć pełny lokalny eksport
+projektu EasyEDA i zweryfikować katalog FOOTPRINT oraz project.json.
+Nie rekonstruować brakujących padów z Gerbera ani z obrysów komponentu.
+Zapisano diagnozę w docs/pcb-easyeda.md, todo.md i migracja.md.
+Sprawdzenia: statyczna inspekcja rekordów/identyfikatorów oraz dokumentacji
+formatu EasyEDA; **nie uruchamiano testów, FDTD ani benchmarków**.
+Ograniczenie: nie sprawdzono jeszcze pełnego archiwum projektu z footprintami.
