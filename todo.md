@@ -1,263 +1,176 @@
 # TODO — PCB: aktualny stan i następne kroki
 
-Stan na 2026-10-20. Ten plik opisuje **faktyczny stan main** po PCB-015B/B1/B2
-oraz kolejność dalszej pracy. Nie oznacza, że pozycje otwarte zostały wykonane.
+Stan na 2026-10-21. Ten plik opisuje bieżący kierunek rozwoju rdzenia PCB po
+PCB-015C0.1. Priorytetem jest workflow użytkownika oparty o EasyEDA source PCB;
+Gerber/Excellon pozostają ważnym, ale opcjonalnym artefaktem produkcyjnym.
 
-## Co jest już zrobione
+## Stan potwierdzony
 
-### PCB-013A — profile i sterowanie openEMS
+### FAST / reduced quasi-TEM
 
-Dostępne są profile `preview/design/verify` w
-`parameters/openems_profiles.toml`, potwierdzenie Y/N/E, `--openems-set`,
-`--yes`, ustawienia timestep/EndCriteria/NrTS/MaxTime/BC/runtime, pola E/H
-domyślnie w częstotliwości środkowej oraz raport fazowy co 15°.
+Istnieje osobny solver `antenna_lab.pcb.reduced_control`, który nie uruchamia
+openEMS/FDTD. Obsługuje podstawową sieć TL + idealne R/L/C, ground-PTH jako
+jawną aproksymację, bottom-ground setback oraz fail-closed dla nieobsługiwanej
+topologii i sprzężeń.
 
-`NrTS` jest sufitem bezpieczeństwa, nie definicją jakości.
+PCB-015C0/C0.1 zachowało Gerberowe Line/Arc jako provenance i usunęło fałszywe
+`stroke_not_preserved` wynikające z porównywania dwóch niezależnie
+skwantyzowanych reprezentacji. Commity C0.1:
 
-### PCB-015A1 — walidacja geometrii bez kwadratowej pętli Python
+- `a3fb155cca227a09033dc487834bc3102f208d75`
+- `95796d5be7d22aa9d41dd8f24e13e1f3e79adb58`
+- `0a6cad98311345eff5b4119ce6da8e1cf2b63162`
 
-Commit:
-`017dfe1254fa173747f7d1a6535eec35979b779a`
+Na realnym lokalnym `test_spirala.zip` użytkownik potwierdził po C0.1 następny
+jawny blocker:
 
-Usunięto pełny O(N²) scan par krawędzi w `validation.py::_polygon()`.
-Walidacja pozostaje fail-closed: GEOS/Shapely sprawdza poprawność polygonu,
-bez `make_valid`, `buffer(0)`, snappingu ani automatycznej naprawy.
+`Reduced source route Arc unsupported: top:route_000009 ...; no guessed TL arc.`
 
-Lokalny pomiar użytkownika na tej samej serpentynie:
+To potwierdza, że route-survival/projection nie jest już bieżącym blockerem.
 
-- przed: 3 364 506 592 wywołania, 687,776 s pod `cProfile`,
-- po: 122 243 799 wywołań, 58,034 s pod `cProfile`.
+## Zmiana architektury: EasyEDA source-first
 
-To około 27,5× mniej wywołań i 11,9× krótszy profilowany przebieg. Czasy
-`cProfile` nie są zwykłym wall-clock i nie służą do prognoz runtime.
+Dalszy rozwój rdzenia nie ma odtwarzać semantyki projektu z Gerberów, jeżeli
+dostępny jest plik source PCB z EasyEDA.
 
-### PCB-015A2/A3 — FAST / APPROX reduced quasi-TEM
+Kontrakt:
 
-Commity:
+1. **EasyEDA source PCB jest źródłem prawdy o intencji projektowej i semantyce**:
+   nets, Line/Arc, szerokości, signed sweep, warstwy, vias, pady/piny, stackup,
+   board geometry i inne jawne dane CAD.
+2. **FAST ma działać również bez Gerberów.** Brak Gerber/Excellon nie jest
+   błędem, jeżeli source PCB zawiera wystarczające dane do żądanego modelu.
+3. **Gerber/Excellon są opcjonalną walidacją artefaktu produkcyjnego.** Gdy są
+   dostarczone, służą do sprawdzenia, czy eksport odpowiada source, a nie do
+   nadpisywania lub rekonstruowania source.
+4. Reconciliation używa **jawnego parametru użytkownika** określającego
+   dopuszczalną różnicę geometryczną, np. `manufacturing_tolerance_um`.
+   Przykładowe 10 µm jest wartością podaną przez użytkownika dla konkretnej
+   pracy, nie globalnym defaultem fizycznym ani stałą w kodzie.
+5. Odchyłka <= ustawiona tolerancja jest akceptowana jako zgodny eksport;
+   przekroczenie tolerancji ma dawać jednoznaczny mismatch/fail zgodnie z
+   polityką wywołania. Tolerancja reconciliation nie jest snappingiem,
+   geometry-resolution ani rozdzielczością siatki EM.
+6. Rdzeń nie narzuca realizmu produkcji PCB. Source może opisywać również
+   nietypowe/umowne konstrukcje, np. bardzo gruby dielektryk o epsilon_r≈1,
+   jeżeli jest to świadomy model użytkownika.
+7. Gerber-only route provenance z PCB-015C0/C0.1 pozostaje fallbackiem i
+   materiałem diagnostycznym. Nie jest teraz priorytetem rozwoju.
 
-- `5b1695af2596baae301b284c8bd70886c5857b85`
-- `0ac8f3b0a92dc9c9926ae3d59a14642698c215de`
+## Priorytety implementacji
 
-Istnieje osobny solver `antenna_lab.pcb.reduced_control`, który:
+### P0 — PCB-015D0: minimalny parser EasyEDA source PCB do jawnego IR
 
-- nie importuje natywnego openEMS,
-- nie buduje domeny 3-D/PML/Yee-gridu,
-- ekstrahuje jednoznaczne prostoliniowe/ortogonalne odcinki,
-- liczy izolowany mikrostrip modelem Hammerstad–Jensen,
-- rozwiązuje częstotliwościową sieć TL + idealne R/L/C,
-- zapisuje Z(f), S11(f), SWR, graf i provenance,
-- jawnie oznacza wynik `reduced_quasi_tem / approximate`,
-- jawnie pomija promieniowanie, dyspersję, straty linii i pasożyty zakrętów/padów.
+Celem jest parser source-first, nie pełna implementacja całego formatu EasyEDA.
 
-Sprzężenia równoległych odcinków są wykrywane, ale nie są jeszcze rozwiązywane.
-Solver nie udaje wtedy wyniku.
+Pierwszy checkpoint ma:
 
-Testy PCB-015A:
+- rozpoznać format/wersję (`DOCTYPE`, `HEAD`, potrzebne ustawienia jednostek),
+- zachować warstwy i fizykę warstw (`LAYER`, `LAYER_PHYS`),
+- zachować nets (`NET`),
+- parsować semantyczne `LINE` i `ARC` bez rekonstrukcji z polygonu,
+- dla `ARC` zachować endpointy, signed sweep, width, layer, net i source ID,
+- parsować `VIA` i podstawowe przypisanie net/layer,
+- parsować `PAD_NET` i minimalne dane potrzebne do source/component contacts,
+- zachować provenance: source file, hash, record ID/index i wersję formatu,
+- przeliczyć dane przestrzenne do SI dokładnie na granicy parsera,
+- nie zgadywać jednostek; jeśli format/wersja nie wystarcza do jednoznacznej
+  interpretacji, parser ma zgłosić konkretny brak zamiast heurystycznie skalować,
+- zachować deterministyczny, strict-JSON-compatible IR.
 
-- celowane przed publikacją: 76/76 PASS,
-- końcowe reduced: 17/17 PASS,
-- pełny unittest uruchomiony raz: 414 testów, 2 failures, 27 errors, 3 skipped;
-  były to istniejące/downstream odmowy audytu siatki i stara oczekiwana wielkość
-  emtest3, nie błędy nowych testów reduced.
+Nieznane rekordy nie muszą być implementowane, jeśli nie są potrzebne do
+żądanego modelu. Nie wolno jednak cicho zignorować rekordu, który może zmieniać
+używaną topologię, materiał albo geometrię aktywnej warstwy.
 
-W PCB-015A nie uruchamiano natywnego FDTD.
+### P1 — PCB-015D1: source-only canonical PCB model i FAST
 
-## Faktyczny stan lokalnej serpentyny
+Zbudować z EasyEDA source wystarczający canonical PCB model, aby reduced solver
+mógł działać **bez żadnego Gerbera**.
 
-Lokalny plik użytkownika `test_spirala.zip` istnieje poza śledzonym stanem repo.
-Po PCB-015B użytkownik uruchomił FAST na rzeczywistym ZIP-ie. Kolejne jawne
-blokery ujawniły dwa zbyt konserwatywne założenia oraz właściwy problem ekstrakcji.
+Zakres ma objąć co najmniej dane potrzebne dla aktualnej klasy projektów:
 
-PCB-015B jest **ukończone**: plated PTH top→udowodniony bottom ground może być
-traktowany w FAST jako idealne połączenie do `ground`, z jawnym pominięciem
-indukcyjności/strat via i rozłożonej impedancji topowego polygonu masowego.
-Signal vias, inner-layer vias, NPTH i kontakty niejednoznaczne nadal fail closed.
+- board outline,
+- top/bottom copper primitives potrzebne dla aktywnej trasy i reference plane,
+- Line/Arc route graph z nets,
+- vias,
+- stackup/materials,
+- source/component contacts wymagane przez istniejący reduced solver.
 
-PCB-015B1 dopuściło naturalny setback bottom ground od obrysu płytki. Rzeczywisty
-bottom `bottom:copper_0001` ma jeden polygon, zero holes, pole
-599,50695 mm² i bbox około 24,49×24,48 mm przy board 25×25 mm; różnica
-25,49305 mm² wynika z około 0,25–0,26 mm cofnięcia od krawędzi. FAST nie wymaga
-już `ground == board outline`; wymaga jednej ciągłej, hole-free referencji
-pokrywającej całą aktywną miedź sygnałową i powierzchnie kontaktów source/RLC.
+Dla polygonów/pourów parser ma korzystać z semantyki source EasyEDA, a nie
+generować Gerbera pośrednio i odczytywać go ponownie.
 
-PCB-015B2 przestało odrzucać cały conductor tylko dlatego, że Gerberowa
-polygonizacja prostoliniowej trasy zawiera lokalne round/chamfered joins.
-Dopuszczone są wyłącznie width-scale resztki przy udowodnionych końcach/złączach;
-rzeczywiste nielokalne krzywe/skosy nadal fail closed. Użytkownik podał, że po
-tych zmianach lokalne testy reduced przechodzą.
+Source-only path ma zachować fail-closed dla brakujących danych istotnych dla
+konkretnego solve, ale sam brak Gerbera nie może powodować odmowy.
 
-Rzeczywisty run serpentyny zatrzymuje się obecnie na:
+### P2 — PCB-015D2: opcjonalny EasyEDA ↔ Gerber/Excellon reconciliation
 
-`Reduced extraction: curved/oblique top copper top:copper_0001 has no resolvable straight sections.`
-
-Diagnostyka tego conductora:
-- pole 14,85795 mm²,
-- bbox (-3,79, -17,83) … (2,64, 0,43) mm,
-- 3088 wierzchołków,
-- 1085 krawędzi sklasyfikowanych jako oblique i 2003 orthogonal,
-- łączna długość krawędzi oblique około 52,257 mm,
-- przykładowa długa krawędź (-0,56,-0,43)→(-0,57,-2,29) mm ma tylko około
-  0,31° odchylenia od pionu.
-
-To nie jest mały pad ani wyłącznie lokalny narożnik. Obecny FAST próbuje
-odtworzyć centerline z końcowego `CopperPolygon`, mimo że importer Gerbera
-wcześniej zna źródłowe `Line`/`Arc` i szerokość apertury. To jest aktualny
-blocker. Nie należy go obchodzić globalną tolerancją kąta ani dalszym
-rozluźnianiem polygon guardów.
-
-Nie ma jeszcze wyniku FAST Z/S11 dla realnej serpentyny.
-
-## Priorytety
-
-### P0 — PCB-015C0: zweryfikować source-route checkpoint
-
-Checkpoint implementuje detached Line/Arc, audyt ordered composition,
-normalizację/projekcję i preferencję source axes w FAST. Przy publikacji nie
-potwierdzono jeszcze realnej serpentyny. Aktualny krok to lokalna weryfikacja
-route-status/Arc/połączeń osi i kontaktów; nie luzowanie polygon guardów.
-Poniższy kontrakt pozostaje kryterium odbioru.
-
-Następny krok ma usunąć potrzebę zgadywania centerline z 3-tysięcznego polygonu.
+Jeżeli użytkownik poda Gerber/Excellon, porównać artefakt produkcyjny z modelem
+source.
 
 Wymagania:
 
-- zachować z importu Gerbera źródłowe stroke/route provenance co najmniej dla
-  `Line` i `Arc`: geometria osi, szerokość apertury, warstwa i provenance źródła,
-- nie zastępować finalnego `CopperPolygon`; polygon pozostaje źródłem prawdy
-  dla fizycznego kontaktu, clear polarity, PTH, padów i ciągłości,
-- po końcowej kompozycji boolean przypisać route primitive do dokładnie jednego
-  finalnego conductora albo fail closed; clear/restore nie może pozostawić
-  niezweryfikowanego stroke jako aktywnej linii,
-- normalizacja i geometry resolution muszą objąć route provenance spójnie z
-  resztą geometrii; bez drugiego, niezależnego snappingu,
-- FAST ma budować odcinki z udowodnionych centerlines/provenance, a finalny
-  polygon ma potwierdzać istnienie i ciągłość przewodnika,
-- dowolny kąt prostego `Line` ma być obsługiwany bez wymogu `x1==x2` /
-  `y1==y2`; nie wprowadzać arbitralnej tolerancji kąta,
-- prawdziwe `Arc` może pozostać jawnie unsupported w pierwszym checkpointcie,
-  jeśli nie da się go poprawnie sprowadzić bez zgadywania; metadata musi jednak
-  zachować fakt istnienia łuku,
-- pady/flashe/regions nie mogą zostać fałszywie potraktowane jako linia TL,
-- zachować deterministyczność i strict JSON provenance.
+- tolerancja jest parametrem użytkownika, nie stałą,
+- parametr musi być zapisany w summary/provenance wyniku,
+- porównanie ma być feature-aware, a nie vertex-to-vertex tessellation equality,
+- Line: axis/endpoints/width/envelope,
+- Arc: source signed sweep/radius/width/envelope,
+- Via: centre/drill/outer/contact,
+- board/pours: coverage/topology w zakresie wspieranym przez checkpoint,
+- mismatch raportuje feature/source ID, wielkość odchyłki i ustawiony limit,
+- odchyłka poniżej limitu jest akceptowana,
+- reconciliation nie modyfikuje source geometry i nie snapuje source do Gerbera,
+- brak Gerberów oznacza `manufacturing_validation=not_requested/not_available`,
+  a nie błąd source-only solve.
 
-Kryterium sukcesu checkpointu: realna serpentyna ma przejść za obecny błąd
-`top:copper_0001 has no resolvable straight sections` albo zatrzymać się na
-nowym, bardziej fizycznym i jednoznacznym ograniczeniu źródłowego route
-provenance. Nie wolno produkować Z/S11 przez zgadywanie geometrii.
+Nie używać tej tolerancji jako tolerancji FAST, meshera ani geometry-resolution.
 
-### P1 — PCB-015C: pairwise coupled microstrip
+### P3 — PCB-015D3: semantic Line/Arc transmission-line graph
 
-Dopiero po poprawnym route extraction wrócić do głównego braku fizyki FAST.
+Po source-first parserze FAST ma brać długość i topologię z prymitywów CAD.
 
-Wymagania:
+- Line: długość z endpointów source.
+- Arc: długość z semantycznego promienia i signed sweep; nie odtwarzać kąta z
+  tessellated Gerber polygonu ani z niezależnie kwantyzowanych trzech punktów.
+- Curvature/bend discontinuity może pozostać jawnie pominiętym efektem w
+  pierwszej wersji, ale długość elektryczna łuku nie może zniknąć ani być chordą.
+- Graph continuity i net ownership pochodzą z source semantics, z fail-closed
+  dla niejednoznaczności.
 
-- nie ignorować równoległych overlapów,
+### P4 — PCB-015C: pairwise coupled microstrip
+
+Dopiero po semantic route graph:
+
+- nie ignorować równoległych/zbliżonych fragmentów,
 - nie używać arbitralnego współczynnika sprzężenia,
-- wyznaczać parametry sprzężonego przekroju metodą fizyczną:
-  macierze C/C0 → L albo udokumentowany model even/odd,
-- zbudować poprawny stamp wieloportowy do istniejącej sieci,
+- wyznaczać coupled-line parameters metodą fizyczną (C/C0→L lub udokumentowany
+  even/odd),
 - splitować sekcje tam, gdzie zmienia się stan sprzężenia,
-- zachować fail-closed dla 3+ przewodników/nierozwiązywalnej topologii,
-- porównać kierunek zmian gap/coupling na testach syntetycznych.
+- fail closed dla topologii wykraczającej poza obsługiwany model.
 
-Po tym kroku realna serpentyna powinna po raz pierwszy mieć FAST Z/S11, nadal
-jawnie approximate i bez gwarancji błędu względem full-wave.
+To pozostaje głównym brakującym elementem fizyki FAST dla serpentyny.
 
-### P2 — skrócić preparation full-wave bez zmiany fizyki
+### P5 — wydajność i ekonomiczny full-wave
 
-Po usunięciu starego O(N²) profil pokazuje nowe bottlenecki:
-
-- `compact_features()`: 17 wywołań, około 31,3 s cumulative pod cProfile,
-- `make_gerber_mesh_anchor_plan()`: 7 wywołań, około 27,3 s cumulative,
-- `make_pcb_domain_mesh()`: 2 wywołania, około 25,0 s cumulative,
-- całe `prepare-only`: około 58,0 s pod cProfile.
-
-Czasy cumulative nakładają się i nie wolno ich sumować.
-
-Kierunek:
-
-- policzyć immutable physical feature model raz dla niezmienionej geometrii
-  i przekazywać go dalej,
-- nie wywoływać `compact_features()` wielokrotnie w plannerach/audytach,
-- utworzony i zaudytowany finalny mesh przekazać do native preparation zamiast
-  budować ten sam mesh po raz drugi.
-
-Bez osłabiania feature/copper/port audits.
-
-### P3 — ekonomiczna domena full-wave
-
-Dopiero po użytecznym FAST wrócić do:
-
-- diagnostyki bilansu komórek domeny,
-- PCB-specific absolute padding XY/Z zamiast samego wavelength padding,
-- taniego prepare-only sweepu domen,
-- minimalnej liczby FDTD do convergence check,
-- DESIGN jako ekonomicznego full-wave,
-- VERIFY jako konserwatywnego odniesienia.
-
-Nie zmieniać kilku osi jakości naraz.
-
-### P4 — pola i viewer PCB
-
-Częściowo wykonane w PCB-016A:
-
-- domyślny widok XY raportu używa teraz Fit PCB: bbox całej geometrii PCB
-  + 6% marginesu zamiast pełnego extentu dumpu,
-- E i H w tym samym widoku używają identycznego cropu,
-- browser sampling 80×80 jest wybierany wewnątrz pokazywanego zakresu,
-  więc nie marnuje rozdzielczości ekranu na puste powietrze,
-- statyczne diagramy fazowe XY używają tego samego viewportu,
-- zmiana jest wyłącznie prezentacyjna: NPZ, field dump, mesh i FDTD pozostają
-  bez zmian; stare przebiegi można przerysować bez ponownego solve.
-
-Pozostaje do wykonania:
-
-- field dump ograniczony do PCB bbox + jawny margines,
-- opcjonalny Full field extent / full-domain dump,
-- `xy_dielectric_mid`,
-- Ez / |E| dla laminatu,
-- pionowy przekrój trace→ground,
-- sensowny viewport pionowych XZ/YZ,
-- playback fazy co 15° bez dodatkowego FDTD pozostaje zachowany.
+Po użytecznym source-first FAST wrócić do optymalizacji preparation, domeny,
+viewerów i minimalnej liczby FDTD. Nie mieszać tego z parserem EasyEDA.
 
 ## Zasady dalszej pracy
 
-1. FAST ma redukować fizykę do istotnych modów/napięć/prądów; nie implementować
-   "sparse FDTD" przez pomijanie komórek o chwilowo małym polu.
-2. Promieniowanie rzędu około 1% nie jest celem dokładności FAST, ale nie wolno
-   deklarować 1% błędu bez kalibracji.
-3. Geometry resolution pozostaje niezależna od siatki EM.
-4. Nie upraszczać źródłowej miedzi po cichu.
-5. Unsupported topology -> fail closed, nie zgadywać.
-6. Full-wave DESIGN/VERIFY pozostaje arbitrem dla finalistów i kalibracji FAST.
-7. Drogie FDTD tylko wtedy, gdy decyzji nie da się podjąć z modelu reduced,
-   prepare-only albo istniejących wyników.
-8. Testy na lokalnym komputerze użytkownika są tanie; testy wykonywane przez
-   zdalnego agenta są kosztowne. Agent ma preferować analizę statyczną i mały,
-   bezpośrednio związany zestaw testów, a pełny unittest uruchamiać najwyżej raz
-   i tylko wtedy, gdy jest naprawdę potrzebny do decyzji.
-9. Znaczącą pracę commitować i publikować na origin/main przed drogim testem.
-   PASS/PARTIAL/FAIL, brak fixture użytkownika lub błąd integracyjny nie blokuje
-   checkpointu/pusha. Po nieudanym teście opublikować stan wraz z diagnozą,
-   zamiast pozostawiać pracę wyłącznie w środowisku agenta.
+1. Source EasyEDA jest nadrzędny dla semantyki projektowej, gdy jest dostępny.
+2. Gerber/Excellon jest artefaktem produkcyjnym i opcjonalnym dowodem zgodności.
+3. Source-only ma działać bez Gerberów.
+4. Manufacturing tolerance ustawia użytkownik dla konkretnego workflow; 10 µm
+   nie jest globalną prawdą projektu.
+5. Nie rekonstruować z Gerbera informacji, które source podaje jawnie.
+6. Unsupported/missing semantics -> jawny fail, nie heurystyczne zgadywanie.
+7. Geometry resolution, manufacturing reconciliation i mesh EM są trzema
+   niezależnymi kontraktami.
+8. Full-wave DESIGN/VERIFY pozostaje arbitrem efektów 3-D, ale nie warunkiem
+   codziennego FAST.
+9. Testy lokalne użytkownika są tanie; testy zdalnego agenta są kosztowne.
+   Agent preferuje analizę statyczną i najmniejszy bezpośredni zestaw testów.
+10. Znaczącą pracę commitować i publikować na `origin/main` przed drogimi
+    testami. PASS/PARTIAL/FAIL nie blokuje checkpointu/pusha.
 
-## Docelowy układ
-
-```text
-FAST / APPROX
-  reduced quasi-TEM / transmission-line network
-  -> codzienne iteracje i sweepy
-  -> ground PTH jako jawna aproksymacja po klasyfikacji
-  -> coupled-line physics wymagane dla serpentyny
-
-DESIGN
-  ekonomiczny full-wave openEMS
-  -> kontrola efektów 3-D pominiętych przez FAST
-
-VERIFY
-  konserwatywny openEMS
-  -> finaliści i kalibracja modelu FAST
-```
-
-Najbliższy pojedynczy krok to **lokalna weryfikacja PCB-015C0 na source routes**,
-nie dalsze strojenie PML, viewer ani coupled-line solver przed poprawną ekstrakcją osi.
+Najbliższy krok: **PCB-015D0 — minimalny parser EasyEDA source PCB i jawny,
+deterministyczny semantic IR.** Nie rozwijać teraz Gerber-only Arc reconstruction.
