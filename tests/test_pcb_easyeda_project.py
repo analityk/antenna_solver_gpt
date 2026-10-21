@@ -135,6 +135,41 @@ class ProjectTests(unittest.TestCase):
             cfg={'port':{'mode':'explicit','negative_mm':[-2.032,0],'positive_mm':[2.032,0],'width_mm':.508}}
             with self.assertRaisesRegex(ConfigurationError,'barrel plating'):source_layout_geometry(layout,cfg)
 
+    def test_real_spiral_canonical_port_vias_and_explicit_passive(self):
+        path=Path(__file__).resolve().parents[1]/'gerbs/emtest4/spirala.epro'
+        if not path.exists():self.skipTest('user spiral archive not present')
+        source=materialize_project_source(load_easyeda_project(path))
+        layout=build_source_layout(source)
+        cfg={'port':{'mode':'source','source_index':0},
+             'drills':{'pth_model':'solid_pec_equivalent','pth_plating_um':25},
+             'component_values':{'R1':{'kind':'R','value':'49.9ohm'}}}
+        # Explicit test assumptions, never invented from Device/CSRC nominal value.
+        g=source_layout_geometry(layout,cfg)
+        self.assertEqual(len(g.source_pads),4);self.assertEqual(len(g.drills),2)
+        self.assertEqual([d.connected_layer_roles for d in g.drills],[('top','bottom')]*2)
+        self.assertEqual(len(g.components),1);self.assertEqual(g.components[0].id,'R1')
+        self.assertEqual(g.port.negative_xy_m[0],g.port.positive_xy_m[0])
+        from antenna_lab.pcb.transform import normalize_port_orientation,inverse_transform_geometry
+        before=g.as_dict();n,t=normalize_port_orientation(g);back=inverse_transform_geometry(n,t)
+        self.assertEqual(g.as_dict(),before)
+        for a,b in zip(g.source_pads,back.source_pads):
+            for v,w in zip(a.vertices_xy_m,b.vertices_xy_m):
+                self.assertAlmostEqual(v[0],w[0],places=14);self.assertAlmostEqual(v[1],w[1],places=14)
+
+    def test_archive_integrity_version_and_duplicate_source(self):
+        with TemporaryDirectory() as tmp:
+            path=write_project(tmp);path.write_bytes(path.read_bytes()[:-30])
+            with self.assertRaisesRegex(ConfigurationError,'integrity'):load_easyeda_project(path)
+        with TemporaryDirectory() as tmp:
+            p,b,f=fixture();p['config']['editorVersion']='3.0'
+            with self.assertRaisesRegex(ConfigurationError,'version unsupported'):
+                load_easyeda_project(write_project(tmp,(p,b,f)))
+        with TemporaryDirectory() as tmp:
+            p,b,f=fixture();f[0][-1]='1.7'
+            project=load_easyeda_project(write_project(tmp,(p,b,f)))
+            self.assertEqual(len(resolve_project_components(project)),1)
+            with self.assertRaisesRegex(ConfigurationError,'indexed only'):materialize_project_source(project)
+
     def test_archive_security_and_selection(self):
         for name in ('../escape','/absolute','FOOTPRINT\\escape','project.JSON'):
             with self.subTest(name=name),TemporaryDirectory() as tmp:

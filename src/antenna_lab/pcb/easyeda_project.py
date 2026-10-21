@@ -57,9 +57,9 @@ def documents(raw, name):
         if not isinstance(r, list) or not r or not isinstance(r[0], str):
             raise ConfigurationError(f'EasyEDA {name}:{index}: primitive array required.')
         if r[0] == 'DOCTYPE':
-            if r not in (['DOCTYPE', 'PCB', '1.8'], ['DOCTYPE', 'FOOTPRINT', '1.8']):
+            if r not in (['DOCTYPE', 'PCB', '1.8'], *(['DOCTYPE','FOOTPRINT',v] for v in ('1.3','1.7','1.8'))):
                 raise ConfigurationError(f'EasyEDA {name}:{index}: unsupported document/version {r!r}.')
-            current = dict(kind=r[1], start_line=index, records=[], source_file=name,
+            current = dict(kind=r[1], format_version=r[2], start_line=index, records=[], source_file=name,
                            source_sha256=sha256(raw).hexdigest())
             result.append(current)
         if current is None:
@@ -275,6 +275,11 @@ def materialize_project_source(project):
         routes=tuple(replace(r, record_index=line_map[r.record_index], source_sha256=pcb['source_sha256']) for r in source.routes),
         vias=tuple(replace(v, record_index=line_map[v.record_index], source_sha256=pcb['source_sha256']) for v in source.vias))
     semantic = source.semantics
+    for entries in semantic.values():
+        if isinstance(entries,list):
+            for entry in entries:
+                if isinstance(entry,dict) and 'record_index' in entry:
+                    entry['record_index']=line_map[entry['record_index']]
     instances, pads, drills = instantiate_components(resolved, semantic['layers'], semantic['nets'])
     semantic['pads'].extend(pads)
     semantic.update(resolved_components=instances, footprint_drills=drills,

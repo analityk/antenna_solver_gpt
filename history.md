@@ -2273,3 +2273,18 @@ nie dodano Arc TL ani coupling. Nieobsługiwane modele elektryczne komponentów
 nie mogą być cicho pominięte. Pad holes przechodzą tę samą transformację/projekcję.
 Testy test_pcb_easyeda_project przygotowane, jeszcze nieuruchomione; checkpoint
 przed weryfikacją. Pełna suite/native/FDTD nie są planowane w tym etapie.
+
+### PCB-015D4 — pierwszy wynik i drugi checkpoint
+
+Po publikacji b2086ca wykonano wyłącznie test_pcb_easyeda_project: 11 PASS,
+w tym rzeczywista spirala.epro: 2 COMPONENT, 4 PAD_NET, cztery fizyczne pady
+R0603 i contact audit passed; źródło CSRC nr 0. Osobny read-only diagnostic
+potwierdził 6 LINE/7 ARC/2 VIA/4 conductors. PSU zatrzymał się na bibliotece
+FOOTPRINT 1.7; ma też 1.3. Resolver może indeksować stare dokumenty/pad IDs,
+ale fizyczna instancja pozostaje jawnie ograniczona do 1.8.
+
+Dodano jawny port mode=source/source_index (pełna szczelina z finalnej miedzi,
+nie tylko krawędzi apertury) oraz opcjonalne explicit component_values, bez
+używania nominalnego Device jako źródła. THT otwory odejmowane są także od
+pourów; geometryczny drill/metalizacja pozostają rozdzielone. Test realnego
+canonical PcbGeometry/portu/vias/R1 przygotowany; jeszcze nieuruchomiony.

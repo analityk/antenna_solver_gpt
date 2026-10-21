@@ -56,6 +56,8 @@ def instantiate_components(resolved, pcb_layers, nets):
     for comp in resolved:
         fp=comp['footprint'];r=comp['component_record']['data'];cid=comp['component_id']
         label=f'{comp["designator"]} ({cid}), {fp["source_file"]}'
+        if fp.get('format_version')!='1.8':
+            raise ConfigurationError(f'EasyEDA {label}: footprint version {fp.get("format_version")} indexed only; geometry supported for 1.8.')
         if r[3] not in layer_ids.values():
             raise ConfigurationError(f'EasyEDA {label}: COMPONENT side must be top/bottom.')
         bottom=r[3]==layer_ids['BOTTOM'];pos=tuple(metres(v,label) for v in r[4:6]);angle=number(r[6],label)

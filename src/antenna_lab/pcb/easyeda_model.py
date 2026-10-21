@@ -101,6 +101,17 @@ def build_source_layout(source):
         from .gerber import _buffer,CURVE_ERROR_M
         disk=_buffer(Point(via.centre_xy_m),via.pad_diameter_m/2,CURVE_ERROR_M)
         for r in z:add(via.id+':'+r,via.net,copper_layer_ids[r],disk,'via_pad')
+    # Physical through holes remove planar copper on both sides, including pours.
+    # Annuli stay intact; plating is a separate explicitly configured solver model.
+    for drill in data.get('footprint_drills',()):
+        from .gerber import _buffer,CURVE_ERROR_M
+        hole=_buffer(Point(drill['centre_xy_m']),drill['drill_diameter_m']/2,CURVE_ERROR_M)
+        shapes=[(id,net,r,shape.difference(hole),kind) for id,net,r,shape,kind in shapes]
+    for id,net,r,shape,kind in shapes:
+        if shape.is_empty or not shape.is_valid:
+            raise ConfigurationError(f'EasyEDA {id}: drill removes/invalidates source copper.')
+        if not Polygon(board.vertices_xy_m).buffer(TOLERANCE_M).covers(shape):
+            raise ConfigurationError(f'EasyEDA {id}: physical copper outside board outline.')
     # Nets define intent but cannot conceal a physical short in source copper.
     for i,(id,net,r,shape,_) in enumerate(shapes):
         for oid,on,orr,other,_ in shapes[:i]:
@@ -150,7 +161,7 @@ def build_source_layout(source):
         feature_owners=owners,feature_kinds={id:kind for id,_,_,_,kind in shapes},source_semantics=data,assumptions=assumptions,
         missing_dependencies=dependencies,source_file=source.source_file,source_sha256=source.source_sha256,
         resolved_components=data.get('resolved_components',[]),footprint_drills=data.get('footprint_drills',[]),
-        project_provenance=data.get('project_provenance'),
+        project_provenance=data.get('project_provenance'),source_pad_provenance=data['pads'],
         contact_audit=_contact_audit(shapes,owners,data,source))
 
 
@@ -178,9 +189,11 @@ def source_layout_geometry(layout,override):
     """
     if layout['missing_dependencies']:
         raise ConfigurationError('EasyEDA missing source dependency: '+layout['missing_dependencies'][0]['message'])
-    if not isinstance(override,dict) or set(override)-{'port','drills'}:
-        raise ConfigurationError('EasyEDA source override accepts only explicit port and optional drills; source owns stackup/materials.')
+    if not isinstance(override,dict) or set(override)-{'port','drills','component_values'}:
+        raise ConfigurationError('EasyEDA source override accepts only port, optional drills and explicit component_values; source owns stackup/materials.')
     p=override.get('port')
+    if isinstance(p,dict) and p.get('mode')=='source':
+        p=_source_port_config(layout,p)
     if not isinstance(p,dict) or p.get('mode')!='explicit':
         raise ConfigurationError('EasyEDA source excitation undefined: provide --source-config with explicit port negative_mm/positive_mm/width_mm; no automatic pad guess.')
     from .easyeda import number
@@ -202,11 +215,13 @@ def source_layout_geometry(layout,override):
         design_source=dict(kind='easyeda_source',source_file=layout['source_file'],source_sha256=layout['source_sha256'],
             conductor_nets=layout['conductor_nets'],feature_owners=layout['feature_owners'],
             feature_kinds=layout['feature_kinds'],resolved_components=layout.get('resolved_components',[]),
-            project_provenance=layout.get('project_provenance'),contact_audit=layout.get('contact_audit'),manufacturing_validation='not_requested',override=override))
+            project_provenance=layout.get('project_provenance'),source_pad_provenance=layout.get('source_pad_provenance',[]),contact_audit=layout.get('contact_audit'),manufacturing_validation='not_requested',override=override))
+    geometry.components=_source_components(layout,geometry,override.get('component_values',{}))
     if layout['vias'] or layout.get('footprint_drills'):
         settings=override.get('drills',{})
         plating=settings.get('pth_plating_um')
-        if settings.get('pth_model')!='solid_pec_equivalent' or isinstance(plating,bool) or not isinstance(plating,(int,float)) or not isfinite(plating) or plating<=0:
+        needs_plating=bool(layout['vias']) or any(v['plated'] for v in layout.get('footprint_drills',()))
+        if needs_plating and (settings.get('pth_model')!='solid_pec_equivalent' or isinstance(plating,bool) or not isinstance(plating,(int,float)) or not isfinite(plating) or plating<=0):
             raise ConfigurationError('EasyEDA VIA: source gives drill/pad diameters, not barrel plating; explicit drills.pth_plating_um and solid_pec_equivalent required.')
         from .drills import connected_layers
         drills=[]
@@ -219,7 +234,8 @@ def source_layout_geometry(layout,override):
             x,y=v['centre_xy_m'];diameter=v['drill_diameter_m']
             radius=diameter/2+plating*1e-6 if v['plated'] else None
             if not v['plated']:
-                raise ConfigurationError(f"EasyEDA PAD {v['id']}: NPTH solver installation unsupported by source checkpoint.")
+                drills.append(PcbDrill(v['id'],x,y,diameter,False,'NPTH','EasyEDA PAD',v['source_sha256']))
+                continue
             # Annular pads are actual copper; prove barrel contact and net on each layer.
             for role in ('top','bottom'):
                 touched=[c for c in geometry.copper if c.layer_role==role and copper_shape(c).distance(Point(x,y))<=radius]
@@ -232,3 +248,57 @@ def source_layout_geometry(layout,override):
     from .bundle import audit_physical_feed
     audit_physical_feed(geometry)
     return geometry
+
+
+def _component_terminals(layout, component):
+    """Supported solver contact subset: exactly two top, axis-aligned RECT pads.
+
+    The actual clear interval comes from final copper, not nominal aperture edges.
+    """
+    from .components import terminal_gap
+    ids=component['pad_ids']
+    entries=[p for p in layout['source_pad_provenance'] if p['id'] in ids]
+    if len(entries)!=2 or {p['pad_number'] for p in entries}!={'1','2'}:
+        raise ConfigurationError(f"EasyEDA {component['designator']}: solver contacts require exactly pads 1/2.")
+    entries.sort(key=lambda p:p['pad_number']);placements=[]
+    top_ids={p['id'] for p in layout['pads'] if p['layer_role']=='top'}
+    for p in entries:
+        shape=Polygon(p['ring_xy_m'],p.get('holes_xy_m',()))
+        if p['id'] not in top_ids or p.get('drill_id') or not shape.equals(shape.envelope):
+            raise ConfigurationError(f"EasyEDA {p['id']}: solver contact needs axis-aligned rectangular top SMD, not a guessed bbox.")
+        x0,y0,x1,y1=shape.bounds
+        placements.append((tuple(p['centre_xy_m']),(x1-x0,y1-y0)))
+    copper=[CopperPolygon(**c) for c in layout['copper']]
+    gap=terminal_gap(component['designator'],placements,copper)
+    return entries,placements,gap
+
+
+def _source_port_config(layout, config):
+    index=config.get('source_index')
+    if type(index) is not int or index<0:
+        raise ConfigurationError('EasyEDA port mode=source requires explicit source_index integer.')
+    candidates=[c for c in layout['resolved_components'] if c['role']=='source' and c['source_index']==index]
+    if len(candidates)!=1:
+        raise ConfigurationError(f'EasyEDA source index {index}: missing/ambiguous explicit CAD source.')
+    if sum(c['role']=='source' for c in layout['resolved_components'])!=1:
+        raise ConfigurationError('EasyEDA FAST currently has one excitation; multiple CAD sources unsupported, not omitted.')
+    _,_,(_,start,stop,_,width)=_component_terminals(layout,candidates[0])
+    return dict(mode='explicit',negative_mm=[v*1e3 for v in start],positive_mm=[v*1e3 for v in stop],width_mm=width*1e3)
+
+
+def _source_components(layout,geometry,values):
+    from .components import ideal_value
+    from .model import PcbLumpedComponent
+    if not isinstance(values,dict):raise ConfigurationError('EasyEDA component_values must be an object.')
+    known={c['designator']:c for c in layout.get('resolved_components',()) if c['role']!='source'}
+    if set(values)-set(known):raise ConfigurationError('EasyEDA component_values names unknown component or source.')
+    result=[]
+    for name,setting in sorted(values.items()):
+        if not isinstance(setting,dict) or set(setting)!={'kind','value'} or setting['kind'] not in ('R','L','C'):
+            raise ConfigurationError(f'EasyEDA {name}: explicit ideal kind R/L/C and value with unit required.')
+        value=ideal_value(setting['kind'],setting['value'])
+        entries,placements,(axis,start,stop,window,width)=_component_terminals(layout,known[name])
+        digest=layout['source_sha256']
+        result.append(PcbLumpedComponent(name,setting['kind'],value,setting['value'],entries[0]['net'],entries[1]['net'],
+            placements[0][0],placements[1][0],'top',axis,start,stop,window,digest,digest))
+    return tuple(result)
