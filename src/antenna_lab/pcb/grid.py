@@ -161,6 +161,21 @@ class TickRoute:
 
 
 @dataclass(frozen=True)
+class TickSourceRoute:
+    id: str
+    start: XY
+    stop: XY
+    width: int
+    center: XY | None
+
+
+@dataclass(frozen=True)
+class TickSourcePad:
+    id: str
+    vertices: Ring
+
+
+@dataclass(frozen=True)
 class QuantizedPcbGeometry:
     """All authoritative spatial values are ticks; no native/export integration.
 
@@ -181,6 +196,8 @@ class QuantizedPcbGeometry:
     source_json: str
     routes: tuple[TickRoute, ...] = ()
     topology_audit_sha256: str = ""
+    source_routes: tuple[TickSourceRoute, ...] = ()
+    source_pads: tuple[TickSourcePad, ...] = ()
 
     @property
     def provenance(self):

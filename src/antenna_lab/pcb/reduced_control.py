@@ -18,13 +18,18 @@ from .simulation import validate_frequency_band
 from .transform import normalize_port_orientation
 
 
+def _polygon_bounds(points):
+    return (min(p[0] for p in points),min(p[1] for p in points),max(p[0] for p in points),max(p[1] for p in points))
+
+
 def _json(path,value):
     path.write_text(json.dumps(value,indent=2,allow_nan=False)+'\n',encoding='utf-8')
 
 
 def run_reduced(input_path, output_dir, *, pcb_config=None, geometry_resolution_um=10,
                 result_frequency_hz=(1.3e9,1.42e9,1.5e9),excitation_center_hz=1.42e9,
-                excitation_cutoff_hz=.2e9,reference_impedance_ohm=50.,sweep_request=None):
+                excitation_cutoff_hz=.2e9,reference_impedance_ohm=50.,sweep_request=None,
+                easyeda_source=None,source_config=None,inspect_source=False):
     """Keep the same import/normalize/project boundaries; no 3-D mesh, no fallback.
 
     Failed extraction/coupling leaves a diagnostic summary, never impedance.csv.
@@ -34,7 +39,11 @@ def run_reduced(input_path, output_dir, *, pcb_config=None, geometry_resolution_
     if isinstance(geometry_resolution_um,bool) or geometry_resolution_um not in (100,10,1,.1):
         raise ConfigurationError('Geometry resolution requires 100,10,1,0.1 um.')
     grid=PcbGrid({100:100000,10:10000,1:1000,.1:100}[geometry_resolution_um])
-    input_path=Path(input_path);output=Path(output_dir)
+    if easyeda_source is not None and (input_path is not None or pcb_config is not None):
+        raise ConfigurationError('Use --easyeda-source independently of Gerber input/--pcb-config; source physical contacts use --source-config.')
+    if easyeda_source is None and (source_config is not None or inspect_source):
+        raise ConfigurationError('--source-config/--inspect-source require --easyeda-source.')
+    input_path=Path(input_path) if input_path is not None else None;output=Path(output_dir)
     if output.exists() and (not output.is_dir() or any(output.iterdir())):
         raise ConfigurationError('Reduced output must be empty/new; no old results overwritten.')
     output.mkdir(parents=True,exist_ok=True)
@@ -45,10 +54,34 @@ def run_reduced(input_path, output_dir, *, pcb_config=None, geometry_resolution_
             meaning='shared sampling-band validation only; no time-domain excitation'),
         sweep_request_mhz=sweep_request,native_fdtd_runs=0)
     try:
-        if input_path.suffix.lower()=='.zip':
+        if easyeda_source is not None:
+            from .easyeda import load_easyeda_source
+            from .easyeda_model import build_source_layout,source_layout_geometry
+            ir=load_easyeda_source(easyeda_source)
+            _json(output/'source_ir.json',ir.as_dict())
+            summary.update(design_source='easyeda_source',manufacturing_validation='not_requested')
+            layout=build_source_layout(ir)
+            _json(output/'source_model.json',layout)
+            provenance=dict(design_source='easyeda_source',manufacturing_validation='not_requested',
+                source_file=ir.source_file,source_sha256=ir.source_sha256,units=ir.semantics['units'],
+                format_version=ir.format_version,editor_version=ir.editor_version,
+                missing_source_dependencies=layout['missing_dependencies'])
+            _json(output/'import.json',provenance)
+            summary['provenance']=provenance
+            if inspect_source:
+                summary.update(status='source_inspected',canonical_status='missing_dependencies' if layout['missing_dependencies'] else 'physical_layout_ready',
+                    source_route_count=len(ir.routes),source_via_count=len(ir.vias),
+                    board_bounds_m=list(_polygon_bounds(layout['outline']['vertices_xy_m'])))
+                _json(output/'summary.json',summary)
+                return summary
+            override={} if source_config is None else json.loads(Path(source_config).read_text(encoding='utf-8-sig'))
+            provenance['explicit_source_override']=override
+            _json(output/'import.json',provenance)
+            source=source_layout_geometry(layout,override)
+        elif input_path is not None and input_path.suffix.lower()=='.zip':
             from .experiment import resolve_experiment,load_experiment_geometry
             config,source,provenance=load_experiment_geometry(resolve_experiment(input_path,pcb_config))
-        elif input_path.is_dir():
+        elif input_path is not None and input_path.is_dir():
             from .bundle import load_bundle_geometry
             config,source,provenance=load_bundle_geometry(input_path,pcb_config)
         else:
@@ -98,7 +131,10 @@ def run_reduced(input_path, output_dir, *, pcb_config=None, geometry_resolution_
 
 def main(argv=None):
     parser=argparse.ArgumentParser(description='FAST approximate quasi-TEM PCB graph (no FDTD)')
-    parser.add_argument('input',type=Path)
+    parser.add_argument('input',type=Path,nargs='?')
+    parser.add_argument('--easyeda-source',type=Path)
+    parser.add_argument('--source-config',type=Path)
+    parser.add_argument('--inspect-source',action='store_true')
     parser.add_argument('--pcb-config',type=Path)
     parser.add_argument('--output',type=Path)
     parser.add_argument('--geometry-resolution-um',type=float,choices=(100,10,1,.1),default=10)
@@ -107,6 +143,8 @@ def main(argv=None):
     for name in ('start','stop','step'):parser.add_argument(f'--sweep-{name}-mhz',type=float)
     args=parser.parse_args(argv)
     try:
+        if (args.input is None)==(args.easyeda_source is None):
+            raise ConfigurationError('Choose Gerber input OR --easyeda-source PATH.')
         request=(args.sweep_start_mhz,args.sweep_stop_mhz,args.sweep_step_mhz)
         sweep=any(v is not None for v in request)
         if sweep and (not all(v is not None for v in request) or args.frequencies_mhz is not None):
@@ -121,8 +159,14 @@ def main(argv=None):
             output=Path(mkdtemp(prefix=datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ_'),dir=root))
         result=run_reduced(args.input,output,pcb_config=args.pcb_config,
             geometry_resolution_um=args.geometry_resolution_um,reference_impedance_ohm=args.reference_impedance_ohm,
-            sweep_request=request if sweep else None,**band)
-        print(f"Status: {result['status']} / approximate\n{output.resolve()/'summary.json'}\n{output.resolve()/'impedance.csv'}")
+            sweep_request=request if sweep else None,easyeda_source=args.easyeda_source,
+            source_config=args.source_config,inspect_source=args.inspect_source,**band)
+        print(f"Status: {result['status']} / approximate\n{output.resolve()/'summary.json'}")
+        if result['status']=='completed':print(output.resolve()/'impedance.csv')
+        elif args.inspect_source:
+            print(output.resolve()/'source_model.json')
+            for dependency in result['provenance']['missing_source_dependencies']:
+                print('Missing source dependency: '+dependency['message'])
         return 0
     except (ConfigurationError,ValueError,OSError) as exc:
         print(f'Reduced PCB: {exc}',file=sys.stderr);return 1

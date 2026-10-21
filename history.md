@@ -2049,3 +2049,72 @@ lokalnych sprawdzeń użytkownika. Następna implementacja ma być publikowana n
 `origin/main` checkpointami przed drogimi testami; lokalne testy użytkownika
 pozostają preferowaną szeroką weryfikacją.
 
+
+## 2026-10-21 — PCB-015D0, checkpoint parsera EasyEDA source-first
+
+Dodano neutralny SourceRoutePrimitive/SourceVia i immutable EasyEdaSource,
+parser PCB 1.8/editor 2.2.x oraz centralną konwersję jednostek. Raw record order,
+IDs, SHA256, nets, signed sweep, stackup i dane komponentów pozostają detached.
+Semantyka opiera się na oficjalnych docs V2 oraz implementacji KiCad Pro:
+PCB=mil, POURED paths=10mil, CANVAS=display. Nie inferujemy skali z wymiarów.
+Obsługiwane rekordy i ograniczenia opisuje docs/pcb-easyeda.md. D0 nie wymaga
+Gerbera; canonical D1 i CLI są kolejnym checkpointem. D2 nieimplementowane.
+
+Remote miał nowszy HEAD 459785e niż wskazany w zadaniu; zawiera już dodany
+przez użytkownika test_spirala.epcb. Zachowano go bez zmian. Kanał update_ref
+sprawdzono na aktualnym HEAD przed implementacją. Checkpoint publikowany przed
+testami. Nie uruchomiono suite, FDTD/native ani benchmarków.
+
+## 2026-10-21 — PCB-015D1, source-only canonical/FAST checkpoint
+
+Po publikacji parsera 7503ac1737dfaa7ae8a85144c110b516bf4bc277 dodano builder
+physical source image bez Gerber round-trip, per-net union i short audit,
+POLY board, POURED reference, jeden source dielektryk, pads RECT oraz VIA
+z jawnym istniejącym plating override. Brak wynikowego POURED nie wypełnia
+POUR boundary. Dostępny partial canonical layout nie wymaga portu.
+
+`reduced_control --easyeda-source --inspect-source` zapisuje IR/model i jawne
+missing dependencies. Solve z `--source-config` korzysta z istniejącego FAST,
+contact/gap audit, PTH i coupling guards. Semantyczne Line/Arc mają osobny IR,
+a nie Gerber PcbRoute. Normalizacja i wspólna projekcja zachowują source
+ID/net/sweep; fizyczny audit ma istniejący receipt. Source RECT pad z jednym
+junction jest jawnym idealnym terminalem bez pad lead/parasitics; nie dopisujemy
+zgadywanej TL. Arc i sprzężenia nadal blokują unsupported physics.
+
+D2 odłożone, manufacturing_validation=not_requested. Nie zmieniono full-wave,
+PML, meshera, profili ani fizyki PTH. Testy syntetyczne test_pcb_easyeda.py
+przygotowane, jeszcze nieuruchomione: publikacja checkpointu przed sprawdzeniem.
+Source test_spirala.epcb obecny w repo od użytkownika zachowano bez zmian;
+nie wykonano jeszcze jego parser/canonical diagnostic ani pełnej suite/native.
+
+
+### PCB-015D0/D1 — wynik małych sprawdzeń i ograniczenie zakresu
+
+Opublikowano 7503ac1737dfaa7ae8a85144c110b516bf4bc277 (D0) oraz
+26180121f7e799480b907d80fb3dbb754c48ed38 (D1) przed testami.
+Uruchomiono `python -X utf8 -m unittest test_pcb_easyeda -v`: 11 PASS, bez
+native; source-only run syntetyczny wykonał istniejący FAST, nie importer
+Gerbera. Dodatkowo bez zapisu outcomes odczytano test_spirala.epcb przez
+load_easyeda_source/build_source_layout: 198 records, 6 LINE, 7 ARC, 2 VIA,
+4 dostępne regiony miedzi, board 25.0000008 mm, dielectric 0.1999996 mm,
+epsilon_r=4.5, manufacturing_validation=not_requested. Hash source:
+e528f2a4ac1a1957a45e48806bc93da8b42e4af4a0f1da27cd84ce26714d0c4b.
+
+Realny canonical layout jest jawnie niekompletny: CSRC/R1 odwołują się do
+nieobecnego footprintu e8bf627583724bdebefbaa0be79b0d2f. Nie zgadywano padów,
+nie uruchamiano solve serpentyny ani test_spirala.zip. D2 odłożone zgodnie
+z priorytetem source-only. Następnie potrzebne footprint/component contacts,
+semantic Arc i coupled physics; todo zaktualizowane do rzeczywistego blockera.
+
+Przegląd statyczny dodał precyzyjny guard LAYER_PHYS inner SIGNAL/PLANE,
+żeby ograniczony single-dielectric builder nie pomijał go jako artwork.
+Nowy pojedynczy regression jeszcze nieuruchomiony przed tym checkpointem.
+Pełna suite, FDTD, native openEMS i szerokie prepare-only świadomie pominięte.
+
+Po publikacji 68f7e443ec5800ffbe03457f8cdba4a01f487016 uruchomiono tylko:
+- test_pcb_easyeda.EasyEdaTests.test_inner_physical_layer_cannot_be_silently_omitted
+- test_pcb_routes.RouteTests.test_transform_and_shared_projection_preserve_detached_provenance
+- test_pcb_reduced.ReducedTests.test_straight_L_U_extraction_lengths_and_determinism
+Wynik: 3 PASS. Razem wykonano 11 testów source-only i te 3 wąskie sprawdzenia.
+Nie uruchamiano pełnej suite ani native/FDTD. Blocker realnego source pozostaje
+bez zmian: brak geometrii footprintu CSRC/R1; Arc TL i D2 niezaimplementowane.
