@@ -1,6 +1,6 @@
 # TODO — PCB: aktualny stan i następne kroki
 
-Stan na 2026-10-21. **Decyzja użytkownika: podstawowym wejściem geometrii
+Stan na 2026-10-22. **Decyzja użytkownika: podstawowym wejściem geometrii
 PCB jest kompletny projekt EasyEDA Pro V2 `.epro`** (ZIP z `project.json`,
 `PCB/*.epcb`, `FOOTPRINT/*.efoo`). Pojedynczy `.epcb` służy do
 diagnostyki/kompatybilności, a Gerber/Excellon wyłącznie do opcjonalnej
@@ -57,7 +57,13 @@ canonical serpentyny sprawdzony, cała geometria PSU nadal niewspierana.
 Promień i signed sweep źródła; projektowane węzły nie wyznaczają nowego okręgu.
 Zachowane kontakty, 2 ground-PTH, jawny testowy R1 oraz source_index=0.
 `spirala_NNN` działa także dla inspekcji; checkpoint nazw `b9c9987`.
-**TERAZ — PCB-015C (OPEN):** fizyczne pairwise/curved coupling wyłącznie spirali.
+**PCB-015C FROZEN / deferred:** pairwise/curved coupling; użytkownik zamroził FAST.
+**TERAZ:** EasyEDA D4 → istniejący full-wave openEMS, wyłącznie `spirala.epro`.
+Cienki `pcb.easyeda_control`: canonical → normalize → geometry resolution →
+feature-aware mesh → native prepare-only, potem istniejący run_control_model.
+Nie zmieniać meshera, profili ani fizyki. Realny native prepare/FDTD wymaga
+testu użytkownika na Windows; implementacja nie jest walidacją EM.
+Poniższy blocker dotyczy zachowanego, zamrożonego FAST:
 Pierwszy blocker: `curved coupling analysis unsupported`; 7 ARC i 5 skośnych
 LINE mają niewspierane sprzężenia. Powstaje graf, nigdy pozornie poprawne Z/S11.
 Krzywiznowa korekta parametrów przekroju pozostaje jawnie niezamodelowana.
@@ -198,7 +204,7 @@ Po source-first parserze FAST ma brać długość i topologię z prymitywów CAD
 - Graph continuity i net ownership pochodzą z source semantics, z fail-closed
   dla niejednoznaczności.
 
-### P4 — PCB-015C: pairwise coupled microstrip
+### P4 — PCB-015C: pairwise coupled microstrip (FROZEN / deferred)
 
 Dopiero po semantic route graph:
 
@@ -234,6 +240,7 @@ viewerów i minimalnej liczby FDTD. Nie mieszać tego z parserem EasyEDA.
 10. Znaczącą pracę commitować i publikować na `origin/main` przed drogimi
     testami. PASS/PARTIAL/FAIL nie blokuje checkpointu/pusha.
 
-Aktualny krok to **PCB-015C curved/pairwise coupling dla spirali**. D4 canonical serpentyny
+Aktualny krok to **EasyEDA source → istniejący openEMS PCB dla spirali**.
+FAST coupling jest FROZEN / deferred; nie realizować poniższej historii jako polecenia. D4 canonical serpentyny
 nie wymaga Gerbera. Starsze wpisy D0/D1 i audyty przed D4 są w history.md;
 nie traktować ich dawnych braków bibliotek jako aktualnego blockera.

@@ -73,9 +73,9 @@ jest teraz głównie w wielokrotnym `compact_features()`; w pomiarze wykonano
 go 17 razy, a `make_pcb_domain_mesh()` nadal dwa razy.
 
 Najbliższe kroki i kolejność są utrzymywane w [todo.md](todo.md):
-po canonical import D4 i grafie/metryce ARC D3 dla serpentyny następne są
-fizyczne sprzężenia (PCB-015C) i opcjonalny audyt
-zgodności produkcji z Gerberami. Viewer pól full-wave ma już domyślny
+po canonical import D4 aktualny kierunek to `.epro` → istniejący full-wave
+openEMS (`pcb.easyeda_control`, [instrukcja](docs/pcb-easyeda.md)).
+FAST/coupling PCB-015C jest zamrożony decyzją użytkownika z 2026-10-22. Viewer pól full-wave ma już domyślny
 **Fit PCB** dla widoku XY (bbox PCB + 6% marginesu) i można nim przerysować
 stare zapisane pola bez ponownego FDTD. Optymalizacja domeny, dump extentu oraz
 pionowe przekroje pól pozostają otwarte.

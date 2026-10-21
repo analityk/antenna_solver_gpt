@@ -1,5 +1,10 @@
 # FAST / APPROX: model quasi-TEM PCB
 
+**2026-10-22: rozwój FAST/coupling ZAMROŻONY decyzją użytkownika.**
+Bieżący kierunek: `.epro` → istniejący full-wave w `pcb.easyeda_control`.
+Kod i ograniczenia FAST pozostają zachowane; dalszy opis jest dokumentacją
+istniejącego modelu, nie poleceniem implementacji sprzężeń.
+
 To oddzielny solver przybliżony (`reduced_quasi_tem`, `approximate`), bez
 openEMS, 3-D domeny, PML, komórek Yee i pytania o profil. DESIGN/VERIFY nadal
 używają niezmienionej ścieżki full-wave. Nie deklarujemy 1% błędu ani walidacji EM.

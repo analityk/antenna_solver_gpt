@@ -5,6 +5,64 @@ EasyEDA Pro V2: `project.json`, `PCB/*.epcb`, `FOOTPRINT/*.efoo`, również
 embedded FOOTPRINT. Dotychczasowe samodzielne `.epcb` i Gerber pozostają
 kompatybilne. Import nie eksportuje ani nie odczytuje pośredniego Gerbera.
 
+## Source full-wave — most D4 → istniejący PCB openEMS (2026-10-22)
+
+FAST/coupling jest zamrożony. `antenna_lab.pcb.easyeda_control` przyjmuje
+`.epro` i **wymagany** `--source-config`. Korzysta z D4, walidacji canonical,
+jednej normalizacji i istniejącej geometry resolution. Następnie wywołuje
+`make_gerber_mesh_anchor_plan` / `make_pcb_domain_mesh(gerber_quality=...)`:
+historyczna nazwa oznacza istniejący feature-aware mesher CopperPolygon,
+nie odczyt Gerberów. Nie ma fallbacku ani reconciliation z Gerber/Excellon.
+Materiał/stackup i PEC pozostają ze source. Brak jawnej wartości elementu
+pasywnego blokuje pełny solve; CSRC=0 pozostaje źródłem, nie kondensatorem.
+
+Profile i argumenty openEMS pochodzą z `parameters/openems_profiles.toml` oraz
+istniejącego `resolve_profile`/`approve_profile`. Są te same `--quality`,
+`--openems-config`, `--openems-set`, `--yes`, `--no-fields`, `--fields-mhz`,
+center/cutoff/frequencies/sweep. Nie zmieniono limitów, grading, paddingu/PML,
+feature compaction, portu, PTH, RLC ani równań. Duża siatka/istniejący guard
+ma być raportowany, nigdy automatycznie łagodzony.
+
+Przykład **jawnych założeń testowych**, do zapisania przez użytkownika jako
+`parameters/spirala_source.local.json`. 25 µm i 49.9 Ω nie są odczytem z CAD;
+zastąp je własnymi jawnymi danymi, jeśli odbiegają od zamierzonego eksperymentu:
+
+```json
+{
+  "port": {"mode": "source", "source_index": 0},
+  "drills": {"pth_model": "solid_pec_equivalent", "pth_plating_um": 25},
+  "component_values": {"R1": {"kind": "R", "value": "49.9ohm"}}
+}
+```
+
+Windows CMD, najpierw przygotowanie (bez Run):
+
+```cmd
+.\.venv\Scripts\python.exe -m antenna_lab.pcb.easyeda_control --easyeda-project gerbs\emtest4\spirala.epro --source-config parameters\spirala_source.local.json --quality preview --geometry-resolution-um 10 --prepare-only --center-mhz 2000 --cutoff-mhz 1900 --sweep-start-mhz 1500 --sweep-stop-mhz 2500 --sweep-step-mhz 10
+```
+
+Dopiero po inspekcji prepare, ten sam tor uruchamia istniejący FDTD:
+
+```cmd
+.\.venv\Scripts\python.exe -m antenna_lab.pcb.easyeda_control --easyeda-project gerbs\emtest4\spirala.epro --source-config parameters\spirala_source.local.json --quality preview --geometry-resolution-um 10 --center-mhz 2000 --cutoff-mhz 1900 --sweep-start-mhz 1500 --sweep-stop-mhz 2500 --sweep-step-mhz 10
+```
+
+Domyślnie `outcomes/pcb_easyeda/spirala_NNN`; jawny `--output` ma pierwszeństwo,
+a istniejące niepuste wyniki są odrzucane. Zapisane snapshots: project.source,
+component_bindings, source_ir, source_model, geometry.source,
+geometry.normalized_source, geometry, import i summary (JSON). Przy odmowie
+pozostają dane uzyskane do danego etapu, `failed_stage` i dokładny błąd.
+`geometry.json` powstaje dopiero po udanej projekcji. Controller przechowuje
+snapshots do wyjścia, ponieważ istniejący run_control_model wymaga początkowo
+pustego katalogu. Przygotowanie daje `native/model.xml`; solve korzysta ze
+starych CSV/statystyk/pól/raportu, bez nowej pętli Run. Błąd raportu jest best-effort.
+
+`summary/import`: design_source=easyeda_project, manufacturing_validation=
+not_requested, archive SHA/PCB ID/source SHA, jawne source-config, profil,
+geometry resolution i mesh/cost. Prepared/ukończenie nie zatwierdza fizyki.
+**Checkpoint implementacji: testy jeszcze nieuruchomione; native prepare i FDTD
+spirali pozostają do wykonania na Windowsie.** Nie optymalizować kosztu siatki.
+
 ## Aktualne użycie i wynik D4
 
 ```cmd

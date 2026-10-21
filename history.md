@@ -2364,3 +2364,19 @@ Audyt dokumentacji objął README/AGENTS (aktualizacja statusu ARC) oraz cel/arc
 Bez PSU, pełnej suite, natywnych solverów, FDTD, benchmarków i zmian archiwów
 użytkownika/starych wyników. Wersja lokalna użytkownika af91f861... nie była
 badana. Następny zakres to wyłącznie fizyczne sprzężenia spirali.
+
+
+## 2026-10-22 — EasyEDA D4 → istniejący full-wave PCB: checkpoint mostu
+
+Decyzja użytkownika: FAST/coupling FROZEN/deferred. Nie rozwijamy PCB-015C.
+Dodano `pcb.easyeda_control` i małe testy granic integracji. Import .epro D4,
+canonical, normalizacja, geometry resolution i istniejący feature-aware mesher
+łączą się z prepare_pcb_xml_model / run_control_model. Bez Gerber/Excellon,
+bez nowego solvera, bez zmian meshera/profili/portu/PTH/RLC/materiałów.
+Jawny source-config ustanawia port/plating/wartości; brak R1 nie jest pomijany.
+Sekwencyjne katalogi pcb_easyeda/spirala_NNN, snapshoty + provenance także po
+błędzie. Nie zmieniono archiwów ani istniejących wyników.
+
+Ten checkpoint publikowany PRZED testami. Testy jeszcze nieuruchomione;
+realny Windows native prepare/FDTD pozostawiony użytkownikowi, wynik EM
+unverified. Jeśli mesher/port zgłosi guard, zachować go i raportować bez tuningu.

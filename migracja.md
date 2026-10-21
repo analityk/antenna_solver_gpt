@@ -7,8 +7,8 @@
 
 **Repozytorium:** `analityk/antenna_solver_gpt`  
 **Docelowa gałąź:** `main` (chyba że użytkownik jawnie wskaże inną)  
-**Ostatnia inspekcja dokumentów:** 2026-10-21, Europe/Warsaw  
-**Potwierdzony opublikowany checkpoint przed aktualizacją:** `02d6abbf535f2dd88abcbe28edb3d51dd9c339e4`
+**Ostatnia inspekcja dokumentów:** 2026-10-22, Europe/Warsaw  
+**Potwierdzony opublikowany checkpoint przed aktualizacją:** `56ebe378e020bba29391e33696ac3ff1188f8e5b`
 **Uwaga:** ten SHA jest punktem historycznym, nie obietnicą, że nadal jest HEAD. Każde wznowienie rozpoczyna się sprawdzeniem Git.
 
 ## 1. Instrukcja dla nowego czatu — wykonaj po wskazaniu tego pliku
@@ -133,84 +133,57 @@ utworzeniem. W nagłówku zapisuj SHA ostatniego *już potwierdzonego*
 commita bazowego, a opublikowany SHA nowego commita podawaj po publikacji
 w raporcie końcowym. Nowy czat zawsze sam sprawdza HEAD.
 
-## 4. Bieżący punkt wznowienia — spirala po PCB-015D3
+## 4. Bieżący punkt wznowienia — EasyEDA source full-wave
 
-**Zakres użytkownika: wyłącznie `gerbs/emtest4/spirala.epro`. Bez PSU.**
-Nie powtarzać szerokiego D4, nie uruchamiać pełnej suite/native/FDTD/benchmarków.
+**Decyzja 2026-10-22: FAST/coupling FROZEN. Nie realizować PCB-015C.**
+Jedyny realny zakres: `gerbs/emtest4/spirala.epro`, bez PSU i bez Gerberów.
+Baza: `56ebe378e020bba29391e33696ac3ff1188f8e5b`.
 
-**DONE — nazewnictwo:** wspólny lekki allocator Gerber/FAST daje
-`outcomes/pcb_reduced/spirala_001`, następnie max zajętych numerów +1.
-Atomowy mkdir obsługuje równoległe starty; działa także `--inspect-source`.
-Jawny `--output` ma pierwszeństwo. Stare katalogi i archiwa nietknięte.
-Opublikowany checkpoint `b9c99872ceb6eb936bbcc666eb10bb2ee78a7de9`.
+Dodano cienki `pcb.easyeda_control` łączący istniejące D4 z istniejącym
+feature-aware PCB mesh/openEMS. Kolejność: import/resolve/materialize →
+source_layout_geometry z jawnym config → validate → normalize raz →
+apply_geometry_resolution → feature-aware mesh/preflight → prepare XML lub
+run_control_model. Nie zmieniono meshera, profili, równań, fizyki, materiałów,
+PTH, source/komponentów. Source-config z port/plating/R1 jest wymagany;
+niewymodelowany pasywny element nie może być pominięty. Nie tworzono
+ResolvedPcbConfig/Gerber fallback. Pełny kontrakt: docs/pcb-easyeda.md.
 
-**DONE — D3 metryka i graf semantic ARC:** `SourceSection` rozróżnia ARC/LINE,
-zachowuje source endpoints/center/signed sweep i rzeczywistą długość r*abs(theta).
-Projektowane węzły nie wyznaczają nowego promienia. Kierunek, net/owner, source
-junctions, physical contact i receipt projekcji są kontrolowane. Nie zmieniono
-full-wave, mesh, PTH ani tolerancji. Implementacja opublikowana w
-`02d6abbf535f2dd88abcbe28edb3d51dd9c339e4`; późniejszy checkpoint uzupełnia
-wyniki, diagnostykę konsoli i dokumentację (sprawdź HEAD).
+Katalog `outcomes/pcb_easyeda/spirala_NNN`, wspólny allocator; --output wygrywa.
+Snapshoty źródła i audytu zapisują się także przy błędzie, z failed_stage.
+Przed native wyświetlane są istniejące mesh/cost metadane. Guardów nie obchodzić.
+Wzrost kosztu/duży mesh ma być zgłoszony użytkownikowi, nie optymalizowany.
 
-**Potwierdzona spirala Git:** SHA256
-`d94187520eaf519afd6fa3ba8625a3aa43d2b03a9a9178a924ac98586e504132`.
-Canonical D4 nadal: 2 COMPONENT, 4/4 PAD_NET, pady R0603, 6 LINE, 7 ARC,
-2 VIA, 4 conductors. CSRC = source_index 0, nie kondensator zero.
-Aktywny net A: **5 LINE + 7 ARC, 36.373621555 mm**, przed/po projekcji 10 µm.
-2 PTH uziemiają dwa top conductors. Jeden jawny testowy R1 = 49.9 Ω,
-plating = 25 µm; to nie odczytane/domyślne parametry produkcyjne.
-Testowana ścieżka CLI zapisuje graf/summary, bez impedance.csv.
-Wariant lokalny użytkownika SHA `af91f8611267418ca6039f0af45b78475c8998694abf324632a14de69e743df0`
-nie był tutaj dostępny/testowany; nie nadpisano pliku Git ani danych użytkownika.
+## 5. Stan DONE/PARTIAL/OPEN i następny krok
 
-**PARTIAL — fizyka FAST:** analityczna długość łuku jest w istniejącym modelu
-TL, ale parametry przekroju są nadal uniform quasi-TEM; korekty krzywizny i
-sprzężenia nie są obliczane. **OPEN / pierwszy blocker:**
-`Reduced PARTIAL: semantic ARC lengths/topology extracted; curved coupling analysis unsupported (PCB-015C)`.
-`curved_coupling_audit` wymienia 7 ARC oraz 5 skośnych LINE. Brak osiowych
-parallel overlaps nie znaczy braku sprzężeń. Solve jest blokowany przed Z/S11.
+- Implementacja mostu i małe testy są w checkpointcie; **testów jeszcze nie
+  uruchomiono** (najpierw publikacja zgodnie z poleceniem).
+- Następnie wykonać tylko `test_pcb_easyeda_control`, ewentualnie pojedynczą
+  regresję niezmienionego Gerber CLI. Bez pełnej suite i benchmarków.
+- **OPEN:** realny native prepare-only spirali na Windows, potem decyzja o
+  pierwszym preview FDTD. Nie deklarować udanego XML/siatki realnej spirali
+  na podstawie fake testu. Nie uruchamiać native/FDTD zdalnie.
+- D3 metryka/graf i guardy FAST pozostają historycznie działające, ale frozen.
+  36.373621555 mm osi i dawne 7/2 testy nie są odbiorem full-wave.
+- Archiwum Git: d94187520eaf519afd6fa3ba8625a3aa43d2b03a9a9178a924ac98586e504132;
+  lokalny wariant użytkownika af91f861... nie był tutaj badany.
 
-## 5. Następne zadanie i źródła kodu
+## 6. Polecenia użytkownika i dowody
 
-**PCB-015C: pairwise/curved coupling dla spirali.** Najpierw jawny fizyczny
-kontrakt modelu, potem implementacja; żadnych zgadywanych współczynników,
-obcięcia łuków do cięciw ani milczącego pomijania bliskich sekcji. D3 nie jest
-walidacją EM całej serpentyny. Arc curvature corrections pozostają jawnie
-niezamodelowane. Nie rozszerzać zadania o PSU.
+Minimalny jawny source-config oraz dwie pełne komendy CMD są w
+`docs/pcb-easyeda.md`, sekcja Source full-wave. Testowe 25 µm / 49.9 Ω nie
+są domyślnymi wartościami kodu ani odczytem z Device. CSRC=source 0.
 
-Kod: `solvers/reduced_source.py` (source axis/audit), `solvers/reduced_pcb.py`
-(SourceSection, graph, guard), `pcb/reduced_control.py` (CLI i zapis przed odmową),
-`pcb/output.py` (nazwy). Źródła D4: `pcb/easyeda_project.py`,
-`pcb/easyeda_footprints.py`, `pcb/easyeda_model.py`, `pcb/source_ir.py`.
-Pełny kontrakt: docs/pcb-easyeda.md, docs/pcb-reduced.md, todo.md.
-
-## 6. Wykonane testy i następna tania komenda (CMD Windows)
-
-W tej sesji faktycznie wykonano:
-- `test_pcb_output`: 3 PASS (nazwy, równoległość, explicit output/inspect).
-- `test_reduced_source_arcs`: pierwsza próba 2 PASS / 1 ERROR (skośna e40 w
-  starym x/y guardzie), po poprawce 3 PASS. Następnie rozszerzony plik: 4 PASS.
-- Wraz z rozszerzonym plikiem 3 pojedyncze regresje: `test_pcb_easyeda.EasyEdaTests.test_source_arc_survives_projection_but_physics_remains_guarded`,
-  `test_pcb_easyeda.EasyEdaTests.test_source_only_fast_without_manufacturing_files`,
-  `test_pcb_easyeda_project.ProjectTests.test_real_spiral_canonical_port_vias_and_explicit_passive`:
-  cały ten mały zestaw 7 PASS.
-- `test_pcb_reduced.ReducedTests.test_parallel_runs_detected_not_silently_ignored`
-  i `test_import_does_not_load_native_or_fullwave_adapter`: 2 PASS.
-- `git diff --check`: bez błędów whitespace.
-
-Nie uruchomiono pełnej suite, PSU, native/FDTD, benchmarków, convergence ani
-szerokich sweepów. Testy realnej spirali użyły tymczasowych katalogów; stare
-`outcomes/` pozostały nietknięte. Historia D4 jest w history.md, nie jest nowym
-testem tej sesji.
-
-Następny tani test lokalny (bez parametrów/solverów natywnych):
+Tani test lokalny:
 
 ```cmd
-git pull --ff-only && .\.venv\Scripts\python.exe -X utf8 -m unittest discover -s tests -p test_reduced_source_arcs.py -v
+.\.venv\Scripts\python.exe -X utf8 -m unittest discover -s tests -p test_pcb_easyeda_control.py -v
 ```
 
-Inspekcja użytkowa:
-`.\.venv\Scripts\python.exe -m antenna_lab.pcb.reduced_control --easyeda-project gerbs\emtest4\spirala.epro --inspect-source`
+Nie uruchomiono jeszcze żadnego testu nowego mostu ani native/FDTD.
+Poprzednie testy FAST są zapisane w history.md; nie powtarzać ich przy okazji.
+Kod zadania: `pcb/easyeda_control.py`, `tests/test_pcb_easyeda_control.py`.
+Istniejące punkty integracji: pcb/control.py, solvers/openems_pcb.py,
+solvers/pcb_mesh.py i solvers/profiles.py — bez zmian implementacji.
 
 ## 7. Dokumenty, decyzje i ograniczenia wymagające zachowania
 
