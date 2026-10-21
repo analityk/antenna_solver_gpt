@@ -137,8 +137,11 @@ w raporcie końcowym. Nowy czat zawsze sam sprawdza HEAD.
 
 **Kierunek rozwoju:** `antenna_lab` jest pakietem Pythona dla modelowania
 anten i PCB. Pierwotny projekt obejmuje Quados 8 i biquad przy 1420 MHz
-oraz natywny openEMS na Windows 11. **Aktualny priorytet to PCB FAST,
-reduced quasi-TEM, oparty na oryginalnym EasyEDA source PCB.**
+oraz natywny openEMS na Windows 11. **Aktualny priorytet to
+import fizycznej geometrii PCB z kompletnego projektu EasyEDA Pro
+`.epro` (ZIP), a następnie PCB FAST/reduced quasi-TEM.**
+Prace D0/D1 na pojedynczym `.epcb` są ograniczonym historycznym
+checkpointem, nie docelowym workflow.
 
 - **DONE (zakres checkpointów kodu):** M1 generowania/edycji geometrii
   anten; PCB-015D0 — parser semantyczny EasyEDA Pro PCB 1.8/editor 2.2.x;
@@ -156,10 +159,13 @@ reduced quasi-TEM, oparty na oryginalnym EasyEDA source PCB.**
   opcjonalne source↔Gerber/Excellon reconciliation (D2); fizyczna walidacja
   antenowego portu, impedancji, zysku i zbieżności.
 
-Kluczowa decyzja z 2026-10-21: **source-first**. Oryginalny plik EasyEDA jest
-nadrzędnym źródłem topologii i intencji projektowej. Gerber/Excellon służy
-opcjonalnie do sprawdzania eksportu, nie do rekonstrukcji znanych netów,
-łuków i komponentów. Brak Gerbera sam w sobie nie blokuje source-only FAST.
+Kluczowa decyzja z 2026-10-21: **.epro-first**. Cały projekt
+EasyEDA Pro V2 jest podstawowym źródłem geometrii i topologii:
+`project.json`, `PCB/*.epcb`, `FOOTPRINT/*.efoo`.
+**O konkretnym footprintcie rozstrzyga instancja PCB, nie Device.**
+Gerber/Excellon służy opcjonalnej kontroli eksportu,
+nie rekonstrukcji padów, netów i łuków. Brak Gerbera
+nie blokuje source-only FAST.
 D2 będzie mieć tolerancję produkcyjną podawaną przez użytkownika; 10 µm
 nie jest globalnym defaultem ani tolerancją siatki czy FAST.
 
@@ -176,11 +182,16 @@ odwołania oraz 4/4 przypisania PAD_NET. Dawny status
 layout i solve pozostają ograniczone: nadal nie odtwarzają padów
 zewnętrznych. Nie zgaduj geometrii z Gerbera.
 
-**Najbliższe zadanie (uzupełnione po analizie pełnego epro):**
-zaimplementować parser projektu EasyEDA Pro V2 `.epro` jako ZIP
-(`project.json` i katalog `FOOTPRINT/`), resolver bibliotek i fallback
-`Device`, parser `.efoo`/złożonego `.epcb`, instancjonowanie padów
-z transformacją SI i audytem fizycznym. Na przykładzie `test_psu.epro`
+**Najbliższe zadanie — PCB-015D4 (nowa decyzja użytkownika):**
+zaimplementować import pełnego projektu EasyEDA Pro V2 `.epro`
+(bezpieczny ZIP, `project.json`, `PCB/`, `FOOTPRINT/`),
+resolver biblioteki i `.efoo`/złożonego `.epcb`,
+instancjonowanie **footprintu wybranego na PCB**,
+geometrię padów, transformacje SI, `PAD_NET` i audyt
+fizycznych kontaktów. `Device` nie może zastępować
+jawnego footprintu PCB; fallback wyłącznie, gdy
+footprint PCB nie został wskazany, a rozwiązanie
+jest jednoznaczne. Na przykładzie `test_psu.epro`
 potwierdzono 291/291 instancji i 906/906 przypisań pad→net w danych
 źródłowych, lecz **nie jest to jeszcze zdolność obecnego kodu**.
 Przesłane `test_psu.epro` nie jest częścią repozytorium;
@@ -192,18 +203,25 @@ dwoma `.esym`. **Nie jest w repozytorium**; ponowne wznowienie
 pracy programistycznej wymaga jego ponownego przekazania
 lub zgody użytkownika na dodanie jako fixture.
 CSRC i R1 mają PCB `Footprint=R0603` (2×RECT SMD),
-nety 1=A, 2=B i zgodne ID e8/e7. **Uwaga:** Device CSRC
-wskazuje C0603/100 nF, podczas gdy PCB ma R0603 i Value=0.
-Nie podstawiać Device geometry/values po cichu. Szczegółowe
-wymiary i trasa: `docs/pcb-easyeda.md`.
+nety 1=A, 2=B i zgodne ID e8/e7. **Nie ma konfliktu:**
+użytkownik ręcznie wybiera footprinty rodziny rezystorów
+(np. R0603) również dla niepolaryzowanych kondensatorów.
+3D bierze się z komponentu. Biblioteczny `Device C0603/100 nF`
+nie zmienia elektrycznej geometrii PCB.
+**`CSRC` z `Value=0` jest źródłem sygnału o numerze 0,
+nie kondensatorem 0 F; następne jawne źródła mają
+indeksy 1, 2, ...; `C1` i inne kondensatory są zwykłe.**
+Wymiary i dalszy kontrakt: `docs/pcb-easyeda.md`.
 Jeśli wymagany plik `.efoo` nie jest dostępny, zachowaj jawny
 `missing-source-dependency` i wskaż dokładną brakującą zależność zamiast
 udawać udany solve.
 
-**Kryterium gotowości do następnego etapu:** źródłowy model z kompletną
-dostępną geometrią/pinami dla CSRC/R1 przechodzi jawne kontrole geometryczne
-i semantyczne bez wymyślania elementów. Nie oznacza to jeszcze, że obliczono
-serpentynę: aktywne `ARC` i coupling nadal mogą kończyć FAST błędem.
+**Kryterium D4:** `.epro` daje canonical obraz rzeczywistej geometrii
+padów i sieci bez Gerberów, udokumentowaną transformację
+`COMPONENT → footprint PCB → PAD → PAD_NET`,
+poprawną rolę źródła `CSRC/Value=0` i brak sztucznego
+alarmu o C0603/R0603. Dopiero potem model Arc TL
+i sprzężeń; nie zgłaszaj pełnego solve wcześniej.
 
 **Potem:** (1) PCB-015D3 — fizyczna długość łuku z promienia i signed sweep,
 bez chordy lub tessellacji Gerbera; (2) PCB-015C — pairwise/curved coupling
@@ -211,6 +229,15 @@ z fizycznym modelem C/C0 lub even/odd i fail-closed; (3) opcjonalnie D2 —
 feature-aware reconciliation z jawną tolerancją użytkownika; (4) optymalizacja
 pełnej fali. Numer P2 w starszej liście nie oznacza aktualnego priorytetu D2.
 Przed podjęciem działań zawsze ponownie przeczytaj końcówkę `todo.md`.
+
+**Niezmienny kontrakt po przejęciu:** pełne `.epro` jest wejściem
+geometrii. Priorytet jawnego footprintu PCB jest bezwzględny;
+niepolaryzowane pasywne 0603 i pokrewne mogą celowo używać
+rodziny R. `CSRC/Value=0` to źródło nr 0, a dodatkowe
+jawne źródła mają kolejne wartości całkowite. Nie traktuj
+innych kondensatorów jako źródeł z samej nazwy `C`
+czy footprintu `R`. `Device` i model 3D nie mogą
+przedefiniować fizycznego footprintu.
 
 **Punkty do inspekcji w kodzie:** `src/antenna_lab/pcb/easyeda.py`,
 `src/antenna_lab/pcb/easyeda_model.py`,

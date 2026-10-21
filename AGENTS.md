@@ -31,6 +31,45 @@ przesłanki, rzeczywisty stan, dowody, ograniczenia i następne działania.
 Nie odczytuj bez potrzeby całej wieloletniej historii; używaj najnowszych
 wpisów i sięgaj do wcześniejszych decyzji, gdy są istotne.
 
+## Kontrakt importu PCB EasyEDA Pro i konwencje użytkownika — obowiązkowe
+
+- **Nowym docelowym wejściem geometrii PCB jest pełny projekt `.epro`**
+  EasyEDA Pro V2, traktowany jako archiwum z `project.json`,
+  dokumentem `PCB/*.epcb` i geometrią `FOOTPRINT/*.efoo`.
+  `*.epcb` używaj jako wewnętrznego dokumentu/diagnostyki i dawnego
+  częściowego wejścia; Gerber/Excellon pozostają opcjonalną walidacją
+  produkcyjną, nie źródłem projektu FAST.
+- **Rozstrzygające są instancja i footprint rzeczywiście umieszczone
+  na płytce**, również po ręcznej zmianie użytkownika. Nazwa lub
+  footprint przypisany w bibliotecznym `Device` nie może zmieniać
+  geometrii wybranego footprintu PCB ani generować sztucznego alarmu
+  o „niespójności” tylko dlatego, że nazwy są różne.
+- Użytkownik świadomie stosuje **footprinty z rodziny rezystorów
+  (np. `R0603`) dla niepolaryzowanych elementów pasywnych
+  w tych rozmiarach, także kondensatorów**. Oznaczenie biblioteczne
+  `C0603` i płytkowe `R0603` nie są konfliktem. Zachowuj rzeczywiste
+  pady, ich ID, warstwę, transformację, net i otwory z PCB.
+  Bryła/model 3D wynika z komponentu, nie jest kryterium wyboru
+  elektrycznej geometrii footprintu.
+- **`CSRC` z `Value=0` to pierwsze źródło sygnału**, a `0`
+  oznacza **numer źródła**, nie pojemność 0 F. Każde kolejne
+  *jawnie oznaczone źródło* ma `Value` zwiększone o 1
+  (1, 2, 3, ...). Nie zgaduj nazewnictwa przyszłych refdes;
+  inne kondensatory (np. `C1`) pozostają zwykłymi
+  kondensatorami. Nie wnioskuj roli źródła z samego `Device`,
+  nazwy footprintu `R*` ani samej liczby w `Value`
+  komponentu nieoznaczonego jako źródło.
+- Dla `CSRC` w `spirala.epro` fizyczny `R0603` oraz
+  biblioteczny `C0603/100 nF` są **zgodne z intencją
+  projektową**. Interpretacja roli źródła ma pierwszeństwo
+  przed zwykłą wartością bibliotecznego kondensatora.
+  Parametry i wzbudzenie solvera nie mogą być dopowiadane
+  z modelu 3D, wartości nominalnej Device ani z Gerbera.
+- Nie deklaruj, że importer `.epro` już działa: na checkpointcie
+  2026-10-21 jest dopiero **wymaganiem**. Po nim pozostają
+  Arc TL i fizyczny model sprzężenia. Kryteria i status
+  w `todo.md`, techniczny kontrakt w `docs/pcb-easyeda.md`.
+
 ## Cel i stan pracy
 
 Po odczytaniu `migracja.md` zapoznaj się z `goal.md`, adekwatną częścią

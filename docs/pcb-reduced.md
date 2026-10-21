@@ -170,3 +170,20 @@ jednostki i ograniczenia w [pcb-easyeda.md](pcb-easyeda.md). Źródłowy ARC
 zachowuje signed sweep i nie staje się TL z długością cięciwy. Dotychczasowe
 Gerber-only i synthetic pozostają kompatybilne. Zewnętrzne COMPONENT footprinty
 nie są obecnie instancjonowane; missing geometry ma jawny diagnostic.
+
+## Nowy kierunek importu PCB — `.epro` jako geometryczny source (decyzja użytkownika)
+
+Docelową podstawą canonical PCB model jest **pełny projekt EasyEDA Pro
+`.epro`**, a nie pojedynczy `.epcb` lub eksport Gerber. Zaimportowane
+właściwe `.efoo` określa pozycje i kształty padów wybrane w instancji PCB.
+Device i model 3D nie zmieniają tej geometrii; różne nazwy `C0603` w Device
+i `R0603` na PCB są świadomą konwencją niepolaryzowanych pasywnych użytkownika.
+`CSRC/Value=0` oznacza pierwsze źródło sygnału, kolejne jawne źródła
+mają wartości zwiększane o 1; `C1` i inne zwykłe kondensatory nie są
+źródłami. Fizyczne wzbudzenie musi pozostać jawne; nazwa footprintu
+ani Device nie zastępują konfiguracji źródła.
+
+To jest **wymaganie D4, jeszcze nie działające CLI/FAST**. D0/D1 z pojedynczego
+`.epcb` nadal istnieje; po D4 konieczne są Arc TL i pairwise coupling,
+z fail-closed do czasu weryfikacji. Pełny kontrakt i zadania:
+[pcb-easyeda.md](pcb-easyeda.md), [todo.md](../todo.md).

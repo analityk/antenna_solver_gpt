@@ -1,7 +1,101 @@
 # EasyEDA source-first — PCB-015D0/D1
 
-Source PCB jest nadrzędny. Gerber/Excellon nie jest wymagany; brak eksportu
+**Nowe wejście docelowe: pełny projekt `.epro`**, z
+`project.json`, `PCB/*.epcb` i `FOOTPRINT/*.efoo`.
+Jest to wymagany kierunek implementacji, jeszcze nie istniejąca
+funkcja CLI. Pojedyncze `.epcb` jest dziś obsługiwane
+w ograniczonym zakresie D0/D1, ale nie dostarcza pełnej
+biblioteki. Geometria instancji płytkowej jest nadrzędna.
+Gerber/Excellon nie jest wymagany; brak eksportu
 produkcyjnego oznacza `manufacturing_validation=not_requested`.
+
+## Reguły projektanta: nadrzędność footprintu PCB i specjalne źródła
+
+**To jest kontrakt użytkownika, nie domniemany standard EasyEDA.**
+
+- **Geometria miedzi i padów**: liczy się footprint faktycznie wybrany
+  i umieszczony przez projektanta w dokumencie PCB. Nazwa/footprint
+  z bibliotecznego `Device` nie może nadpisać tego wyboru;
+  gdy `Device` wskazuje inną rodzinę footprintów,
+  **nie zgłaszaj konfliktu wyłącznie na tej podstawie**.
+  Niezgodność dopiero między geometrią rzeczywistego PCB
+  i wskazanym plikiem `.efoo` to rzecz wymagająca audytu.
+- Dla **niepolaryzowanych pasywnych** elementów użytkownik
+  ręcznie wybiera obudowy rodziny rezystorów niezależnie
+  od rodzaju R/C, np. footprint **`R0603` dla kondensatora**
+  zamiast bibliotecznego `C0603`. To świadoma zasada
+  unifikacji wymiarów padów. Decyzja o konkretnym
+  footprintcie zawsze należy do użytkownika; nie wymuszaj
+  zmiany na `R*` automatem ani nie zgaduj geometrii.
+- **Model/bryła 3D** jest powiązany z komponentem/Device
+  i nie wybiera fizycznego footprintu używanego
+  w analizie elektromagnetycznej. Różnica modelu 3D
+  i nazwy obudowy bibliotecznej nie jest kolizją padów.
+- **`CSRC` z `Value=0` oznacza źródło sygnału nr 0.**
+  `0` jest indeksem źródła, a **nie pojemnością 0 F**.
+  Kolejne **jawnie oznaczone** źródła, jeśli zostaną
+  dodane, mają indeksy `1, 2, 3, ...`
+  (każdy większy od poprzedniego o 1). Nazwy
+  przyszłych źródeł nie zostały określone —
+  nie traktuj dowolnego `C*` lub kondensatora
+  z `Value=0` jako źródła.
+- Kondensator `C1` i każdy inny nieoznaczony jako
+  źródło kondensator to **zwykły element pasywny**.
+  Dane `Device C0603/100 nF` nie nadają
+  `CSRC` roli kondensatora; definicja
+  `CSRC/Value=0` nadaje mu rolę wzbudzenia.
+  Parametry portu i jego sposób wymuszenia muszą
+  pozostać jawne w kontrakcie solvera.
+- Przy resolverze `COMPONENT → FOOTPRINT → PAD → PAD_NET`
+  rozdzielaj **geometrię PCB**, **tożsamość/rolę
+  elementu** i **prezentację 3D**. Dopuszczaj `Device`
+  jako wtórny indeks, jeśli **brak** jawnego footprintu
+  instancji, rozwiązanie jest jednoznaczne i nie
+  zmienia rzeczywistej geometrii. Brak informacji
+  zgłaszaj fail-closed, bez zastępowania gerberem.
+
+**Konkretna serpentyna**: `CSRC` i `R1`
+w PCB wskazują ten sam `R0603` (pady e8/e7).
+Biblioteczna definicja CSRC wskazuje `C0603`:
+to **zgodne z regułą użytkownika**, nie konflikt.
+Poprzednie raporty używały słowa „rozbieżność”,
+gdy nie znaliśmy tej konwencji — poniższa
+starsza obserwacja geometrii pozostaje historycznym
+dowodem, ale nie jest błędem projektowym.
+
+## Kontrakt planowanego importu `.epro` (PCB-015D4, OPEN)
+
+1. Otwórz archiwum jako ZIP z kontrolą integralności, limitami
+   wielkości/dekompresji i bez rozpakowywania ścieżek poza kontrolowany obszar.
+2. Odczytaj `project.json`, jednoznaczny dokument PCB (również
+   mieszany plik z preambułą FOOTPRINT), bibliotekę `*.efoo`
+   i provenance dokumentów. Sprawdź wersję dialektu i jednostki.
+3. Dla komponentu **najpierw** rozwiąż jawny footprint
+   wybrany w PCB; `Device` nie może go nadpisać.
+   Zachowaj numer i lokalny ID PAD, kształt/wymiary,
+   layer, drill, transformację, mapę PAD_NET i net.
+4. Oddziel semantykę źródeł `CSRC/Value=0`
+   (dalsze jawne numery 1, 2, ...) od zwykłych
+   kondensatorów, włącznie z C1. Zaimplementuj
+   weryfikację indeksów wyłącznie w klasie źródeł,
+   nie dowolnych C*. Wzbudzenie i impedancję
+   ustalaj z jawnej konfiguracji modelu.
+5. Przeprowadź audyt fizycznego ownership/net i
+   kontaktów padów, przelotek, ground i tras.
+   Dla unsupported/fatal braków fail-closed.
+   Nie pomijaj łuków i sprzężeń w FAST.
+6. Przy zmianie kodu dodaj regresje dla
+   `spirala.epro` (CSRC R0603/Value=0) oraz
+   `test_psu.epro` (wielopadowe i THT),
+   o ile źródła staną się dostępne jako
+   fixtures; nie dodawaj załączników użytkownika
+   do repo bez nowej instrukcji.
+
+Obecne CLI `--easyeda-source *.epcb` i
+syntetyczny source-only FAST to **historyczny zakres
+D0/D1**. Nie dokumentuj `--easyeda-project`
+ani innej hipotetycznej składni jako działającej
+przed implementacją i testami.
 
 ## Format i jednostki
 
@@ -252,20 +346,26 @@ prawa leży wewnątrz padu R1 B (odchyłka środka ok. 0.34 mil).
 Te relacje są sprawdzeniem statycznym; fizyczny audyt kontaktów,
 plating VIA, układu warstw i ograniczeń modelu FAST nadal jest konieczny.
 
-**Rozbieżność biblioteczna, nie rozstrzygaj heurystyką:**
-instancja `CSRC` ma atrybut płytkowy `Footprint=R0603`,
-ale jej `Device=9031e3536a2e4419aaeb7e74753ecfcc`
-w `project.json` wskazuje `Footprint=C0603`
+**Wyjaśniony świadomy wybór footprintu i źródła:**
+instancja `CSRC` ma płytkowy `Footprint=R0603`,
+choć `Device=9031e3536a2e4419aaeb7e74753ecfcc`
+w `project.json` wskazuje `C0603`
 (`56832cdf4ece4990869c9dd017ff7c16.efoo`).
-To **różne** geometrie: `R0603` ma lokalne środki padów
-±29.66 mil i rozmiar 31.751 × 34.016 mil, `C0603`
-±27.56 mil i 31.496 × 35.433 mil. Import fizycznej płytki
-ma respektować jawny atrybut footprintu PCB i **zgłosić** konflikt
-metadanych Device, nie zamienić geometrii po cichu.
-Dodatkowo `CSRC` w PCB ma `Value="0"`, a jego Device opisuje
-kondensator **100 nF**; Device R1 opisuje **49.9 Ω**.
-Niczego z tego nie przyjmować milcząco jako konfiguracji
-portu/elementów solvera bez odrębnego kontraktu wartości.
+Geometrie faktycznie różnią się: `R0603` ma lokalne
+środki padów ±29.66 mil i 31.751 × 34.016 mil,
+a `C0603` ±27.56 mil i 31.496 × 35.433 mil.
+**To NIE jest konflikt:** projektant ręcznie
+wybiera `R0603` dla niepolaryzowanych elementów.
+Do modelu geometrii należy więc wziąć **tylko
+rzeczywiste `R0603` z instancji PCB**.
+`CSRC` ma `Value="0"`, czyli źródło nr 0,
+nie kondensator 0 F ani biblioteczny kondensator
+**100 nF**. R1 ma w Device nominalnie **49.9 Ω**;
+to nie uzasadnia automatycznej podmiany
+jawnej konfiguracji elektrycznej.
+Nie zgłaszaj ostrzeżeń o niezgodności Device/PCB
+dla takiej zamierzonej praktyki i nie
+zmieniaj geometrii na podstawie Device.
 
 **Stan implementacji:** źródłowa geometria CSRC/R1 jest dostępna
 w załączniku `.epro`, ale obecny parser przyjmuje pojedynczy

@@ -42,13 +42,26 @@ są liczone modelem Hammerstad–Jensen, a sieć częstotliwościowo z idealnymi
 R/L/C. Wynik jest jawnie oznaczony `reduced_quasi_tem / approximate`.
 Dokładny kontrakt: [docs/pcb-reduced.md](docs/pcb-reduced.md).
 
-Stan jest **PARTIAL**. Solver FAST nie ma jeszcze modelu par sprzężonych
-(coupled microstrip) i obecnie odrzuca każdą geometrię z drills/vias przed
-ekstrakcją. Lokalna serpentyna użytkownika dochodzi właśnie do tego ograniczenia:
-dwa jej PTH łączą dwie topowe wyspy z tą samą ciągłą płaszczyzną bottom ground,
-ale klasyfikacja takich PTH jako idealnych połączeń do węzła `ground` nie jest
-jeszcze zaimplementowana. Nie ma więc jeszcze wyniku FAST Z/S11 dla tej
-serpentyny i nie wolno go inferować z modelu linii izolowanych.
+Stan PCB FAST jest **PARTIAL**. Istnieją ograniczony model idealnych PTH
+do bottom ground oraz wąski parser source-only `*.epcb` (D0/D1),
+ale nie ma obsługi kompletnych archiwów projektu EasyEDA Pro
+`*.epro`, instancji zewnętrznych `*.efoo`, modelu
+elektrycznej długości `ARC` ani fizycznego sprzężenia linii.
+Pełna serpentyna nie ma potwierdzonego wyniku FAST Z/S11.
+
+**Nowy docelowy workflow PCB**: geometria pochodzi z pełnego
+projektu EasyEDA Pro `.epro` (ZIP: `project.json`, `PCB/`,
+`FOOTPRINT/`); Gerber/Excellon jest opcjonalny do
+sprawdzenia artefaktu produkcyjnego. Wybrany przez
+projektanta **footprint instancji na PCB** jest rozstrzygający;
+`Device` nie ma prawa go zastąpić. Użytkownik
+świadomie stosuje rodzinę footprintów rezystorów
+także dla niepolaryzowanych kondensatorów (np. R0603).
+`CSRC` z `Value=0` oznacza źródło sygnału nr 0;
+kolejne jawne źródła mają kolejne wartości 1, 2, ...
+Zwykły `C1` nie jest źródłem. Model 3D wynika
+z komponentu, nie z footprintu. Kontrakt:
+[docs/pcb-easyeda.md](docs/pcb-easyeda.md).
 
 PCB-015A usunęło wcześniejszą patologię walidatora polygonów. Na tej samej
 lokalnej serpentynie profilowane `prepare-only` spadło z około **687,8 s /
@@ -57,9 +70,11 @@ lokalnej serpentynie profilowane `prepare-only` spadło z około **687,8 s /
 jest teraz głównie w wielokrotnym `compact_features()`; w pomiarze wykonano
 go 17 razy, a `make_pcb_domain_mesh()` nadal dwa razy.
 
-Najbliższe kroki i kolejność są utrzymywane w [todo.md](todo.md). Priorytetem
-jest najpierw obsługa PTH top→ciągły bottom ground w FAST, potem fizyczny model
-sprzężonych równoległych odcinków. Viewer pól full-wave ma już domyślny
+Najbliższe kroki i kolejność są utrzymywane w [todo.md](todo.md):
+najpierw importer pełnego `.epro` z footprintami i
+kontaktami (D4), następnie model Arc TL (D3),
+fizyczne sprzężenia (PCB-015C) i opcjonalny audyt
+zgodności produkcji z Gerberami. Viewer pól full-wave ma już domyślny
 **Fit PCB** dla widoku XY (bbox PCB + 6% marginesu) i można nim przerysować
 stare zapisane pola bez ponownego FDTD. Optymalizacja domeny, dump extentu oraz
 pionowe przekroje pól pozostają otwarte.

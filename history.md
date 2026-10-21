@@ -2209,3 +2209,52 @@ padów**; potem brakuje Arc TL i coupling. Zmieniono
 `docs/pcb-easyeda.md`, `migracja.md`, `todo.md`.
 Testy: statyczny audyt ZIP/CRC, identyfikatorów, padów i
 geometrii; **nie** uruchomiono unittest, FDTD ani benchmarków.
+
+## 2026-10-21 — decyzja projektanta: geometria z .epro, footprint PCB i rola CSRC
+
+Nowy wiążący kierunek: **docelowe wejście geometrii PCB to pełny
+projekt EasyEDA Pro `.epro`** z `project.json`, `PCB/`
+i `FOOTPRINT/*.efoo`. `*.epcb` pozostaje wewnętrznym
+dokumentem/profilowym starym wejściem, a Gerber/Excellon
+jest opcjonalną kontrolą produkcji, nie źródłem
+geometrii dla FAST.
+
+**Doprecyzowanie użytkownika korygujące poprzedni raport:**
+to projektant ręcznie wybiera footprint instancji płytkowej,
+który jest nadrzędny nad domyślnym footprintem Device.
+Dla wszystkich niepolaryzowanych elementów pasywnych
+stosuje footprinty rodziny rezystorów przy danym rozmiarze,
+np. świadomie R0603 także dla kondensatora, zamiast
+C0603. Nie jest to rozbieżność ani konflikt, więc
+nie należy zgłaszać ostrzeżenia tylko z powodu
+niezgodnej nazwy bibliotek. Bryła 3D pochodzi
+z komponentu, a nie z footprintu.
+
+**Semantyka źródeł:** `CSRC` z `Value=0` oznacza
+pierwsze źródło sygnału, gdzie Value jest numerem
+(0), a nie pojemnością. Kolejne jawnie oznaczone
+źródła mają Value=1, 2, 3, ...; ich schemat refdes
+nie jest jeszcze ustalony. Zwykłe kondensatory
+takie jak `C1` i inne C* niezadeklarowane
+jako źródła pozostają pasywne. Nie wolno
+wywodzić roli źródła ani elektrycznych parametrów
+z bibliotecznej pojemności, prefiksu footprintu
+lub modelu 3D.
+
+Dla `spirala.epro`: PCB `CSRC` ma R0603 i Value=0,
+choć Device wskazuje C0603/100 nF — wszystko
+jest zgodne z intencją użytkownika. Wcześniejszy
+wniosek w historii o „konflikcie” Device/PCB
+nie obowiązuje; faktyczne różnice geometrii
+pozostają prawidłową obserwacją źródłową.
+
+Zmiany wyłącznie w dokumentacji: `AGENTS.md`,
+`todo.md`, `migracja.md`, `README.md`,
+`docs/pcb-easyeda.md`, `docs/pcb-reduced.md`
+i `history.md`. Utworzono wiążący kontrakt
+D4 i aktualną kolejność: .epro → Arc TL → coupling;
+D2 reconciliation opcjonalny. **Nie zmieniono kodu,
+nie dodano plików użytkownika**, nie uruchamiano
+testów, FDTD ani benchmarków. Sprawdzenie dotyczy
+zgodności i publikacji dokumentacji.
+

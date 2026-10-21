@@ -1,8 +1,86 @@
 # TODO — PCB: aktualny stan i następne kroki
 
-Stan na 2026-10-21. Ten plik opisuje bieżący kierunek rozwoju rdzenia PCB po
-PCB-015C0.1. Priorytetem jest workflow użytkownika oparty o EasyEDA source PCB;
-Gerber/Excellon pozostają ważnym, ale opcjonalnym artefaktem produkcyjnym.
+Stan na 2026-10-21. **Decyzja użytkownika: podstawowym wejściem geometrii
+PCB jest kompletny projekt EasyEDA Pro V2 `.epro`** (ZIP z `project.json`,
+`PCB/*.epcb`, `FOOTPRINT/*.efoo`). Pojedynczy `.epcb` służy do
+diagnostyki/kompatybilności, a Gerber/Excellon wyłącznie do opcjonalnej
+weryfikacji artefaktu produkcyjnego. Obecny kod **nie ma jeszcze importera
+`.epro`**, mimo że parser D0/D1 obsługuje ograniczony `.epcb` i
+syntetyczny FAST.
+
+## Obowiązujący kontrakt projektu — decyzja użytkownika
+
+1. O **geometrii fizycznej** rozstrzyga **footprint instancji PCB**,
+   umieszczony/ewentualnie ręcznie zmieniony przez projektanta.
+   Nigdy nie podmieniaj go na biblioteczny footprint `Device`.
+2. Dla **niepolaryzowanych elementów pasywnych** użytkownik świadomie
+   wybiera footprinty rodziny rezystorów (`R0603` i analogiczne
+   rozmiary), także dla kondensatorów. `CSRC: PCB R0603` i
+   `Device C0603` to **stan poprawny i zamierzony**, bez
+   ostrzeżenia o konflikcie. Model 3D pochodzi od komponentu,
+   niezależnie od footprintu elektrycznego.
+3. **`refdes=CSRC`, `Value=0`** identyfikuje pierwsze źródło
+   sygnału; liczba to **indeks źródła**, nie pojemność.
+   Dalsze jawnie oznaczone źródła mają wartości `1, 2, 3, ...`
+   (o 1 większe od poprzedniego). Nie wymyślaj ich refdes.
+   `C1` i wszystkie inne kondensatory nieoznaczone jako źródło
+   to normalne kondensatory; ich `Value`, `Device` ani
+   `Footprint` same nie ustanawiają roli źródła.
+4. Model i kontakty pochodzą z `.epro` i jego `.efoo`:
+   `COMPONENT` → jawny footprint PCB → `PAD` →
+   `PAD_NET`, z obrotem, odbiciem warstwy i jednostkami SI.
+   `Device` może służyć pomocniczemu indeksowaniu bibliotek
+   **tylko gdy nie nadpisuje jawnej decyzji PCB**.
+   Oddzielnie audytować geometrię/elektrykę i dane do wizualizacji 3D.
+5. Source-only oznacza **bez Gerbera**, a nie bez bibliotek.
+   Brak zależności zgłaszaj jawnie; nie twórz geometrii z Gerbera.
+
+## Aktualna kolejność implementacji — od najbliższego zadania
+
+**TERAZ — PCB-015D4, importer projektu `.epro` (OPEN).**
+Wykonać oddzielnie, z konkretną kontrolą każdego etapu:
+
+1. Bezpieczny odczyt ZIP `.epro`, kontrola profilu V2,
+   `project.json`, wybór jednoznacznego dokumentu PCB,
+   katalogu `FOOTPRINT/*.efoo`, kontrola integralności i provenance.
+2. Rozwiązywanie jawnego footprintu z instancji PCB, również
+   `HEAD.uuid` / `HEAD.source` i wbudowanych dokumentów
+   FOOTPRINT; `Device` tylko jako fallback przy braku
+   jawnego przypisania i po kontroli, bez zastępowania PCB.
+3. Import prawdziwej geometrii `PAD`: numer i ID, RECT,
+   layer/top/bottom, obrót/odbicie/przesunięcie, wiercenie,
+   PTH i metalizacja według jawnego kontraktu, SI i
+   fizyczny audyt zwarć/kontaktów; fail-closed dla
+   geometrii lub transformacji spoza wspieranego podzbioru.
+4. Semantyka źródła `CSRC/Value=0` i indeksowanych kolejnych
+   jawnych źródeł oraz oddzielenie zwykłych kondensatorów.
+   W szczególności użyć PCB `R0603` dla CSRC
+   bez ostrzeżenia o różnicy bibliotecznego `C0603`.
+5. Testy deterministyczne: resolver bibliotek,
+   zgodność `PAD_NET` z numerem i ID, poprawna geometria
+   `spirala.epro` (2/2 instancje, 4/4 rekordy PAD_NET),
+   `test_psu.epro` (291/291 komponentów, 906/906 PAD_NET)
+   i jawną odmowę dla brakujących zależności. Wyniki
+   2/2 i 291/291 są **dotychczas tylko statyczną analizą**
+   załączników, nie zaliczonymi testami nowego importera.
+   Pliki `.epro` są obecnie tylko w załącznikach
+   rozmowy — nie w Git; użycie jako fixtures wymaga
+   ponownego dostępu lub zgody użytkownika na zapis.
+
+**Warunek ukończenia D4:** z `.epro` powstaje canonical
+model fizycznych padów/tras/sieci z audytowalnym pochodzeniem
+i właściwą rolą CSRC, bez Gerberów i bez sztucznego konfliktu
+R0603/C0603. Sukces D4 **nie oznacza solve serpentyny**.
+
+**POTEM — PCB-015D3 (OPEN):** semantic Line/Arc TL, długość
+z signed sweep/radius (nie chordy/gerber tessellation);
+**następnie PCB-015C (OPEN):** fizyczne pairwise/curved
+coupling, bez arbitralnych współczynników. **D2**
+source↔Gerber/Excellon reconciliation pozostaje opcjonalne;
+dalej wydajność/full-wave.
+
+Starsze sekcje P0/P1 niżej dokumentują zakres wcześniejszych
+checkpointów D0/D1, a nie następne zadanie do rozpoczęcia.
 
 ## Stan potwierdzony
 
@@ -28,7 +106,7 @@ jawny blocker:
 
 To potwierdza, że route-survival/projection nie jest już bieżącym blockerem.
 
-## Zmiana architektury: EasyEDA source-first
+## Wcześniejszy kontrakt bazowy: EasyEDA source-first (rozszerzony powyżej o .epro)
 
 Dalszy rozwój rdzenia nie ma odtwarzać semantyki projektu z Gerberów, jeżeli
 dostępny jest plik source PCB z EasyEDA.
@@ -59,7 +137,7 @@ Kontrakt:
 
 ## Priorytety implementacji
 
-### P0 — PCB-015D0: minimalny parser EasyEDA source PCB do jawnego IR
+### Dawne P0 — PCB-015D0: parser pojedynczego source PCB (DONE: ograniczony profil)
 
 Celem jest parser source-first, nie pełna implementacja całego formatu EasyEDA.
 
@@ -82,7 +160,7 @@ Nieznane rekordy nie muszą być implementowane, jeśli nie są potrzebne do
 żądanego modelu. Nie wolno jednak cicho zignorować rekordu, który może zmieniać
 używaną topologię, materiał albo geometrię aktywnej warstwy.
 
-### P1 — PCB-015D1: source-only canonical PCB model i FAST
+### Dawne P1 — PCB-015D1: ograniczony source-only canonical i FAST (PARTIAL)
 
 Zbudować z EasyEDA source wystarczający canonical PCB model, aby reduced solver
 mógł działać **bez żadnego Gerbera**.
@@ -172,10 +250,11 @@ viewerów i minimalnej liczby FDTD. Nie mieszać tego z parserem EasyEDA.
 10. Znaczącą pracę commitować i publikować na `origin/main` przed drogimi
     testami. PASS/PARTIAL/FAIL nie blokuje checkpointu/pusha.
 
-Najbliższy krok po checkpointach D0/D1: **jawna geometria zewnętrznego footprintu
-CSRC/R1 i adapter kontaktów komponentów**, następnie semantic Arc TL oraz
-pairwise/curved coupling. Nie rekonstruować brakującego footprintu z Gerbera.
-D2 reconciliation pozostaje opcjonalne i nie jest implementowane.
+Aktualny krok jest określony w sekcji **PCB-015D4** na początku pliku:
+pełny importer `.epro`, geometria padów i reguła CSRC; następnie
+Arc TL i coupling. D2 reconciliation pozostaje opcjonalne.
+Dane footprintów CSRC/R1 **są** w `spirala.epro`, ale **nie** ma jeszcze
+importera w kodzie. Nie rekonstruować padów z Gerbera.
 
 **Zależności footprintów — nowy wynik 2026-10-21:** pełny
 `test_psu.epro` (udostępniony w rozmowie; **nie w repo**) okazał się
@@ -192,9 +271,10 @@ do repo** (ZIP 9410 B, SHA256 `d94187520eaf519afd6fa3ba8625a3aa43d2b03a9a9178a92
 Oba komponenty CSRC/R1 wskazują `R0603` z biblioteki `.efoo`,
 a 4/4 rekordy PAD_NET pasują zarówno numerem, jak i ID do padów.
 Trzeba więc zbudować ścieżkę ZIP + footprint + transformacja
-+ kontakty, a nie rekonstruować z Gerberów. Uwaga:
-Device CSRC wskazuje C0603, podczas gdy PCB wybrało R0603;
-raportować konflikt i zachować rzeczywisty footprint PCB.
++ kontakty, a nie rekonstruować z Gerberów. **Wyjaśnienie użytkownika:
+R0603 na CSRC jest celowym, nadrzędnym wyborem fizycznym;**
+C0603 w Device i wartość biblioteczna 100 nF nie są konfliktem
+ani parametrem źródła. `CSRC/Value=0` to źródło nr 0.
 Po adapterze nadal 7 Arc i coupling do rozwiązania. Próbka
 wymaga powtórnego dostarczenia lub zgody na dodanie do repo.
 Szczegóły `docs/pcb-easyeda.md`; Arc i coupling pozostają kolejne.
