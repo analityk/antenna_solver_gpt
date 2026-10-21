@@ -2175,3 +2175,37 @@ test fixture. `test_spirala` pozostaje bez odpowiadającej jej biblioteki.
 PAD_NET i numerów PAD z biblioteki. Brak testów natywnych, suite,
 FDTD i benchmarków. `docs/pcb-easyeda.md`, `todo.md`
 i `migracja.md` odzwierciedlają nowy stan.
+
+## 2026-10-21 — pełny eksport serpentyny `spirala.epro`, kontrola footprintów
+
+Użytkownik udostępnił `spirala.epro` (załącznik czatu, **nie wersjonowany**).
+To poprawny ZIP 9410 B, SHA256:
+`d94187520eaf519afd6fa3ba8625a3aa43d2b03a9a9178a924ac98586e504132`.
+Zawiera 1 PCB, 2 FOOTPRINT, 2 SYMBOL, `project.json`.
+Wewnętrzny `.epcb` ma 198 rekordów, a grupy rekordów porównane
+z repozytoryjnym `test_spirala.epcb` są zgodne; pliki jako całość
+nie są bajtowo identyczne (przeplot kolejności typów rekordów).
+
+Plik `FOOTPRINT/e8bf627583724bdebefbaa0be79b0d2f.efoo`
+zawiera **R0603** i pady `e7` (nr 2, B) / `e8` (nr 1, A)
+w kształcie prostokątów SMD. Obie instancje CSRC/R1 używają
+tego ID, 4/4 PAD_NET pasuje jednocześnie numerem i ID,
+po obrocie +90° centra padów zgadzają się z końcówkami A
+i dojściami do B. Semantyczny odcinek A (7 Arc + 5 Line)
+ma geometryczną długość osi ok. 36.3736 mm (nie wartość
+elektryczna modelu). Dwa VIA netu B i dolny POURED wymagają
+osobnego audytu kontaktów i jawnej metalizacji.
+
+Wykryta rozbieżność: PCB CSRC używa R0603, jego Device wskazuje
+C0603 oraz 100 nF, a atrybut PCB ma Value="0". Nie wybierać
+domyślnej geometrii po Device przy konflikcie, nie przypisywać
+elementowi pasywnemu wartości z metadanych jako wyniku solvera.
+R1 Device nominalnie 49.9 Ω.
+
+Wniosek: blokada **dostępności źródłowej geometrii** CSRC/R1
+jest rozwiązana w archiwum przekazanym przez użytkownika, ale
+**kod nadal nie potrafi otworzyć .epro/.efoo ani zinstancjonować
+padów**; potem brakuje Arc TL i coupling. Zmieniono
+`docs/pcb-easyeda.md`, `migracja.md`, `todo.md`.
+Testy: statyczny audyt ZIP/CRC, identyfikatorów, padów i
+geometrii; **nie** uruchomiono unittest, FDTD ani benchmarków.

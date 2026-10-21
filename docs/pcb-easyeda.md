@@ -210,3 +210,75 @@ Sprawdzenia przy tym checkpointcie: poprawne otwarcie/test CRC ZIP,
 odczyt JSON, inwentaryzacja wszystkich ścieżek, indeksów, komponentów,
 rekordów PAD/PAD_NET i statyczna kontrola ich zgodności. Nie wykonywano
 testów programu, FDTD, benchmarków ani natywnego solve.
+
+### Pełny projekt serpentyny `spirala.epro` — audyt źródła 2026-10-21
+
+Użytkownik przekazał **w załączniku rozmowy, a nie w repozytorium** plik
+`spirala.epro` (9410 bajtów, SHA256
+`d94187520eaf519afd6fa3ba8625a3aa43d2b03a9a9178a924ac98586e504132`). Plik ma nagłówek ZIP, poprawny spis treści i CRC
+(`ZipFile.testzip() = None`); zawiera `project.json`, 1 dokument PCB
+(`PCB/c057cdd3b5394bc0ae3ac7797c9d7554.epcb`), dwie definicje
+footprintów `.efoo` i dwa symbole `.esym`. Wewnętrzny plik PCB ma
+198 rekordów: 2 `COMPONENT`, 4 `PAD_NET`, 6 `LINE`, 7 `ARC`,
+2 `VIA` i 1 `POURED`. Kontrola rekordów z repozytoryjnym
+`gerbs/realpcb_microstrip/test_spirala.epcb` potwierdza zgodność
+zawartości grup rekordów (CRC32 dla każdego typu, w kolejności w ramach
+typu), choć **całe bajty pliku nie są identyczne** (inna kolejność
+przeplatania typów rekordów).
+
+**Rozwiązano brakującą zależność na poziomie danych wejściowych:**
+`FOOTPRINT/e8bf627583724bdebefbaa0be79b0d2f.efoo`
+ma `DOCTYPE FOOTPRINT 1.8`, nazwę biblioteczną `R0603`
+i dwa pady prostokątne SMD (bez otworów):
+- nr **2**, ID `e7`, lokalne `(+29.66, 0)` mil,
+  prostokąt `31.751 × 34.016` mil;
+- nr **1**, ID `e8`, lokalne `(-29.66, 0)` mil,
+  ten sam prostokąt.
+Po obrocie instancji **+90°** oba `COMPONENT` przypisują
+pad 1 do netu `A` i pad 2 do `B`, a każdy rekord `PAD_NET`
+zgadza się **zarówno numerem, jak i ID pada**. Środki kontaktów w mm
+(PCB source 1 mil = 0.0254 mm):
+- `CSRC` (2.921, 13.716 mm): pad 1 `A` = (2.921, 12.962636),
+  pad 2 `B` = (2.921, 14.469364);
+- `R1` (20.32, 13.716 mm): pad 1 `A` = (20.32, 12.962636),
+  pad 2 `B` = (20.32, 14.469364).
+
+Net `A` tworzy serię 7 `ARC` i 5 `LINE` między padami A;
+obliczona wyłącznie **geometryczna** suma długości środkowych
+(łuki z chord + signed sweep) to ok. **36.3736 mm**, bez efektów
+sprzężeń/zakrętów. Net `B` ma m.in. dolny `POURED` i
+2 przelotki: lewa przez krótki `LINE` dochodzi do padu CSRC B,
+prawa leży wewnątrz padu R1 B (odchyłka środka ok. 0.34 mil).
+Te relacje są sprawdzeniem statycznym; fizyczny audyt kontaktów,
+plating VIA, układu warstw i ograniczeń modelu FAST nadal jest konieczny.
+
+**Rozbieżność biblioteczna, nie rozstrzygaj heurystyką:**
+instancja `CSRC` ma atrybut płytkowy `Footprint=R0603`,
+ale jej `Device=9031e3536a2e4419aaeb7e74753ecfcc`
+w `project.json` wskazuje `Footprint=C0603`
+(`56832cdf4ece4990869c9dd017ff7c16.efoo`).
+To **różne** geometrie: `R0603` ma lokalne środki padów
+±29.66 mil i rozmiar 31.751 × 34.016 mil, `C0603`
+±27.56 mil i 31.496 × 35.433 mil. Import fizycznej płytki
+ma respektować jawny atrybut footprintu PCB i **zgłosić** konflikt
+metadanych Device, nie zamienić geometrii po cichu.
+Dodatkowo `CSRC` w PCB ma `Value="0"`, a jego Device opisuje
+kondensator **100 nF**; Device R1 opisuje **49.9 Ω**.
+Niczego z tego nie przyjmować milcząco jako konfiguracji
+portu/elementów solvera bez odrębnego kontraktu wartości.
+
+**Stan implementacji:** źródłowa geometria CSRC/R1 jest dostępna
+w załączniku `.epro`, ale obecny parser przyjmuje pojedynczy
+`DOCTYPE PCB`, a `easyeda_model.py` nie instancjonuje `.efoo`.
+Przygotować bezpieczny import `.epro` i projektowy resolver,
+obsłużyć także profil `.efoo` bez wymaganego `HEAD`,
+import padów z pozycji lokalnej do SI, identyfikatory PAD_NET i
+jawny audyt. Po tym **7 Arc TL oraz pairwise coupling wciąż
+blokują pełny wynik rzeczywistej serpentyny**. Nie dodano
+`spirala.epro` do Git; kolejny agent musi uzyskać ten załącznik
+ponownie albo użytkownik musi dopuścić wersjonowanie małej próbki.
+
+**Sprawdzenia:** tylko odczyt archiwum, CRC, JSON, porównanie klas
+rekordów, resolve 2/2 footprintów i 4/4 PAD_NET oraz matematyka
+geometrii, bez uruchamiania kodu projektu, pełnej suite,
+natywnego FDTD lub benchmarków.

@@ -165,12 +165,16 @@ nie jest globalnym defaultem ani tolerancją siatki czy FAST.
 
 ## 5. Najbliższe zadanie i warunek przejścia dalej
 
-**Pierwszy aktualnie udokumentowany blocker:** na
-`gerbs/realpcb_microstrip/test_spirala.epcb` parser i częściowy canonical
-layout działają, ale komponenty `CSRC/R1` odwołują się do zewnętrznego
-footprintu o hashu `e8bf627583724bdebefbaa0be79b0d2f`, którego
-geometrii nie ma w zbudowanym modelu. Nie zgaduj padów/połączeń i nie
-odtwarzaj ich z Gerbera.
+**Aktualny blocker:** brak importera pełnego projektu EasyEDA Pro
+`.epro` i instancjonowania padów `.efoo`, a następnie niewdrożone
+Arc TL i pairwise coupling. W dostarczonym poza Git `spirala.epro`
+**odnaleziono brakujący footprint** CSRC/R1
+`e8bf627583724bdebefbaa0be79b0d2f` i potwierdzono 2/2
+odwołania oraz 4/4 przypisania PAD_NET. Dawny status
+„brak pliku geometrycznego” dotyczył jedynie samodzielnego
+`test_spirala.epcb` w repo. W obecnym kodzie canonical
+layout i solve pozostają ograniczone: nadal nie odtwarzają padów
+zewnętrznych. Nie zgaduj geometrii z Gerbera.
 
 **Najbliższe zadanie (uzupełnione po analizie pełnego epro):**
 zaimplementować parser projektu EasyEDA Pro V2 `.epro` jako ZIP
@@ -181,9 +185,17 @@ potwierdzono 291/291 instancji i 906/906 przypisań pad→net w danych
 źródłowych, lecz **nie jest to jeszcze zdolność obecnego kodu**.
 Przesłane `test_psu.epro` nie jest częścią repozytorium;
 dla odtwarzalności testów będzie potrzebna osobna zgoda na dodanie
-artefaktu lub ponowne dostarczenie. Do odblokowania CSRC/R1
-w serpentynie potrzebny jest **jej** pełny projekt `.epro`;
-nie zastępuj go biblioteką niepowiązanego projektu.
+artefaktu lub ponowne dostarczenie. Plik `spirala.epro` **został dostarczony w bieżącym czacie**:
+9410 B, SHA256 `d94187520eaf519afd6fa3ba8625a3aa43d2b03a9a9178a924ac98586e504132`, ZIP z
+`project.json`, jednym `.epcb`, dwoma `.efoo` i
+dwoma `.esym`. **Nie jest w repozytorium**; ponowne wznowienie
+pracy programistycznej wymaga jego ponownego przekazania
+lub zgody użytkownika na dodanie jako fixture.
+CSRC i R1 mają PCB `Footprint=R0603` (2×RECT SMD),
+nety 1=A, 2=B i zgodne ID e8/e7. **Uwaga:** Device CSRC
+wskazuje C0603/100 nF, podczas gdy PCB ma R0603 i Value=0.
+Nie podstawiać Device geometry/values po cichu. Szczegółowe
+wymiary i trasa: `docs/pcb-easyeda.md`.
 Jeśli wymagany plik `.efoo` nie jest dostępny, zachowaj jawny
 `missing-source-dependency` i wskaż dokładną brakującą zależność zamiast
 udawać udany solve.

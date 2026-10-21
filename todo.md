@@ -187,9 +187,16 @@ brakujących definicji dotyczyło **samego** `test_psu.epcb`, nie
 całego eksportu. Pierwszy krok programistyczny: obsługa importu
 projektu `.epro`, biblioteki `.efoo`, mapy `project.json`,
 źródłowych pads/net i instancji wraz z geometrią i audytem.
-Pełny projekt źródłowy `test_spirala` nadal nie jest dostępny;
-jego fingerprint `e8bf627583724bdebefbaa0be79b0d2f`
-nie wolno odzyskiwać z obcego projektu ani z Gerbera.
+Pełny projekt `spirala.epro` **dostarczono w rozmowie, nie
+do repo** (ZIP 9410 B, SHA256 `d94187520eaf519afd6fa3ba8625a3aa43d2b03a9a9178a924ac98586e504132`).
+Oba komponenty CSRC/R1 wskazują `R0603` z biblioteki `.efoo`,
+a 4/4 rekordy PAD_NET pasują zarówno numerem, jak i ID do padów.
+Trzeba więc zbudować ścieżkę ZIP + footprint + transformacja
++ kontakty, a nie rekonstruować z Gerberów. Uwaga:
+Device CSRC wskazuje C0603, podczas gdy PCB wybrało R0603;
+raportować konflikt i zachować rzeczywisty footprint PCB.
+Po adapterze nadal 7 Arc i coupling do rozwiązania. Próbka
+wymaga powtórnego dostarczenia lub zgody na dodanie do repo.
 Szczegóły `docs/pcb-easyeda.md`; Arc i coupling pozostają kolejne.
 
 ### Checkpoint D0/D1 — 2026-10-21
