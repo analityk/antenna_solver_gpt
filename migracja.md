@@ -7,8 +7,8 @@
 
 **Repozytorium:** `analityk/antenna_solver_gpt`  
 **Docelowa gałąź:** `main` (chyba że użytkownik jawnie wskaże inną)  
-**Ostatnia inspekcja dokumentów:** 2026-10-22, Europe/Warsaw  
-**Potwierdzony opublikowany checkpoint przed aktualizacją:** `56ebe378e020bba29391e33696ac3ff1188f8e5b`
+**Ostatnia inspekcja dokumentów:** 2026-10-22, Europe/Warsaw
+**Potwierdzony opublikowany checkpoint przed aktualizacją:** `2529d04190a06ada0423d0110d0711a4fa412853`
 **Uwaga:** ten SHA jest punktem historycznym, nie obietnicą, że nadal jest HEAD. Każde wznowienie rozpoczyna się sprawdzeniem Git.
 
 ## 1. Instrukcja dla nowego czatu — wykonaj po wskazaniu tego pliku
@@ -155,10 +155,18 @@ Wzrost kosztu/duży mesh ma być zgłoszony użytkownikowi, nie optymalizowany.
 
 ## 5. Stan DONE/PARTIAL/OPEN i następny krok
 
-- Implementacja mostu i małe testy są w checkpointcie; **testów jeszcze nie
-  uruchomiono** (najpierw publikacja zgodnie z poleceniem).
-- Następnie wykonać tylko `test_pcb_easyeda_control`, ewentualnie pojedynczą
-  regresję niezmienionego Gerber CLI. Bez pełnej suite i benchmarków.
+- **DONE implementacja/testy bez native:** checkpoint mostu opublikowany przed
+  testami: `2529d04190a06ada0423d0110d0711a4fa412853`.
+  `test_pcb_easyeda_control`: 5 PASS; pojedynczy istniejący test Gerber CLI: PASS.
+- Mały syntetyczny .epro przeszedł prawdziwy feature-aware mesh i preflight,
+  potem atrapę granicy XML; istniejący run_control_model zapisał CSV z fake
+  wyniku bez wywołania natywnego solvera. Błąd raportu nie psuje ukończonego wyniku.
+- Realny `spirala.epro`: canonical równe D4, normalize/projection PASS,
+  2 PTH i R1 zachowane. Zatrzymano celowo w mockowanej granicy planu kotwic.
+  **Pełnej siatki realnej spirali nie liczono; shape/cell_count pozostają nieznane.**
+  Koszt i ewentualny istniejący guard ma pokazać Windows prepare-only.
+- Brak port/plating/R1 jest sprawdzony jako fail-closed przed meshem/native.
+  Nie czytano produkcyjnych Gerberów, source archive SHA pozostał niezmieniony.
 - **OPEN:** realny native prepare-only spirali na Windows, potem decyzja o
   pierwszym preview FDTD. Nie deklarować udanego XML/siatki realnej spirali
   na podstawie fake testu. Nie uruchamiać native/FDTD zdalnie.
@@ -179,8 +187,12 @@ Tani test lokalny:
 .\.venv\Scripts\python.exe -X utf8 -m unittest discover -s tests -p test_pcb_easyeda_control.py -v
 ```
 
-Nie uruchomiono jeszcze żadnego testu nowego mostu ani native/FDTD.
-Poprzednie testy FAST są zapisane w history.md; nie powtarzać ich przy okazji.
+Faktycznie wykonane:
+- `python -X utf8 -m unittest test_pcb_easyeda_control -v`: **5 PASS**.
+- `python -X utf8 -m unittest test_pcb_gerber.GerberTests.test_cli_and_preflight_failure_before_native -v`: **1 PASS** (mała syntetyczna regresja niezmienionego CLI).
+- `git diff --check`, SHA archiwum i kontrola listy zmian.
+Nie wykonano native XML/FDTD, pełnej suite, realnego mesh spirali, benchmarków,
+FAST/coupling ani PSU. Poprzednie testy FAST są w history.md; nie powtarzać ich przy okazji.
 Kod zadania: `pcb/easyeda_control.py`, `tests/test_pcb_easyeda_control.py`.
 Istniejące punkty integracji: pcb/control.py, solvers/openems_pcb.py,
 solvers/pcb_mesh.py i solvers/profiles.py — bez zmian implementacji.

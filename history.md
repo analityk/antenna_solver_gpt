@@ -2380,3 +2380,28 @@ błędzie. Nie zmieniono archiwów ani istniejących wyników.
 Ten checkpoint publikowany PRZED testami. Testy jeszcze nieuruchomione;
 realny Windows native prepare/FDTD pozostawiony użytkownikowi, wynik EM
 unverified. Jeśli mesher/port zgłosi guard, zachować go i raportować bez tuningu.
+
+
+### 2026-10-22 — odbiór mostu na granicy bez native
+
+Po publikacji `2529d04190a06ada0423d0110d0711a4fa412853` wykonano tylko:
+`test_pcb_easyeda_control` — 5 PASS;
+`test_pcb_gerber.GerberTests.test_cli_and_preflight_failure_before_native` — 1 PASS.
+Nowy kontroler daje canonical identyczne D4, wykonuje normalize/projection,
+przekazuje quality do istniejącego feature-aware mesha oraz sprawdza source
+config. Syntetyczny projekt wykonuje prawdziwy mesh/preflight i przechodzi
+mock XML/istniejący run_control_model z fake wynikiem. Test sprawdza także
+brak native Run dla prepare, pusty katalog, zapis snapshotów po guardzie,
+niezmienność źródła i best-effort błąd raportu. Żadne dane fake nie są
+publikowane jako wynik fizycznej spirali.
+
+Spirala: canonical/normalize/projection PASS do kontrolowanej granicy planu
+kotwic; source-config z 25 µm/49.9 Ω był wyłącznie jawnym test assumption.
+Brak dowolnego port/plating/R1 odrzucany przed meshem. Archiwum SHA d941875...
+bez zmian. Pełny feature-aware mesh spirali nie był obliczany w tym teście;
+shape/cell_count i natywny model.xml pozostają do sprawdzenia na Windows.
+Nie uruchomiono pełnej suite, FDTD/native, benchmarków, PSU, FAST ani coupling.
+Nie zmieniono żadnego pliku istniejącego meshera, profili, solvera, parsera
+ani Gerber CLI. Aktualne dokumenty: README, todo, history, pcb-easyeda,
+pcb-reduced (zamrożenie), migracja. Następny krok: lokalny prepare-only,
+raport realnego kosztu lub istniejącego guardu, bez automatycznej optymalizacji.

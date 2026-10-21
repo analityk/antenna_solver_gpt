@@ -60,8 +60,13 @@ starych CSV/statystyk/pól/raportu, bez nowej pętli Run. Błąd raportu jest be
 `summary/import`: design_source=easyeda_project, manufacturing_validation=
 not_requested, archive SHA/PCB ID/source SHA, jawne source-config, profil,
 geometry resolution i mesh/cost. Prepared/ukończenie nie zatwierdza fizyki.
-**Checkpoint implementacji: testy jeszcze nieuruchomione; native prepare i FDTD
-spirali pozostają do wykonania na Windowsie.** Nie optymalizować kosztu siatki.
+**Sprawdzenia bez native: 5 testów mostu + 1 regresja Gerber CLI PASS.**
+Syntetyczny .epro korzysta z rzeczywistego feature-aware mesha/preflight;
+XML i wynik są atrapami granicy native. Realna spirala przechodzi D4,
+normalizację i projekcję do granicy planu kotwic. Pełnej siatki spirali tutaj
+nie liczono, jej cell_count oraz natywny XML/FDTD pozostają **niezweryfikowane**.
+Uruchom Windows prepare-only, zapisz koszt lub dokładny guard. Nie optymalizować
+kosztu siatki w ramach tego checkpointu.
 
 ## Aktualne użycie i wynik D4
 

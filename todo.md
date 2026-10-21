@@ -61,8 +61,11 @@ Zachowane kontakty, 2 ground-PTH, jawny testowy R1 oraz source_index=0.
 **TERAZ:** EasyEDA D4 → istniejący full-wave openEMS, wyłącznie `spirala.epro`.
 Cienki `pcb.easyeda_control`: canonical → normalize → geometry resolution →
 feature-aware mesh → native prepare-only, potem istniejący run_control_model.
-Nie zmieniać meshera, profili ani fizyki. Realny native prepare/FDTD wymaga
-testu użytkownika na Windows; implementacja nie jest walidacją EM.
+Most zaimplementowany; 5 testów nowego kontrolera + 1 regresja CLI PASS.
+Nie zmieniać meshera, profili ani fizyki. **Następny krok: Windows prepare-only**,
+pomiar istniejącego shape/cell_count albo raport guardu (bez tuningu).
+Realny native prepare/FDTD i pełna siatka spirali wymagają testu użytkownika;
+implementacja nie jest walidacją EM.
 Poniższy blocker dotyczy zachowanego, zamrożonego FAST:
 Pierwszy blocker: `curved coupling analysis unsupported`; 7 ARC i 5 skośnych
 LINE mają niewspierane sprzężenia. Powstaje graf, nigdy pozornie poprawne Z/S11.
