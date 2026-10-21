@@ -1983,3 +1983,69 @@ potwierdzenie lokalnego blockera. Oczekiwany Arc unsupported pozostaje jawnym
 ograniczeniem C0.1; pairwise coupling nieimplementowany. Bez FDTD, native
 openEMS, benchmarków ani prepare-only. todo pozostaje bez zmiany, bo realny
 następny blocker wymaga lokalnego potwierdzenia użytkownika.
+
+## 2026-10-21 — pivot source-first: EasyEDA jako źródło semantyki PCB
+
+**Powód zmiany podejścia:** po PCB-015C0.1 użytkownik uruchomił realny
+`test_spirala.zip`. Fałszywy `stroke_not_preserved` zniknął i FAST zatrzymał
+się zgodnie z oczekiwaniem na:
+
+`Reduced source route Arc unsupported: top:route_000009 ...; no guessed TL arc.`
+
+Następnie użytkownik dostarczył źródłowy plik PCB z EasyEDA. Plik ten zawiera
+jawne rekordy CAD, których dotychczas próbowaliśmy odtwarzać po eksporcie do
+Gerbera: `NET`, `LINE`, `ARC`, `VIA`, `PAD_NET`, warstwy i
+`LAYER_PHYS`. Przykładowe rekordy aktywnej trasy zawierają net `A`, warstwę,
+endpointy, szerokość oraz signed sweep łuku, m.in. łuki około ±180°, 59,0156°
+i 52,916°. To odpowiada strukturze rzeczywistej serpentyny znacznie lepiej niż
+rekonstrukcja kąta/promienia z tessellated Gerber polygonu po geometry-resolution.
+
+**Nowa decyzja architektoniczna:** dla workflow użytkownika EasyEDA source PCB
+jest źródłem prawdy o intencji projektowej, topologii i semantyce geometrii.
+Gerber/Excellon pozostają artefaktem produkcyjnym. Jeżeli są dostępne, służą do
+reconciliation/walidacji eksportu; nie mają nadpisywać source ani być głównym
+źródłem Line/Arc/net/stackup.
+
+Brak Gerberów **nie jest błędem**. Source-only path ma móc zbudować model i
+uruchomić FAST, jeżeli source zawiera wszystkie dane wymagane przez dany solve.
+Dotychczasowy Gerber-only provenance z PCB-015C0/C0.1 zostaje jako fallback
+i diagnostyka, ale jego dalsze rozwijanie nie jest obecnie priorytetem.
+
+**Tolerancja zgodności produkcyjnej:** reconciliation EasyEDA↔Gerber ma używać
+jawnego parametru ustawianego przez użytkownika dla konkretnego projektu.
+Przykładowe 10 µm jest tylko wartością roboczą dla jednego przypadku. Nie jest
+globalnym defaultem fizycznym ani tolerancją geometry-resolution/FAST/mesha.
+Jeżeli różnica source↔manufacturing jest mniejsza lub równa ustawionemu
+limitowi, eksport uznaje się za zgodny w tym kontrakcie. Większa różnica ma być
+raportowana z feature/source ID i limitem. Reconciliation nie snapuje source do
+Gerbera i nie naprawia projektu.
+
+To rozdzielenie jest ważne również dla konstrukcji celowo nietypowych lub
+nierealistycznych produkcyjnie. Rdzeń może modelować np. source z bardzo grubym
+dielektrykiem i epsilon_r≈1, jeżeli użytkownik świadomie tak zdefiniował model.
+Parametr manufacturing tolerance może być wtedy większy albo walidacja
+Gerber/Excellon może być całkowicie pominięta.
+
+**Plan wdrożenia:**
+
+- PCB-015D0: minimalny parser EasyEDA source PCB do deterministycznego semantic
+  IR: format/version, units, layers/LAYER_PHYS, NET, LINE, ARC, VIA, PAD_NET
+  oraz provenance. Parser nie ma implementować całego EasyEDA i nie może
+  heurystycznie zgadywać jednostek.
+- PCB-015D1: source-only canonical PCB model + FAST bez obowiązkowych Gerberów,
+  w tym board/reference geometry, routes, vias, stackup i potrzebne contacts.
+- PCB-015D2: opcjonalny feature-aware EasyEDA↔Gerber/Excellon reconciliation z
+  user-configurable manufacturing tolerance.
+- PCB-015D3: semantic Line/Arc TL graph; długość Arc pochodzi z source sweep/radius,
+  nie z Gerber tessellation/chordy.
+- potem PCB-015C: pairwise coupled microstrip.
+
+**Wpływ na fizykę/wyniki w tym commicie:** brak zmian kodu solvera, geometrii,
+full-wave, mesha, PML ani wyników. To zmiana planu i kontraktu źródeł danych.
+
+**Sprawdzenia:** dokumentacja została zaktualizowana bez uruchamiania testów,
+benchmarków ani FDTD. Dane realnej serpentyny i EasyEDA source pochodzą z
+lokalnych sprawdzeń użytkownika. Następna implementacja ma być publikowana na
+`origin/main` checkpointami przed drogimi testami; lokalne testy użytkownika
+pozostają preferowaną szeroką weryfikacją.
+
