@@ -2288,3 +2288,33 @@ nie tylko krawędzi apertury) oraz opcjonalne explicit component_values, bez
 używania nominalnego Device jako źródła. THT otwory odejmowane są także od
 pourów; geometryczny drill/metalizacja pozostają rozdzielone. Test realnego
 canonical PcbGeometry/portu/vias/R1 przygotowany; jeszcze nieuruchomiony.
+
+### PCB-015D4 — odbiór zakresu i przekazanie
+
+Drugi checkpoint 3b373e9 opublikowany przed sprawdzeniem: 25 testów
+(test_pcb_easyeda_project + test_pcb_easyeda) PASS. Następnie 3 testy celowane
+PASS: dodatnia instalacja canonical round THT z explicit plating, realny
+canonical serpentyny i istniejący Arc guard, jawny indeks źródła.
+Nie uruchamiano full suite/native/FDTD/benchmarków.
+
+Spirala (archiwum SHA d94187520eaf519afd6fa3ba8625a3aa43d2b03a9a9178a924ac98586e504132):
+4 pady R0603 z dwóch instancji, 4/4 numery i IDs PAD_NET, net A/B, 6 LINE,
+7 ARC, 2 VIA, 4 conductors. Contact audit i PcbGeometry/port/PTH/R1 PASS przy
+jawnych testowych plating=25um i R1=49.9ohm, bez wartości elektrycznej z CSRC
+Device. Normalizacja/odwrotność zachowuje geometrię. build_reduced_model
+zatrzymuje się na EasyEDA source ARC unsupported; nie utworzono Z/S11.
+
+PSU (SHA 659e3eacb05b4f91645bab3f621723adf85d14f56505aa6962e7d3f60a770982):
+nowy kod potwierdził 291 instancji i 906 mapowań numer+ID; 288 PCB explicit,
+3 Device fallback; 257 library i 34 embedded. Physical canonical FAIL CLOSED
+na pustym NET w PCB record 145. Starsze footprinty 1.3/1.7 są indeksowane,
+ale nie materializowane; dodatkowo slots/complex pours/stackup poza zakresem.
+To jawny PARTIAL, nie geometryczne PASS PSU.
+
+Drobne zabezpieczenia: duplicate designator, integer source index,
+multiple-source guard także przy explicit port, UTF-8 project error i limity
+archiwum w provenance. Testy finalnych kontaktów zachowują pełną fizyczną
+kontrolę, a round pad holes również przechodzą wspólną transformację/projekcję.
+Uaktualniono migracja/todo/README/AGENTS oraz docs/pcb-easyeda i pcb-reduced;
+następny priorytet D3 Arc TL, potem coupling. Nic nie zmieniono w archiwach
+użytkownika, openEMS, mesherze ani zasadach PTH. Source CAD nie jest dopowiadany.

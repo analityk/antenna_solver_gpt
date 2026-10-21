@@ -191,6 +191,8 @@ def source_layout_geometry(layout,override):
         raise ConfigurationError('EasyEDA missing source dependency: '+layout['missing_dependencies'][0]['message'])
     if not isinstance(override,dict) or set(override)-{'port','drills','component_values'}:
         raise ConfigurationError('EasyEDA source override accepts only port, optional drills and explicit component_values; source owns stackup/materials.')
+    if sum(c['role']=='source' for c in layout.get('resolved_components',()))>1:
+        raise ConfigurationError('EasyEDA FAST has one excitation; multiple CAD sources unsupported, not omitted.')
     p=override.get('port')
     if isinstance(p,dict) and p.get('mode')=='source':
         p=_source_port_config(layout,p)

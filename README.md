@@ -44,9 +44,10 @@ Dokładny kontrakt: [docs/pcb-reduced.md](docs/pcb-reduced.md).
 
 Stan PCB FAST jest **PARTIAL**. Istnieją ograniczony model idealnych PTH
 do bottom ground oraz wąski parser source-only `*.epcb` (D0/D1),
-ale nie ma obsługi kompletnych archiwów projektu EasyEDA Pro
-`*.epro`, instancji zewnętrznych `*.efoo`, modelu
-elektrycznej długości `ARC` ani fizycznego sprzężenia linii.
+oraz importer `.epro`/`.efoo` D4 w zadeklarowanym podzbiorze.
+Canonical serpentyny z rzeczywistymi padami przechodzi audyt; PSU pozostaje
+częściowo obsługiwany (referencje 291/906, nie pełna geometria).
+Nie ma modelu elektrycznej długości `ARC` ani fizycznego sprzężenia linii.
 Pełna serpentyna nie ma potwierdzonego wyniku FAST Z/S11.
 
 **Nowy docelowy workflow PCB**: geometria pochodzi z pełnego
@@ -71,8 +72,7 @@ jest teraz głównie w wielokrotnym `compact_features()`; w pomiarze wykonano
 go 17 razy, a `make_pcb_domain_mesh()` nadal dwa razy.
 
 Najbliższe kroki i kolejność są utrzymywane w [todo.md](todo.md):
-najpierw importer pełnego `.epro` z footprintami i
-kontaktami (D4), następnie model Arc TL (D3),
+po canonical import D4 dla serpentyny następny jest model Arc TL (D3),
 fizyczne sprzężenia (PCB-015C) i opcjonalny audyt
 zgodności produkcji z Gerberami. Viewer pól full-wave ma już domyślny
 **Fit PCB** dla widoku XY (bbox PCB + 6% marginesu) i można nim przerysować

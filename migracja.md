@@ -8,7 +8,7 @@
 **Repozytorium:** `analityk/antenna_solver_gpt`  
 **Docelowa gałąź:** `main` (chyba że użytkownik jawnie wskaże inną)  
 **Ostatnia inspekcja dokumentów:** 2026-10-21, Europe/Warsaw  
-**HEAD potwierdzony przed ustanowieniem tego protokołu:** `f350cb5b92dcfdb69615226e78ea9031fa3af5ab`  
+**Potwierdzony opublikowany checkpoint przed aktualizacją:** `3b373e9efc7cca5e5ef9e8d71bf8b02038bcd867`
 **Uwaga:** ten SHA jest punktem historycznym, nie obietnicą, że nadal jest HEAD. Każde wznowienie rozpoczyna się sprawdzeniem Git.
 
 ## 1. Instrukcja dla nowego czatu — wykonaj po wskazaniu tego pliku
@@ -133,196 +133,95 @@ utworzeniem. W nagłówku zapisuj SHA ostatniego *już potwierdzonego*
 commita bazowego, a opublikowany SHA nowego commita podawaj po publikacji
 w raporcie końcowym. Nowy czat zawsze sam sprawdza HEAD.
 
-## Bieżący checkpoint PCB-015D4 (implementacja przed testami)
+## 4. Bieżący punkt wznowienia — PCB-015D4
 
-Baza b7626f36bd582d678893b7f587f89f59cc745d50: oba archiwa są już w Git
-(`gerbs/emtest4/spirala.epro`, `gerbs/test_psu/test_psu.epro`). Starsze uwagi
-poniżej o plikach tylko w rozmowie są nieaktualne. Implementacja archive/resolver/
-PAD instantiation i CLI jest zapisana; jeszcze nie sprawdzona wykonaniem.
-Następny krok: wąski test `test_pcb_easyeda_project.py`, fizyczny audyt
-serpentyny i raport ograniczeń PSU. Nie uruchamiać pełnej suite ani FDTD.
-D3 Arc TL i coupling pozostają OPEN. Nie zgłaszać pełnego FAST jako PASS.
+**Kierunek:** pełne `.epro` → canonical PCB/source semantics → FAST.
+**Baza zadania:** b7626f36bd582d678893b7f587f89f59cc745d50.
+**Ostatni już opublikowany checkpoint przed tym zapisem:**
+3b373e9efc7cca5e5ef9e8d71bf8b02038bcd867 (wcześniej b2086ca9ff41a848534c8945d440bd970beea5ed).
+Zawsze sprawdź nowy HEAD; niniejszy końcowy checkpoint dostaje SHA po publikacji.
 
-## 4. Punkt wznowienia — stan na 2026-10-21
+**DONE:** importer `.epro` bez ekstrakcji/pośredniego Gerbera, CRC/limity,
+strict JSON, project.json i wybór PCB, resolver `.efoo`/embedded, PCB Footprint
+przed Device, PAD ID+number+net, obrót/odbicie/SI, CSRC Value=0/source_index=0.
+Materializacja padów, union miedzi per net/warstwa, kontrola zwarć i ownership,
+contact metadata, port z rzeczywistej szczeliny i jawne idealne RLC są zintegrowane
+z istniejącą ścieżką. Gerber i samodzielny .epcb pozostają kompatybilne.
 
-**Kierunek rozwoju:** `antenna_lab` jest pakietem Pythona dla modelowania
-anten i PCB. Pierwotny projekt obejmuje Quados 8 i biquad przy 1420 MHz
-oraz natywny openEMS na Windows 11. **Aktualny priorytet to
-import fizycznej geometrii PCB z kompletnego projektu EasyEDA Pro
-`.epro` (ZIP), a następnie PCB FAST/reduced quasi-TEM.**
-Prace D0/D1 na pojedynczym `.epcb` są ograniczonym historycznym
-checkpointem, nie docelowym workflow.
+**Obsługiwany profil:** PCB/footprint 1.8, editor 2.2.x, top/bottom/jeden dielektryk,
+RECT bez round corners, circle/OVAL SMD, round through PAD z jawnym plating.
+Footprinty 1.3/1.7 tylko indeksowane; ich geometria odrzucana. Przesunięcie
+pad local → mirror Y na bottom → obrót instancji → PCB. Nie zmieniono
+full-wave, meshera, PML ani tolerancji. Epsilon_r=1 i gruby dielektryk legalne.
 
-- **DONE (zakres checkpointów kodu):** M1 generowania/edycji geometrii
-  anten; PCB-015D0 — parser semantyczny EasyEDA Pro PCB 1.8/editor 2.2.x;
-  PCB-015D1 — ograniczona ścieżka source-only: neutralny IR, canonical
-  layout, inspekcja i możliwość FAST bez Gerbera dla wspieranych projektów.
-  Zachowane są jednostki, nets, Line/Arc/signed sweep, VIA i provenance.
-- **PARTIAL:** PCB FAST obsługuje jednoznaczne odcinki microstrip, wybrane
-  idealne R/L/C i ground-PTH, nie całe sprzężone PCB. Model EasyEDA
-  obsługuje określone top/bottom, jeden dielektryk, RECT PAD,
-  materializowany POURED i VIA z jawną metalizacją; nie pełny format CAD.
-  Adapter openEMS dla anten i pola E/H istnieją, ale bez kompletnej
-  walidacji fizycznej.
-- **OPEN:** instancje zewnętrznych footprintów i kontakty komponentów;
-  semantyczny Arc jako linia transmisyjna; sprzężenia pairwise microstrip;
-  opcjonalne source↔Gerber/Excellon reconciliation (D2); fizyczna walidacja
-  antenowego portu, impedancji, zysku i zbieżności.
+**Dostępność i odbiór realny:** oba archiwa są w Git od b7626f3, nie w ulotnym
+załączniku; żadnego pliku użytkownika nie zmodyfikowano.
 
-Kluczowa decyzja z 2026-10-21: **.epro-first**. Cały projekt
-EasyEDA Pro V2 jest podstawowym źródłem geometrii i topologii:
-`project.json`, `PCB/*.epcb`, `FOOTPRINT/*.efoo`.
-**O konkretnym footprintcie rozstrzyga instancja PCB, nie Device.**
-Gerber/Excellon służy opcjonalnej kontroli eksportu,
-nie rekonstrukcji padów, netów i łuków. Brak Gerbera
-nie blokuje source-only FAST.
-D2 będzie mieć tolerancję produkcyjną podawaną przez użytkownika; 10 µm
-nie jest globalnym defaultem ani tolerancją siatki czy FAST.
+- `gerbs/emtest4/spirala.epro`, SHA256
+  d94187520eaf519afd6fa3ba8625a3aa43d2b03a9a9178a924ac98586e504132:
+  canonical PASS — 2 COMPONENT, 4 PAD_NET, cztery fizyczne pady R0603,
+  6 LINE, 7 ARC, 2 VIA, 4 conductors. CSRC source_index=0. Każdy pad ma
+  fizyczny kontakt. PcbGeometry, normalizacja/odwrotność, pełna szczelina portu,
+  PTH top/bottom i R1 sprawdzone z **jawnymi testowymi** plating=25 um,
+  R1=49.9ohm (to nie domyślny parametr producenta/source).
+- `gerbs/test_psu/test_psu.epro`, SHA256
+  659e3eacb05b4f91645bab3f621723adf85d14f56505aa6962e7d3f60a770982:
+  identity PASS — 291 komponentów/906 PAD_NET z kontrolą ID i numeru,
+  288 PCB explicit + 3 Device fallback; 257 library + 34 embedded.
+  **Physical canonical UNSUPPORTED:** pierwsza odmowa pusty NET (PCB record 145).
+  Dalej są stare footprinty 1.3/1.7, slots i bogatszy materiał/pours.
+  Nie deklarować ich fizycznego connectivity ani wyniku FAST.
 
-## 5. Najbliższe zadanie i warunek przejścia dalej
+**PARTIAL:** ogólna zgodność EasyEDA, elektryczny FAST i source component subset.
+CSRC/Value to indeks, nie nominalna pojemność Device. Zwykły C1 nie jest źródłem.
+Kolejne jawne źródła mogą mieć Solver Role=source i ciągłe indeksy od 0;
+obecny solver odrzuca wiele źródeł. `component_values` ustala jawne R/L/C;
+niezamodelowany element nie jest cicho pomijany. 3D nie rozstrzyga footprintu.
 
-**Aktualny blocker:** brak importera pełnego projektu EasyEDA Pro
-`.epro` i instancjonowania padów `.efoo`, a następnie niewdrożone
-Arc TL i pairwise coupling. W dostarczonym poza Git `spirala.epro`
-**odnaleziono brakujący footprint** CSRC/R1
-`e8bf627583724bdebefbaa0be79b0d2f` i potwierdzono 2/2
-odwołania oraz 4/4 przypisania PAD_NET. Dawny status
-„brak pliku geometrycznego” dotyczył jedynie samodzielnego
-`test_spirala.epcb` w repo. W obecnym kodzie canonical
-layout i solve pozostają ograniczone: nadal nie odtwarzają padów
-zewnętrznych. Nie zgaduj geometrii z Gerbera.
+**OPEN:** D3 Arc TL, PCB-015C coupling, rozszerzenie PSU i opcjonalne D2.
+Realna spirala po udanym canonical dociera do **EasyEDA source ARC unsupported**.
+Nie wygenerowano dla niej Z/S11 i nie należy deklarować całego FAST jako PASS.
 
-**Najbliższe zadanie — PCB-015D4 (nowa decyzja użytkownika):**
-zaimplementować import pełnego projektu EasyEDA Pro V2 `.epro`
-(bezpieczny ZIP, `project.json`, `PCB/`, `FOOTPRINT/`),
-resolver biblioteki i `.efoo`/złożonego `.epcb`,
-instancjonowanie **footprintu wybranego na PCB**,
-geometrię padów, transformacje SI, `PAD_NET` i audyt
-fizycznych kontaktów. `Device` nie może zastępować
-jawnego footprintu PCB; fallback wyłącznie, gdy
-footprint PCB nie został wskazany, a rozwiązanie
-jest jednoznaczne. Na przykładzie `test_psu.epro`
-potwierdzono 291/291 instancji i 906/906 przypisań pad→net w danych
-źródłowych, lecz **nie jest to jeszcze zdolność obecnego kodu**.
-Przesłane `test_psu.epro` nie jest częścią repozytorium;
-dla odtwarzalności testów będzie potrzebna osobna zgoda na dodanie
-artefaktu lub ponowne dostarczenie. Plik `spirala.epro` **został dostarczony w bieżącym czacie**:
-9410 B, SHA256 `d94187520eaf519afd6fa3ba8625a3aa43d2b03a9a9178a924ac98586e504132`, ZIP z
-`project.json`, jednym `.epcb`, dwoma `.efoo` i
-dwoma `.esym`. **Nie jest w repozytorium**; ponowne wznowienie
-pracy programistycznej wymaga jego ponownego przekazania
-lub zgody użytkownika na dodanie jako fixture.
-CSRC i R1 mają PCB `Footprint=R0603` (2×RECT SMD),
-nety 1=A, 2=B i zgodne ID e8/e7. **Nie ma konfliktu:**
-użytkownik ręcznie wybiera footprinty rodziny rezystorów
-(np. R0603) również dla niepolaryzowanych kondensatorów.
-3D bierze się z komponentu. Biblioteczny `Device C0603/100 nF`
-nie zmienia elektrycznej geometrii PCB.
-**`CSRC` z `Value=0` jest źródłem sygnału o numerze 0,
-nie kondensatorem 0 F; następne jawne źródła mają
-indeksy 1, 2, ...; `C1` i inne kondensatory są zwykłe.**
-Wymiary i dalszy kontrakt: `docs/pcb-easyeda.md`.
-Jeśli wymagany plik `.efoo` nie jest dostępny, zachowaj jawny
-`missing-source-dependency` i wskaż dokładną brakującą zależność zamiast
-udawać udany solve.
+## 5. Następne zadanie i źródła kodu
 
-**Kryterium D4:** `.epro` daje canonical obraz rzeczywistej geometrii
-padów i sieci bez Gerberów, udokumentowaną transformację
-`COMPONENT → footprint PCB → PAD → PAD_NET`,
-poprawną rolę źródła `CSRC/Value=0` i brak sztucznego
-alarmu o C0603/R0603. Dopiero potem model Arc TL
-i sprzężeń; nie zgłaszaj pełnego solve wcześniej.
+**Najbliżej PCB-015D3:** korzystać z zachowanych source ARC/signed sweep/radius,
+nie tessellacji ani cięciwy. Po nim coupled microstrip; nie omijać guardów.
+Warunek: poprawny model i testy łuku, zachowana semantyczna ciągłość i długość.
+PSU jest odrębnym zakresem kompatybilności, nie wymogiem do rozpoczęcia D3.
 
-**Potem:** (1) PCB-015D3 — fizyczna długość łuku z promienia i signed sweep,
-bez chordy lub tessellacji Gerbera; (2) PCB-015C — pairwise/curved coupling
-z fizycznym modelem C/C0 lub even/odd i fail-closed; (3) opcjonalnie D2 —
-feature-aware reconciliation z jawną tolerancją użytkownika; (4) optymalizacja
-pełnej fali. Numer P2 w starszej liście nie oznacza aktualnego priorytetu D2.
-Przed podjęciem działań zawsze ponownie przeczytaj końcówkę `todo.md`.
+Kod D4: `pcb/easyeda_project.py` (bezpieczny ZIP/resolver),
+`pcb/easyeda_footprints.py` (pady i transformacje), `pcb/easyeda_model.py`
+(canonical/net/contact), `pcb/reduced_control.py` (CLI),
+`pcb/source_ir.py`, `solvers/reduced_source.py` (guard/terminal).
+`tests/test_pcb_easyeda_project.py` i legacy `test_pcb_easyeda.py`.
+Pełny kontrakt i ograniczenia: docs/pcb-easyeda.md, docs/pcb-reduced.md, todo.md.
 
-**Niezmienny kontrakt po przejęciu:** pełne `.epro` jest wejściem
-geometrii. Priorytet jawnego footprintu PCB jest bezwzględny;
-niepolaryzowane pasywne 0603 i pokrewne mogą celowo używać
-rodziny R. `CSRC/Value=0` to źródło nr 0, a dodatkowe
-jawne źródła mają kolejne wartości całkowite. Nie traktuj
-innych kondensatorów jako źródeł z samej nazwy `C`
-czy footprintu `R`. `Device` i model 3D nie mogą
-przedefiniować fizycznego footprintu.
+## 6. Dowody i następne tanie komendy (CMD Windows)
 
-**Punkty do inspekcji w kodzie:** `src/antenna_lab/pcb/easyeda.py`,
-`src/antenna_lab/pcb/easyeda_model.py`,
-`src/antenna_lab/pcb/source_ir.py`,
-`src/antenna_lab/pcb/reduced_control.py`,
-`src/antenna_lab/solvers/reduced_source.py`,
-`tests/test_pcb_easyeda.py`. Kieruj się stanem kodu, nie samą listą plików.
-
-**Późniejsza weryfikacja pełnego archiwum (2026-10-21):**
-przesłany przez użytkownika poza Git `test_psu.epro` jest poprawnym
-ZIP EasyEDA Pro V2 (SHA256 `659e3eacb05b4f91645bab3f621723adf85d14f56505aa6962e7d3f60a770982`);
-wewnątrz: 1 PCB, 46 plików `.efoo`, 77 plików `.esym` i
-`project.json` z 46 footprintami oraz 77 device. Wszystkie
-291 instancji komponentów mają definicję footprintu (254 bezpośrednio
-w `.efoo`, 34 w `.epcb`, 3 przez Device), a wszystkie 906 rekordów
-`PAD_NET` wskazuje istniejący numer pada. Wcześniejsze 169 brakujących
-odnosi się **tylko do pojedynczego pliku** `test_psu.epcb`.
-Nie udowodniono fizycznego connectivity ani obliczeń FAST;
-plik `.epro` nie jest wersjonowany. Szczegóły `docs/pcb-easyeda.md`.
-
-**Nowe rozpoznanie zależności (statyczna inspekcja 2026-10-21):**
-`test_spirala.epcb` zawiera 2 `COMPONENT`, 4 `PAD_NET` i 0 `PAD`/`FOOTPRINT`;
-nie dostarcza więc sam geometrii CSRC/R1. `test_psu.epcb` jest nietypowym
-złożeniem 34 dokumentów `FOOTPRINT` i jednego `PCB`; dokument PCB zawiera
-291 komponentów, a po dopasowaniu `HEAD.uuid`/`HEAD.source` do atrybutu
-`Footprint` 119 instancji ma odpowiadającą definicję, 169 jej nie ma,
-zaś 3 nie mają rozpoznanego atrybutu. Obecne definicje obejmują
-`R0603`, `G0603`, testpointy i przewlekane złącze; nie jest to reguła
-SMD/THT ani dowód definicji 0805. Samo dopasowanie identyfikatora
-nie jest jeszcze udanym importem modelu. Szczegóły: `docs/pcb-easyeda.md`.
-
-## 6. Dowody, dostępne komendy i niewykonane sprawdzenia
-
-**Dotychczas potwierdzone historycznie:**
-
-- `test_spirala.epcb`: 198 rekordów, 6 LINE, 7 ARC, 2 VIA,
-  4 dostępne regiony miedzi; obrys około 25 mm, dielektryk około
-  0,2 mm, epsilon_r = 4,5. Parser i ograniczony canonical PASS,
-  nie pełny solve. SHA256 danych:
-  `e528f2a4ac1a1957a45e48806bc93da8b42e4af4a0f1da27cd84ce26714d0c4b`.
-- 11 testów `test_pcb_easyeda.py` PASS dla checkpointu D0/D1, w tym
-  syntetyczny source-only FAST bez Gerbera. Następne 3 wąskie regresje
-  PASS, zapisane na końcu `history.md`. Są to wyniki **historyczne**,
-  nie testy uruchomione podczas odczytu tego dokumentu.
-- Brak potwierdzonego full solve rzeczywistej serpentyny; nie uruchamiano
-  w tych checkpointach pełnego zestawu testów ani natywnego FDTD.
-- 2026-10-21 do repo dodano także `gerbs/test_psu/test_psu.epcb` i
-  `gerbs/test_psu/psu.zip`. Ich obecność nie dowodzi jeszcze działania FAST.
-- Zakończone natywne przebiegi antenowe na Windowsie potwierdziły poprawkę
-  granic zasilania `aligned_feed` (450 dodatnich wkładów). Lokalna praca
-  0,949145539 W i strumień 0,948187885 W różnią się o około 0,10090%,
-  ale pojedyncze odniesienie U·I=1 W różni się od lokalnej pracy o
-  5,085%. **Nie zatwierdza to impedancji ani zysku**; M2/M3 otwarte.
-
-**Inspekcja source bez portu/Gerbera (CMD Windows):**
+Faktycznie uruchomione w D4:
+- `python -X utf8 -m unittest test_pcb_easyeda_project -v`: 11 PASS (pierwszy checkpoint).
+- `python -X utf8 -m unittest test_pcb_easyeda_project test_pcb_easyeda -v`: 25 PASS.
+- Trzy testy po wzmocnieniu asercji: round THT z jawnym plating,
+  real spiral canonical/Arc guard, explicit source indices: 3 PASS.
+- Read-only diagnostic obu archiwów: wyniki powyżej; pierwsza próba PSU
+  wykazała wersję biblioteki 1.7, po rozdzieleniu indeksu od materializacji
+  potwierdzono 291/906 i aktualny physical guard pustego NET.
+Nie uruchomiono pełnej suite, native/FDTD, benchmarków ani convergence sweeps.
+Nie wykonywano pełnego solve serpentyny. Wyniki historyczne anten i D0/D1
+pozostają w history.md; nie są dowodem nowej walidacji EM.
 
 ```cmd
-.\.venv\Scripts\python.exe -m antenna_lab.pcb.reduced_control --easyeda-source gerbs\realpcb_microstrip\test_spirala.epcb --inspect-source
+git pull --ff-only && .\.venv\Scripts\python.exe -m antenna_lab.pcb.reduced_control --easyeda-project gerbs\emtest4\spirala.epro --inspect-source
 ```
-
-**Obsługiwany solve z kompletnymi kontaktami:**
 
 ```cmd
-.\.venv\Scripts\python.exe -m antenna_lab.pcb.reduced_control --easyeda-source projekt.epcb --source-config source-contacts.json
+.\.venv\Scripts\python.exe -X utf8 -m unittest discover -s tests -p test_pcb_easyeda_project.py -v
 ```
 
-**Pełne testy na docelowym Windows, tylko gdy zasadne:**
-
-```cmd
-.\.venv\Scripts\python.exe -X utf8 -m unittest discover -s tests -v
-```
-
-Projekt używa `unittest`, nie wymaga `pytest`. Benchmarki są wykluczone
-bez osobnej instrukcji użytkownika. Dla zmiany samej dokumentacji wystarczy
-kontrola spójności treści i commitów; nie przedstawiaj jej jako testu EM.
+Inspekcja nie wymaga config portu/plating. Solve wymaga jawnego source-config
+(port mode=source/source_index albo explicit; plating oraz component_values),
+przy czym obecne guardy Arc/coupling nadal uniemożliwiają pełny wynik serpentyny.
+Nie zgaduj brakującej elektryki z Device. Polecenia/dane przykładów są w docs.
 
 ## 7. Dokumenty, decyzje i ograniczenia wymagające zachowania
 

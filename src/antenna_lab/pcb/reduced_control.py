@@ -45,9 +45,9 @@ def run_reduced(input_path, output_dir, *, pcb_config=None, geometry_resolution_
         raise ConfigurationError('--source-pcb-id requires --easyeda-project.')
     source_input=easyeda_source if easyeda_source is not None else easyeda_project
     if source_input is not None and (input_path is not None or pcb_config is not None):
-        raise ConfigurationError('Use --easyeda-source independently of Gerber input/--pcb-config; source physical contacts use --source-config.')
+        raise ConfigurationError('Use --easyeda-source/--easyeda-project independently of Gerber input/--pcb-config; source physical contacts use --source-config.')
     if source_input is None and (source_config is not None or inspect_source):
-        raise ConfigurationError('--source-config/--inspect-source require --easyeda-source.')
+        raise ConfigurationError('--source-config/--inspect-source require --easyeda-source or --easyeda-project.')
     input_path=Path(input_path) if input_path is not None else None;output=Path(output_dir)
     if output.exists() and (not output.is_dir() or any(output.iterdir())):
         raise ConfigurationError('Reduced output must be empty/new; no old results overwritten.')

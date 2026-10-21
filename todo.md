@@ -4,9 +4,8 @@ Stan na 2026-10-21. **Decyzja użytkownika: podstawowym wejściem geometrii
 PCB jest kompletny projekt EasyEDA Pro V2 `.epro`** (ZIP z `project.json`,
 `PCB/*.epcb`, `FOOTPRINT/*.efoo`). Pojedynczy `.epcb` służy do
 diagnostyki/kompatybilności, a Gerber/Excellon wyłącznie do opcjonalnej
-weryfikacji artefaktu produkcyjnego. Obecny kod **nie ma jeszcze importera
-`.epro`**, mimo że parser D0/D1 obsługuje ograniczony `.epcb` i
-syntetyczny FAST.
+weryfikacji artefaktu produkcyjnego. Importer D4 `.epro` jest zaimplementowany w ograniczonym profilu;
+canonical serpentyny sprawdzony, cała geometria PSU nadal niewspierana.
 
 ## Obowiązujący kontrakt projektu — decyzja użytkownika
 
@@ -37,50 +36,31 @@ syntetyczny FAST.
 
 ## Aktualna kolejność implementacji — od najbliższego zadania
 
-**TERAZ — PCB-015D4, importer projektu `.epro` (OPEN).**
-Wykonać oddzielnie, z konkretną kontrolą każdego etapu:
+**D4 DONE dla wspieranego profilu i canonical serpentyny; PARTIAL dla PSU.**
 
-1. Bezpieczny odczyt ZIP `.epro`, kontrola profilu V2,
-   `project.json`, wybór jednoznacznego dokumentu PCB,
-   katalogu `FOOTPRINT/*.efoo`, kontrola integralności i provenance.
-2. Rozwiązywanie jawnego footprintu z instancji PCB, również
-   `HEAD.uuid` / `HEAD.source` i wbudowanych dokumentów
-   FOOTPRINT; `Device` tylko jako fallback przy braku
-   jawnego przypisania i po kontroli, bez zastępowania PCB.
-3. Import prawdziwej geometrii `PAD`: numer i ID, RECT,
-   layer/top/bottom, obrót/odbicie/przesunięcie, wiercenie,
-   PTH i metalizacja według jawnego kontraktu, SI i
-   fizyczny audyt zwarć/kontaktów; fail-closed dla
-   geometrii lub transformacji spoza wspieranego podzbioru.
-4. Semantyka źródła `CSRC/Value=0` i indeksowanych kolejnych
-   jawnych źródeł oraz oddzielenie zwykłych kondensatorów.
-   W szczególności użyć PCB `R0603` dla CSRC
-   bez ostrzeżenia o różnicy bibliotecznego `C0603`.
-5. Testy deterministyczne: resolver bibliotek,
-   zgodność `PAD_NET` z numerem i ID, poprawna geometria
-   `spirala.epro` (2/2 instancje, 4/4 rekordy PAD_NET),
-   `test_psu.epro` (291/291 komponentów, 906/906 PAD_NET)
-   i jawną odmowę dla brakujących zależności. Wyniki
-   2/2 i 291/291 są **dotychczas tylko statyczną analizą**
-   załączników, nie zaliczonymi testami nowego importera.
-   Pliki `.epro` są obecnie tylko w załącznikach
-   rozmowy — nie w Git; użycie jako fixtures wymaga
-   ponownego dostępu lub zgody użytkownika na zapis.
+- ZIP/CRC/limity/strict JSON, wybór PCB, biblioteki `.efoo` i embedded,
+  nadrzędność PCB nad Device, kontrola PAD ID+number, SI transform i source_index.
+- SMD RECT/circle/OVAL; round through pad z jawną metalizacją i otworem.
+  Top/bottom/jeden dielektryk; unknown geometry fail-closed.
+- `spirala.epro` jest w `gerbs/emtest4`: 2/2 komponenty, 4/4 mapowania,
+  cztery rzeczywiste pady R0603, kontakty, port, PTH i explicit R1 sprawdzone.
+- `test_psu.epro` jest w `gerbs/test_psu`: 291/291 i 906/906 resolve PASS,
+  34 embedded / 257 library (3 Device fallback). Physical canonical FAIL CLOSED:
+  pusty NET w PCB record 145; dalej starsze footprinty 1.3/1.7, slots,
+  rozbudowane pours/stackup. Nie jest to potwierdzona geometria/FAST PSU.
+- Sprawdzenia D4: 11 testów pierwszego checkpointu, następnie 25 testów
+  projektu+legacy .epcb, następnie 3 celowane testy (THT/serpentyna/source index).
+  Każdy zestaw PASS; bez pełnej suite i native/FDTD.
 
-**Warunek ukończenia D4:** z `.epro` powstaje canonical
-model fizycznych padów/tras/sieci z audytowalnym pochodzeniem
-i właściwą rolą CSRC, bez Gerberów i bez sztucznego konfliktu
-R0603/C0603. Sukces D4 **nie oznacza solve serpentyny**.
-
-**POTEM — PCB-015D3 (OPEN):** semantic Line/Arc TL, długość
-z signed sweep/radius (nie chordy/gerber tessellation);
-**następnie PCB-015C (OPEN):** fizyczne pairwise/curved
-coupling, bez arbitralnych współczynników. **D2**
-source↔Gerber/Excellon reconciliation pozostaje opcjonalne;
-dalej wydajność/full-wave.
-
-Starsze sekcje P0/P1 niżej dokumentują zakres wcześniejszych
-checkpointów D0/D1, a nie następne zadanie do rozpoczęcia.
+**TERAZ — PCB-015D3 (OPEN):** model semantic Arc TL, fizyczna długość
+z promienia/signed sweep, bez cięciwy. Realny canonical jest dostępny;
+`build_reduced_model` zatrzymuje go na `EasyEDA source ARC unsupported`.
+**POTEM — PCB-015C (OPEN):** fizyczne pairwise/curved coupling.
+Nie produkować niesprzężonego przybliżenia serpentyny jako wyniku końcowego.
+**Osobny dług D4:** rozszerzenie PSU (puste/unconnected nets, starsze biblioteki,
+slots/custom pads, complex pours/stackup). Nie blokuje rozpoczęcia D3 dla spirali.
+D2 source/manufacturing reconciliation nadal opcjonalne. Pełny zakres/CLI:
+[docs/pcb-easyeda.md](docs/pcb-easyeda.md).
 
 ## Stan potwierdzony
 
@@ -250,49 +230,6 @@ viewerów i minimalnej liczby FDTD. Nie mieszać tego z parserem EasyEDA.
 10. Znaczącą pracę commitować i publikować na `origin/main` przed drogimi
     testami. PASS/PARTIAL/FAIL nie blokuje checkpointu/pusha.
 
-Aktualny krok jest określony w sekcji **PCB-015D4** na początku pliku:
-pełny importer `.epro`, geometria padów i reguła CSRC; następnie
-Arc TL i coupling. D2 reconciliation pozostaje opcjonalne.
-Dane footprintów CSRC/R1 **są** w `spirala.epro`, ale **nie** ma jeszcze
-importera w kodzie. Nie rekonstruować padów z Gerbera.
-
-**Zależności footprintów — nowy wynik 2026-10-21:** pełny
-`test_psu.epro` (udostępniony w rozmowie; **nie w repo**) okazał się
-archiwum ZIP EasyEDA V2 z `project.json`, `PCB/`, 46 plikami `.efoo`
-i 77 `.esym`. Statycznie rozwiązano 291/291 instancji COMPONENT
-oraz 906/906 przypisań PAD_NET (254 przez bibliotekę, 34 przez
-wbudowane footprinty, 3 przez atrybut Device). Wcześniejsze 169
-brakujących definicji dotyczyło **samego** `test_psu.epcb`, nie
-całego eksportu. Pierwszy krok programistyczny: obsługa importu
-projektu `.epro`, biblioteki `.efoo`, mapy `project.json`,
-źródłowych pads/net i instancji wraz z geometrią i audytem.
-Pełny projekt `spirala.epro` **dostarczono w rozmowie, nie
-do repo** (ZIP 9410 B, SHA256 `d94187520eaf519afd6fa3ba8625a3aa43d2b03a9a9178a924ac98586e504132`).
-Oba komponenty CSRC/R1 wskazują `R0603` z biblioteki `.efoo`,
-a 4/4 rekordy PAD_NET pasują zarówno numerem, jak i ID do padów.
-Trzeba więc zbudować ścieżkę ZIP + footprint + transformacja
-+ kontakty, a nie rekonstruować z Gerberów. **Wyjaśnienie użytkownika:
-R0603 na CSRC jest celowym, nadrzędnym wyborem fizycznym;**
-C0603 w Device i wartość biblioteczna 100 nF nie są konfliktem
-ani parametrem źródła. `CSRC/Value=0` to źródło nr 0.
-Po adapterze nadal 7 Arc i coupling do rozwiązania. Próbka
-wymaga powtórnego dostarczenia lub zgody na dodanie do repo.
-Szczegóły `docs/pcb-easyeda.md`; Arc i coupling pozostają kolejne.
-
-### Checkpoint D0/D1 — 2026-10-21
-
-Działa source-only parser PCB 1.8/editor 2.2.x, neutralny IR i ograniczony
-canonical layout (top / jeden dielektryk / bottom, R/L outline, materializowany
-POURED, absolutne RECT PAD, Line/Arc, VIA z jawną metalizacją). CLI:
-`reduced_control --easyeda-source ... --inspect-source` nie wymaga portu/Gerbera.
-Kompletny syntetyczny source z explicit port przeszedł FAST bez Gerberów;
-11 testów w test_pcb_easyeda.py PASS na pierwszym checkpointcie integracji.
-
-Realny dodany do repo test_spirala.epcb: parser i layout PASS, 198 rekordów,
-6 LINE, 7 ARC, 2 VIA, obrys ~25 mm, substrate ~0.2 mm / epsilon_r=4.5.
-Canonical layout jawnie niekompletny: brak geometrii footprintu o hashu
-`e8bf627583724bdebefbaa0be79b0d2f` dla CSRC/R1. Nie wykonano solve ani native.
-Dla bezpośrednich PADów źródłowych jeden route junction w padzie może być
-idealnym terminalem, bez zgadywania lead length i bez parasitics.
-Opis units/ograniczeń: docs/pcb-easyeda.md. Brak Gerbera = not_requested.
-
+Aktualny krok to **D3 Arc TL**, następnie coupling. D4 canonical serpentyny
+nie wymaga Gerbera. Starsze wpisy D0/D1 i audyty przed D4 są w history.md;
+nie traktować ich dawnych braków bibliotek jako aktualnego blockera.

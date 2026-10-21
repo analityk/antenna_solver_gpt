@@ -131,7 +131,11 @@ def load_easyeda_project(path, *, pcb_id=None):
         raise ConfigurationError(f'EasyEDA invalid archive/integrity: {exc}') from exc
     if 'project.json' not in members:
         raise ConfigurationError('EasyEDA archive requires root project.json.')
-    project = strict_json(members['project.json'].decode('utf-8-sig'), 'project.json')
+    try:
+        text=members['project.json'].decode('utf-8-sig')
+    except UnicodeError as exc:
+        raise ConfigurationError('EasyEDA project.json: invalid UTF-8.') from exc
+    project = strict_json(text, 'project.json')
     if not isinstance(project, dict) or not isinstance(project.get('config'), dict):
         raise ConfigurationError('EasyEDA project.json: project/config object required.')
     editor = project['config'].get('editorVersion', '')
@@ -167,7 +171,9 @@ def load_easyeda_project(path, *, pcb_id=None):
                 raise ConfigurationError(f'EasyEDA embedded FOOTPRINT at {doc["start_line"]}: HEAD.uuid required.')
             footprints.append(dict(key=key, **doc))
     data = dict(project=project, pcb=selected[0], footprints=footprints, members=manifest,
-                archive_integrity='crc_passed', manufacturing_validation='not_requested')
+                archive_integrity='crc_passed', manufacturing_validation='not_requested',
+                archive_limits=dict(compressed_bytes=MAX_ARCHIVE_BYTES,member_bytes=MAX_MEMBER_BYTES,
+                    total_bytes=MAX_TOTAL_BYTES,members=MAX_MEMBERS,records_per_document=MAX_RECORDS,compression_ratio=MAX_COMPRESSION_RATIO))
     return EasyEdaProject(str(path), digest, pcb_id, json.dumps(data, sort_keys=True, allow_nan=False))
 
 
@@ -197,7 +203,7 @@ def resolve_project_components(project):
             mappings.setdefault(r[1], []).append(e)
         elif r[0] == 'COMPONENT':
             components.append(e)
-    resolved = []; seen = set(); source_indices = []
+    resolved = []; seen = set(); source_indices = []; designators=set()
     for entry in components:
         r = entry['data']; cid = r[1]
         if cid in seen or len(r) not in (9, 10) or not isinstance(r[7], dict):
@@ -239,9 +245,13 @@ def resolve_project_components(project):
         if set(assigned) != set(ids):
             raise ConfigurationError(f'EasyEDA {cid}: unmapped footprint pads {sorted(set(ids)-set(assigned))}; no guessed nets.')
         ref = a.get('Designator', cid)
+        if not isinstance(ref,str) or not ref or ref in designators:
+            raise ConfigurationError(f'EasyEDA invalid/duplicate component Designator {ref!r}.')
+        designators.add(ref)
         source_index = None
         if ref == 'CSRC' or a.get('Solver Role') == 'source':
             value = a.get('Value')  # Never from Device's nominal capacitor value.
+            if type(value) is int and value>=0:value=str(value)
             if not isinstance(value, str) or not value.isascii() or not value.isdigit():
                 raise ConfigurationError(f'EasyEDA source {ref}: explicit nonnegative integer Value required.')
             source_index = int(value)

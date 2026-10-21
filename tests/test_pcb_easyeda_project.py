@@ -134,6 +134,11 @@ class ProjectTests(unittest.TestCase):
             self.assertTrue(all(p['holes_xy_m'] for p in layout['pads']))
             cfg={'port':{'mode':'explicit','negative_mm':[-2.032,0],'positive_mm':[2.032,0],'width_mm':.508}}
             with self.assertRaisesRegex(ConfigurationError,'barrel plating'):source_layout_geometry(layout,cfg)
+            cfg['drills']={'pth_model':'solid_pec_equivalent','pth_plating_um':25}
+            geometry=source_layout_geometry(layout,cfg)
+            self.assertEqual(len(geometry.drills),2)
+            self.assertTrue(all(d.connected_layer_roles==('top','bottom') for d in geometry.drills))
+            self.assertTrue(all(p.holes_xy_m for p in geometry.source_pads))
 
     def test_real_spiral_canonical_port_vias_and_explicit_passive(self):
         path=Path(__file__).resolve().parents[1]/'gerbs/emtest4/spirala.epro'
@@ -152,11 +157,14 @@ class ProjectTests(unittest.TestCase):
         from antenna_lab.pcb.transform import normalize_port_orientation,inverse_transform_geometry
         before=g.as_dict();n,t=normalize_port_orientation(g);back=inverse_transform_geometry(n,t)
         self.assertEqual(g.as_dict(),before)
+        from antenna_lab.solvers.reduced_pcb import build_reduced_model
+        with self.assertRaisesRegex(ConfigurationError,'EasyEDA source ARC unsupported'):
+            build_reduced_model(n)
         for a,b in zip(g.source_pads,back.source_pads):
             for v,w in zip(a.vertices_xy_m,b.vertices_xy_m):
                 self.assertAlmostEqual(v[0],w[0],places=14);self.assertAlmostEqual(v[1],w[1],places=14)
 
-    def test_archive_integrity_version_and_duplicate_source(self):
+    def test_archive_integrity_and_library_version(self):
         with TemporaryDirectory() as tmp:
             path=write_project(tmp);path.write_bytes(path.read_bytes()[:-30])
             with self.assertRaisesRegex(ConfigurationError,'integrity'):load_easyeda_project(path)
@@ -169,6 +177,16 @@ class ProjectTests(unittest.TestCase):
             project=load_easyeda_project(write_project(tmp,(p,b,f)))
             self.assertEqual(len(resolve_project_components(project)),1)
             with self.assertRaisesRegex(ConfigurationError,'indexed only'):materialize_project_source(project)
+
+    def test_explicit_source_indices_and_ordinary_capacitor(self):
+        with TemporaryDirectory() as tmp:
+            p,b,f=fixture();b[17][7]['Value']='1'
+            with self.assertRaisesRegex(ConfigurationError,'contiguous from 0'):
+                resolve_project_components(load_easyeda_project(write_project(tmp,(p,b,f))))
+        with TemporaryDirectory() as tmp:
+            p,b,f=fixture();b[18][8]='drive';b[17][7].update({'Solver Role':'source','Value':0})
+            cs=resolve_project_components(load_easyeda_project(write_project(tmp,(p,b,f))))
+            self.assertEqual(cs[0]['source_index'],0)
 
     def test_archive_security_and_selection(self):
         for name in ('../escape','/absolute','FOOTPRINT\\escape','project.JSON'):

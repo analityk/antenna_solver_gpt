@@ -1,13 +1,106 @@
-# EasyEDA source-first — PCB-015D0/D1
+# EasyEDA source-first — PCB-015D4
 
-**Nowe wejście docelowe: pełny projekt `.epro`**, z
-`project.json`, `PCB/*.epcb` i `FOOTPRINT/*.efoo`.
-Jest to wymagany kierunek implementacji, jeszcze nie istniejąca
-funkcja CLI. Pojedyncze `.epcb` jest dziś obsługiwane
-w ograniczonym zakresie D0/D1, ale nie dostarcza pełnej
-biblioteki. Geometria instancji płytkowej jest nadrzędna.
-Gerber/Excellon nie jest wymagany; brak eksportu
-produkcyjnego oznacza `manufacturing_validation=not_requested`.
+Pełny projekt **`.epro` jest obsługiwanym wejściem** w ograniczonym profilu
+EasyEDA Pro V2: `project.json`, `PCB/*.epcb`, `FOOTPRINT/*.efoo`, również
+embedded FOOTPRINT. Dotychczasowe samodzielne `.epcb` i Gerber pozostają
+kompatybilne. Import nie eksportuje ani nie odczytuje pośredniego Gerbera.
+
+## Aktualne użycie i wynik D4
+
+```cmd
+.\.venv\Scripts\python.exe -m antenna_lab.pcb.reduced_control --easyeda-project gerbs\emtest4\spirala.epro --inspect-source
+```
+
+Przy wielu PCB podaj `--source-pcb-id UUID` z mapy `project.json.pcbs`.
+Powstają `project.source.json` (pełny detached manifest/records/hash),
+`component_bindings.json` (wybrana biblioteka, PAD ID/number/net),
+`source_ir.json`, `source_model.json`, `import.json` i `summary.json`.
+Inspekcja materializuje pady, union miedzi per warstwa/net i audyt kontaktów;
+nie tworzy Z/S11. Wyjątek zapisuje `status=failed` i przyczynę, a dostępne
+wcześniejsze snapshots pozostają. Nieobecny/niewspierany dokument nie staje
+się domyślną geometrią.
+
+**Spirala: canonical PASS, nie electromagnetic PASS.** Archiwum w Git:
+`gerbs/emtest4/spirala.epro`. Rzeczywiste 2 COMPONENT / 4 PAD_NET / 4 pady
+R0603, 6 LINE / 7 ARC / 2 VIA, nety A/B i 4 conductors. CSRC ma source_index=0.
+Potwierdzono kontakt wszystkich czterech padów, PcbGeometry, normalizację
+oraz — przy jawnych testowych założeniach metalizacji i R1 — port i PTH.
+FAST następnie odmawia na `EasyEDA source ARC unsupported`; nie emituje Z/S11.
+
+**PSU: identity PASS, physical canonical UNSUPPORTED.** Archiwum
+`gerbs/test_psu/test_psu.epro`: kod potwierdził 291 komponentów, 906 mapowań
+numer+ID, 288 jawnych footprintów PCB + 3 fallback Device; 257 bibliotek
+zewnętrznych + 34 embedded. Pierwsza odmowa fizycznego parsera: pusty `NET`
+(PCB record 145). Są też biblioteki 1.3/1.7, slots i bogatsze pours/stackup;
+nie uznano ich za obsługiwane. 291/906 nie jest dowodem kontaktów PSU.
+
+## Bezpieczeństwo i zakres geometrii
+
+ZIP odczytywany w pamięci, bez ekstrakcji. Sprawdzane CRC wszystkich plików,
+duplikaty (także case-insensitive), traversal/absolutne ścieżki, symlinki,
+szyfrowanie i strict JSON (również duplicate keys/NaN/Inf). Limity zapisane
+w provenance: 128 MiB archiwum, 64 MiB/member, 256 MiB łącznie, 4096 members,
+1 mln linii/document, compression ratio 1000. To limity importu, nie fizyka.
+
+PCB: DOCTYPE 1.8, editor 2.2.x. FOOTPRINT 1.8 może nie mieć HEAD i może mieć
+puste separatory `[]`. Starsze 1.3/1.7 są indeksowane tylko dla kontroli
+referencji; użycie ich geometrii kończy się jawnym błędem. Dokładny UUID ma
+pierwszeństwo przed aliasem HEAD.source; wieloznaczny alias jest błędem.
+Jawny Footprint PCB wygrywa nad Device, również jeśli Device nie istnieje.
+Fallback Device jest możliwy tylko przy braku jawnego Footprint. Model 3D
+nigdy nie wybiera miedzi.
+
+Pady: RECT bez rounded corners, okrągły ELLIPSE/ROUND, OVAL; warstwy top/bottom.
+Round through PAD wymaga MULTI i jawnego plated=0/1; holes są odejmowane także
+od pourów. Per-layer padstack, slots, custom polygons i nieznane fizyczne
+prymitywy footprintu są odrzucane. Znane artwork mask/paste/silk/model są
+pomijane z zapisem IDs; raw zostaje. Specyfikacja:
+[PAD](https://github.com/easyeda/easyeda-file-format-v2/blob/63f38c2758cbe2456e8b5c7e76469369430d94af/docs/en/pcb/primitives/pad.md),
+[COMPONENT/PAD_NET](https://github.com/easyeda/easyeda-file-format-v2/blob/63f38c2758cbe2456e8b5c7e76469369430d94af/docs/en/pcb/package/component.md).
+
+Transformacja: lokalny obrót pada → jego lokalny środek → dla bottom odbicie
+lokalnego Y → CCW obrót instancji → pozycja PCB. Zmienia się strona top/bottom;
+THT pozostaje through. Źródłowy układ +Y-up i skala mil zachowane; dla ćwierć
+obrotu współczynniki dokładne 0/±1. Jest to odpowiednik `Flip TOP_BOTTOM` i
+`SetOrientationDegrees` importera KiCad Pro po uwzględnieniu jego screen-Y.
+Offset round drill jest w osiach pada. Nie dodano snappingu ani nowej tolerancji.
+Krzywe padów używają dotychczasowego `CURVE_ERROR_M` importera.
+
+Fizyczny audyt: finalna miedź jest unionem per net/layer; przecięcie różnych
+netów jest zwarciem. Każdy pad/stroke musi mieć dokładnie jednego właściciela.
+Kontakty padów są zapisywane jako rzeczywiste przecięcia; izolowany pad nie
+zyskuje fikcyjnego połączenia. Przynależność PTH do warstw sprawdzana geometrycznie,
+a metalizacja nie może dotknąć obcego netu. Otwór nie ujawnia grubości plating.
+Top/bottom i jeden dielektryk to nadal zakres canonical; epsilon_r=1 i duża
+grubość są legalne, bez narzuconej typowej FR4.
+
+## Jawny kontrakt elektryczny FAST
+
+`--source-config` może podać istniejący port explicit albo wybrać jawne źródło:
+
+```json
+{
+  "port": {"mode": "source", "source_index": 0},
+  "drills": {"pth_model": "solid_pec_equivalent", "pth_plating_um": 25},
+  "component_values": {"R1": {"kind": "R", "value": "49.9ohm"}}
+}
+```
+
+To **przykładowe jawne założenia**, nie odczytana/zweryfikowana grubość plating
+ani automatyczna elektryka Device. Port source wymaga dwóch prostokątnych,
+osiowych top SMD padów 1/2; rzeczywista szczelina pochodzi z union miedzi,
+a pełna szerokość i pusty interior przechodzą istniejący audyt. Oblique/custom
+contacts wymagają dalszej implementacji; explicit port pozostaje obsługiwany.
+R/L/C są idealne, wartości z jednostkami podaje `component_values`. Brakujący
+model elektryczny nie jest pomijany w solve. Indeks CSRC nie jest pojemnością.
+Dalsze źródła można jawnie oznaczyć `Solver Role=source`; indeksy muszą być
+unikalne i ciągłe od zera. Canonical zachowuje je, lecz obecny FAST przyjmuje
+jedno wzbudzenie i odrzuca wiele źródeł. RLC/źródła nie są wywodzone z 3D.
+
+PTH solver używa wyłącznie dotychczasowego solid PEC equivalent i jawnego
+plating; NPTH nie jest połączeniem (FAST nadal nie obsługuje NPTH).
+Full-wave/mesh/PML nie zostały zmienione. D3 Arc TL, PCB-015C coupling i D2
+manufacturing reconciliation pozostają OPEN. Gerber nie jest fallbackiem.
 
 ## Reguły projektanta: nadrzędność footprintu PCB i specjalne źródła
 
@@ -63,40 +156,6 @@ gdy nie znaliśmy tej konwencji — poniższa
 starsza obserwacja geometrii pozostaje historycznym
 dowodem, ale nie jest błędem projektowym.
 
-## Kontrakt planowanego importu `.epro` (PCB-015D4, OPEN)
-
-1. Otwórz archiwum jako ZIP z kontrolą integralności, limitami
-   wielkości/dekompresji i bez rozpakowywania ścieżek poza kontrolowany obszar.
-2. Odczytaj `project.json`, jednoznaczny dokument PCB (również
-   mieszany plik z preambułą FOOTPRINT), bibliotekę `*.efoo`
-   i provenance dokumentów. Sprawdź wersję dialektu i jednostki.
-3. Dla komponentu **najpierw** rozwiąż jawny footprint
-   wybrany w PCB; `Device` nie może go nadpisać.
-   Zachowaj numer i lokalny ID PAD, kształt/wymiary,
-   layer, drill, transformację, mapę PAD_NET i net.
-4. Oddziel semantykę źródeł `CSRC/Value=0`
-   (dalsze jawne numery 1, 2, ...) od zwykłych
-   kondensatorów, włącznie z C1. Zaimplementuj
-   weryfikację indeksów wyłącznie w klasie źródeł,
-   nie dowolnych C*. Wzbudzenie i impedancję
-   ustalaj z jawnej konfiguracji modelu.
-5. Przeprowadź audyt fizycznego ownership/net i
-   kontaktów padów, przelotek, ground i tras.
-   Dla unsupported/fatal braków fail-closed.
-   Nie pomijaj łuków i sprzężeń w FAST.
-6. Przy zmianie kodu dodaj regresje dla
-   `spirala.epro` (CSRC R0603/Value=0) oraz
-   `test_psu.epro` (wielopadowe i THT),
-   o ile źródła staną się dostępne jako
-   fixtures; nie dodawaj załączników użytkownika
-   do repo bez nowej instrukcji.
-
-Obecne CLI `--easyeda-source *.epcb` i
-syntetyczny source-only FAST to **historyczny zakres
-D0/D1**. Nie dokumentuj `--easyeda-project`
-ani innej hipotetycznej składni jako działającej
-przed implementacją i testami.
-
 ## Format i jednostki
 
 Obsługiwany profil: JSON arrays per line, DOCTYPE PCB 1.8, editorVersion 2.2.x.
@@ -120,7 +179,7 @@ Ogólna dokumentacja V2 mówi 0.01 inch bez rozróżnienia PCB/schematic. Nie
 przenosimy tego domyślnie na wszystkie rekordy PCB: implementacja importera
 potwierdza rozdzielone skale. Nie jest to EasyEDA Standard ani format Pro V3.
 
-## Zakres checkpointu parsera
+## Zakres parsera pojedynczego .epcb (legacy D0/D1)
 
 DOCTYPE, HEAD, CANVAS, LAYER, LAYER_PHYS, NET, LINE, ARC, VIA, PAD_NET,
 COMPONENT i ATTR. POLY/POUR: niezaokrąglone R (dowolny obrót) i proste kontury
@@ -185,7 +244,12 @@ ukrytego domyślnego limitu; source-only zapisuje `not_requested`. Gerber ZIP/
 katalog nadal działa przez dotychczasowy argument pozycyjny. Full-wave bez zmian.
 
 
-## Sprawdzenie checkpointu 2026-10-21
+## Historyczne sprawdzenia przed D4 — nie bieżący stan
+
+Poniższe audyty dokumentują etap przed dodaniem archiwów i implementacją D4.
+Uwagi o braku archiwów w Git/importera nie opisują już aktualnego kodu.
+
+### Sprawdzenie checkpointu 2026-10-21
 
 11 testów w `test_pcb_easyeda.py` PASS: parser, jednostki, signed sweeps,
 VIA, nietypowy dielektryk, błędy, brak footprintu, source-only FAST z idealnymi

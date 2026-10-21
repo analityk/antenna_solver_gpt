@@ -168,8 +168,8 @@ z jawnymi kontaktami i plating. `--inspect-source` zapisuje neutralny IR oraz
 dostępną fizyczną geometrię bez wymogu portu. Nie ładuje Gerbera. Szczegóły,
 jednostki i ograniczenia w [pcb-easyeda.md](pcb-easyeda.md). Źródłowy ARC
 zachowuje signed sweep i nie staje się TL z długością cięciwy. Dotychczasowe
-Gerber-only i synthetic pozostają kompatybilne. Zewnętrzne COMPONENT footprinty
-nie są obecnie instancjonowane; missing geometry ma jawny diagnostic.
+Gerber-only i synthetic pozostają kompatybilne. Samodzielne .epcb nadal nie instancjonuje zewnętrznych bibliotek.
+Pełne projekty korzystają z poniższej ścieżki D4.
 
 ## Nowy kierunek importu PCB — `.epro` jako geometryczny source (decyzja użytkownika)
 
@@ -183,7 +183,13 @@ mają wartości zwiększane o 1; `C1` i inne zwykłe kondensatory nie są
 źródłami. Fizyczne wzbudzenie musi pozostać jawne; nazwa footprintu
 ani Device nie zastępują konfiguracji źródła.
 
-To jest **wymaganie D4, jeszcze nie działające CLI/FAST**. D0/D1 z pojedynczego
-`.epcb` nadal istnieje; po D4 konieczne są Arc TL i pairwise coupling,
-z fail-closed do czasu weryfikacji. Pełny kontrakt i zadania:
+**D4 zaimplementowane w ograniczonym profilu**: `--easyeda-project PATH`
+(zamiast argumentu Gerber / `--easyeda-source`), opcjonalnie `--source-pcb-id`.
+`--inspect-source` wykonuje canonical pad/net/contact audit bez solve.
+Rzeczywista spirala.epro przechodzi canonical; istniejący guard Arc TL nadal
+zatrzymuje FAST. Nie powstał wynik Z/S11 serpentyny. PSU ma potwierdzone
+291/906 referencji, ale fizyczny importer odmawia na pustym NET i ma dalsze
+ograniczenia bibliotek/geometrii. D0/D1 .epcb i Gerber pozostają kompatybilne.
+`--source-config` jawnie wybiera source_index, plating i idealne wartości RLC;
+nie są dopowiadane z Device. Arc TL i pairwise coupling pozostają OPEN. Pełny kontrakt i zadania:
 [pcb-easyeda.md](pcb-easyeda.md), [todo.md](../todo.md).

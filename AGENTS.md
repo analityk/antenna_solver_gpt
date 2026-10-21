@@ -65,10 +65,11 @@ wpisów i sięgaj do wcześniejszych decyzji, gdy są istotne.
   przed zwykłą wartością bibliotecznego kondensatora.
   Parametry i wzbudzenie solvera nie mogą być dopowiadane
   z modelu 3D, wartości nominalnej Device ani z Gerbera.
-- Nie deklaruj, że importer `.epro` już działa: na checkpointcie
-  2026-10-21 jest dopiero **wymaganiem**. Po nim pozostają
-  Arc TL i fizyczny model sprzężenia. Kryteria i status
-  w `todo.md`, techniczny kontrakt w `docs/pcb-easyeda.md`.
+- Importer `.epro` D4 działa tylko w zadeklarowanym podzbiorze:
+  canonical serpentyny jest sprawdzony, cały PSU nie. Nie utożsamiaj
+  mapowania footprintów z poprawną geometrią lub wynikiem FAST.
+  Arc TL i fizyczny model sprzężenia pozostają otwarte. Aktualny
+  zakres/status: `todo.md`, `migracja.md`, `docs/pcb-easyeda.md`.
 
 ## Cel i stan pracy
 
