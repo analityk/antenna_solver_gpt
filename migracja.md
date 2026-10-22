@@ -133,6 +133,26 @@ utworzeniem. W nagłówku zapisuj SHA ostatniego *już potwierdzonego*
 commita bazowego, a opublikowany SHA nowego commita podawaj po publikacji
 w raporcie końcowym. Nowy czat zawsze sam sprawdza HEAD.
 
+## Nowy checkpoint — Windows PCB GUI (2026-10-23)
+
+Na bazie narzędzi PCB dodano `src/antenna_lab/pcb/gui.py` (Tkinter),
+czysty moduł `gui_commands.py`, Windows `PCB_GUI.bat`, celowane testy
+bez natywnego solvera i `docs/pcb-gui.md`. GUI prowadzi przez wybór
+lokalnego `.epro`, inspect-source (bez rozwiązywania FAST), przygotowanie,
+pełny FDTD i późniejszy raport. W formularzu są wszystkie częstotliwości,
+profil, geometry-resolution, PTH, opcjonalna source-config, override
+solverów, faza 15/30°, kadrowanie pola. Stan zadań wyświetla się w
+logu na żywo. Każdy etap działa jako osobny subprocess, nie wymaga
+drugiego solvera. `--yes` uruchamia FDTD dopiero po pytaniu w GUI.
+Wyniki `<stem>_NNN`, brak nadpisywania i brak fałszywego completed.
+
+Nowe GUI uruchom: `PCB_GUI.bat` z głównego katalogu repozytorium lub
+`\.venv\Scripts\python.exe -m antenna_lab.pcb.gui`. Nie wykonano
+natywnego uruchomienia GUI pod Windows w środowisku asystenta ani FDTD;
+testy komend: `python -m unittest discover -s tests -p test_pcb_gui_commands.py -v`.
+Pierwszy test odbiorczy użytkownika to otwarcie GUI i inspekcja lokalnego
+`gerbs/dif4001/dif4001.epro`, potem PREPARE-ONLY.
+
 ## Nowy checkpoint — automatyczna konfiguracja źródła EasyEDA
 
 Dla pełnego `.epro` kontroler PCB potrafi bez `--source-config` zbudować
