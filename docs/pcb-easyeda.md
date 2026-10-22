@@ -524,3 +524,7 @@ nie wymaga ponownego importu .epro ani FDTD. Błąd statystyk nie blokuje
 odczytu portu; status zakończenia czasowego pozostaje wtedy niepotwierdzony.
 Pola i raport mają oddzielne statusy. Legacy bez wymaganych artefaktów jest
 odrzucany z listą braków — nie odtwarzamy parametrów z bieżącego profilu.
+
+Raporty pól z .epro korzystają ze wspólnego ROI PCB: domyślnie active+geometry,
+−40 dB, margines 1 mm. Nowy kadr można otrzymać poleceniem `report` na zapisanych
+wynikach, bez ponownego importu ani FDTD. Kontrakt i opcje: [fields.md](fields.md).

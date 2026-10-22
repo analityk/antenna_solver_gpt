@@ -1,10 +1,10 @@
 # TODO — PCB: aktualny stan i następne kroki
 
-**Bieżące zadanie:** wspólny postprocessing PCB bez ponownego FDTD.
-Wspólny kontrakt i małe regresje PASS; opis `docs/pcb-postprocess.md`.
-Priorytet: lokalny odbiór danych Windows, bez ponownego FDTD.
-Legacy bez jawnych ustawień/pełnej siatki/specyfikacji portu pozostaje fail-closed.
-FAST/coupling oraz PSU poza zakresem. Poniższy opis mostu jest historyczny.
+**Bieżące zadanie:** ROI pól PCB we wspólnej warstwie raportowania.
+Implementacja active+geometry / −40 dB / 1 mm; 8 testów algorytmu PASS,
+przed odbiorem CLI i małych regresji. Kontrakt: docs/fields.md.
+Bez FDTD, PSU i FAST/coupling. Postprocessing pozostaje wspólny i nie zmienia
+surowych danych. Następny lokalny krok: nowy raport z zapisanych NPZ Windows.
 
 Stan na 2026-10-22. **Decyzja użytkownika: podstawowym wejściem geometrii
 PCB jest kompletny projekt EasyEDA Pro V2 `.epro`** (ZIP z `project.json`,

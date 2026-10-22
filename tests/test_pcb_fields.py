@@ -193,13 +193,15 @@ class PcbFieldTests(unittest.TestCase):
         metadata=result['fields'];p=metadata['planes'][0]
         data=load_plane(out/'fields/xy_air.npz',p,metadata['frequency_hz']);snapshot=data['E_v_per_m'].copy()
         view=view_fields(data,p,0);paths=overlays(self.g.as_dict(),p)
-        fig=pcb_phase_figure(view,paths,p)
+        from antenna_lab.visualization.field_roi import field_roi,FieldCrop
+        roi=field_roi(view,paths,FieldCrop(mode="board"))
+        fig=pcb_phase_figure(view,paths,p,roi=roi)
         norms=[a.collections[0].norm for a in fig.axes[:8]]
         self.assertIs(norms[0],norms[2]);self.assertIs(norms[0],norms[6])
         self.assertEqual(norms[0].vmin,-norms[0].vmax)
-        payload=viewer_payload(view,paths,list(range(0,360,30)))
+        payload=viewer_payload(view,paths,list(range(0,360,30)),roi=roi)
         self.assertEqual(payload['phases'],list(range(0,360,30)))
-        self.assertEqual(payload['display_extent'],'fit_pcb_6_percent_margin')
+        self.assertEqual(payload['display_extent'],'board')
         self.assertGreater(payload['u'][0],view['u'][0]);self.assertLess(payload['u'][-1],view['u'][-1])
         self.assertGreater(payload['v'][0],view['v'][0]);self.assertLess(payload['v'][-1],view['v'][-1])
         board=np.asarray(paths[0]['points'])

@@ -53,3 +53,11 @@ W `stages` są osobne engine/temporal_completion/port/fields/report. Przy błęd
 pola zapisują się tylko kompletne NPZ poprawnych przekrojów; metadata wskazuje
 failed_planes. Brakujące przekroje nie są zastępowane zerami. Błędy zwracają
 niezerowy kod CLI; odczyt poprawnych sond przy braku stats pozostaje możliwy.
+
+## Kadrowanie pól
+
+`pcb.postprocess` przyjmuje te same opcje ROI co `report`:
+`--field-view`, `--field-crop-threshold-db`, `--field-crop-margin-mm`.
+Domyślnie active+geometry / −40 dB / 1 mm. Są przekazywane wyłącznie do
+renderera; nie zmieniają odzyskiwania fazorów ani danych wyniku.
+Pełny kontrakt i fallbacki: [fields.md](fields.md#roi-raportów-pcb--bez-nowych-obliczeń).

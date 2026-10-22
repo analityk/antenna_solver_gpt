@@ -8,7 +8,7 @@
 **Repozytorium:** `analityk/antenna_solver_gpt`  
 **Docelowa gałąź:** `main` (chyba że użytkownik jawnie wskaże inną)  
 **Ostatnia inspekcja dokumentów:** 2026-10-22, Europe/Warsaw
-**Potwierdzony opublikowany checkpoint przed aktualizacją:** `be850d9aa68b5d421ff504002811e8f0a0a216a8`
+**Potwierdzony opublikowany checkpoint przed aktualizacją:** `f1c7a5a268e370afcac2bbbe054a68efdb6d5851`
 **Uwaga:** ten SHA jest punktem historycznym, nie obietnicą, że nadal jest HEAD. Każde wznowienie rozpoczyna się sprawdzeniem Git.
 
 ## 1. Instrukcja dla nowego czatu — wykonaj po wskazaniu tego pliku
@@ -133,45 +133,34 @@ utworzeniem. W nagłówku zapisuj SHA ostatniego *już potwierdzonego*
 commita bazowego, a opublikowany SHA nowego commita podawaj po publikacji
 w raporcie końcowym. Nowy czat zawsze sam sprawdza HEAD.
 
-## 4. Bieżący punkt wznowienia — ogólny postprocessing PCB
+## 4. Bieżący punkt wznowienia — ROI wizualizacji pól PCB
 
-Baza abc0707e9ea8ef21013ed16c7c8704d320f6f567. Aktualne zadanie:
-odseparować wykonanie od analizy istniejących sond/HDF5 dla EasyEDA i Gerber.
-Nie rozwijać FAST, PSU, fizyki ani meshera. Nie uruchamiać FDTD.
-
-Opublikowany checkpoint 6731e3324d581ddf334c164de4c9867363249b0a:
-pcb-run.json przed Run, execution.json,
-shared process_results, CLI pcb.postprocess, niezależne statusy i osobne
-rewizje odzyskanych wyników. Szczegóły: docs/pcb-postprocess.md.
+Baza f1c7a5a268e370afcac2bbbe054a68efdb6d5851. Implementacja w
+visualization/field_roi.py i pcb_fields.py. Ta sama warstwa raportów dla
+EasyEDA/Gerber, bez zmian solvera. Domyślnie active+geometry / −40 dB / 1 mm.
+Pełna specyfikacja: docs/fields.md. Dane NPZ/HDF5 nie są modyfikowane.
 
 ## 5. DONE / PARTIAL / OPEN
 
-DONE bez native: wspólny normal/recovery postprocessing, pełny zapis przed Run,
-bezpieczne osobne rewizje, odrębne statusy i raport offline.
-12 testów postprocessingu + 3 kontrolerów EasyEDA/synthetic + 1 Gerber PASS.
-Po publikacji be850d9: dodatkowo
-test_pcb_gerber_quality.GerberQualityTests.test_timestep_limit_is_unconfirmed_even_with_processed_impedance
-PASS (preview/design/verify, wyłącznie fake native). Łącznie 17 różnych testów.
-Pola odtwarzają się z zapisanych HDF5, normalizacja bez zmian, cache NPZ
-walidowany istniejącym loaderem; każdy przekrój może mieć osobny błąd.
-Legacy wymaga jawnej kompletnej specyfikacji, inaczej precyzyjny brak danych.
-Realnych surowych wyników Windows nie ma tutaj; nie twierdzić, że odzyskano
-raport użytkownika. Wymagana kontrola natywnego CalcPort na jego środowisku.
+DONE implementacja ROI: maksimum po całym okresie z fazorów, oddzielne
+względne progi E/H, suma fizycznej geometrii i aktywności, fallback, stałe
+limity PNG/HTML dla wszystkich faz. Domain pokazuje pełny zapisany przekrój.
+Nie rozszerzać ROI samą szarą maską halo lub obrysem PCB.
+8 celowanych testów algorytmu PASS. Test CLI i małe regresje jeszcze niewykonane.
+Realne dane pól spirali niedostępne; dwa zrzuty obejrzano, nie są testem NPZ.
+Poprzedni postprocessing: 17 testów historycznych PASS, native Windows nadal
+wymaga lokalnego odbioru; brakujące legacy artefakty nie są zgadywane.
 
 ## 6. Następne sprawdzenie
 
 ```cmd
-.\.venv\Scripts\python.exe -X utf8 -m unittest discover -s tests -p test_pcb_postprocess.py -v
+.\.venv\Scripts\python.exe -m antenna_lab report "<katalog_wynikow>" --field-view active+geometry --field-crop-threshold-db -40 --field-crop-margin-mm 1 --open
 ```
 
-Wykonano test_pcb_postprocess (12 testów), dwa wybrane testy
-test_pcb_easyeda_control, test_pcb_control.ControlTests.test_high_level_prepares_once_and_retains_native
-i test_pcb_gerber.GerberTests.test_single_run_pipeline_native_fakes_normal_policy_and_output.
-Pierwsza próba granic: 3 błędy starych atrap z port_spec=None, po poprawce PASS.
-Nie uruchamiać pełnej suite,
-FDTD, benchmarków, PSU ani coupling. Następny krok: lokalna weryfikacja CLI na kopii wyników Windows i ustalenie
-kompletności starszego przebiegu. Nie uruchamiać ponownie FDTD. CLI:
-`python -m antenna_lab.pcb.postprocess --run-dir <katalog>`.
+Testy ukierunkowane: test_pcb_field_roi. Nie wykonywać FDTD, pełnej suite,
+PSU ani FAST. Uzupełnić wynik małej regresji CLI/raportu i opublikować.
+Opcje ROI działają także w pcb.postprocess; tylko prezentacja, bez wpływu na
+CalcPort, normalizację pól, maskowanie i częstotliwości.
 
 ## 7. Dokumenty, decyzje i ograniczenia wymagające zachowania
 

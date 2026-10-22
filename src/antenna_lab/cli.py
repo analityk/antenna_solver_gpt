@@ -40,6 +40,8 @@ def parser():
     report.add_argument("--start-mhz", type=float, help="Opcjonalny początek widma z surowych sond portu")
     report.add_argument("--stop-mhz", type=float, help="Opcjonalny koniec widma z surowych sond portu")
     report.add_argument("--step-mhz", type=float, help="Krok widma; wymaga obu granic i zapisanych sond")
+    from antenna_lab.visualization.field_roi import add_crop_arguments
+    add_crop_arguments(report)
     report.add_argument("--phase-step", type=int, choices=[15, 30], help="Diagramy E/H od 0 do 180° co 15 lub 30°; bez FDTD")
     report.add_argument("--field-components", nargs=2, choices=list("xyz"), metavar=("E", "H"),
                         help="Składowe diagramów, np. x z; domyślnie zależne od przekroju")
@@ -169,7 +171,8 @@ def _report(args):
             print("Uwaga: geometria i częstotliwości są zgodne, ale ustawienia symulacji lub solvera różnią się. "
                   "Raport pokazuje zapisany przebieg, nie przelicza nowych ustawień.", flush=True)
     print(f"Odczyt zapisanych wyników: {run_path}", flush=True)
-    path = generate_report(run_path, args.output, start_mhz=args.start_mhz,
+    from antenna_lab.visualization.field_roi import crop_arguments
+    path = generate_report(run_path, args.output, **crop_arguments(args), start_mhz=args.start_mhz,
                            stop_mhz=args.stop_mhz, step_mhz=args.step_mhz, variant_name=variant_name,
                            phase_step=args.phase_step,
                            field_components=tuple("xyz".index(a) for a in args.field_components) if args.field_components else None)

@@ -220,10 +220,10 @@ def process_results(manifest, native, output, *, port=None, execution=None):
     return result
 
 
-def render_report(output, result, *, phase_step=None):
+def render_report(output, result, *, phase_step=None, report_options=None):
     try:
         from antenna_lab.visualization.report import generate_report
-        path = generate_report(output, automatic=True, **({'phase_step':phase_step} if phase_step else {}))
+        path = generate_report(output, automatic=True, **({'phase_step':phase_step} if phase_step else {}), **(report_options or {}))
         result['stages']['report'] = {'status':'generated', 'path':str(path)}
         print(f'Raport HTML: {path}')
     except Exception as exc:
@@ -235,7 +235,7 @@ def render_report(output, result, *, phase_step=None):
         print(f'Report status could not be saved: {exc}; prior result artifacts preserved.')
 
 
-def recover_run(run_dir, *, render=True, reuse=True):
+def recover_run(run_dir, *, render=True, reuse=True, report_options=None):
     """Read original artifacts; write isolated revision. Never overwrite originals."""
     from .output import allocate_output_dir
     root = Path(run_dir).resolve()
@@ -264,7 +264,7 @@ def recover_run(run_dir, *, render=True, reuse=True):
                 if (root/name).is_file(): shutil.copy2(root/name, destination/name)
             if field_meta.is_file(): shutil.copytree(root/'fields', destination/'fields')
             summary.setdefault('stages', {})['postprocess']={'status':'reused', 'source':str(root)}
-            if render: render_report(destination, summary)
+            if render: render_report(destination, summary, report_options=report_options)
             else: write_json(destination/'summary.json', summary)
             return destination, summary
     manifest, native = load_preparation(root)
@@ -275,7 +275,7 @@ def recover_run(run_dir, *, render=True, reuse=True):
     execution = read_json(root/'execution.json') if (root/'execution.json').is_file() else None
     result = process_results(manifest, native, destination, execution=execution)
     result['recovery_source'] = str(root)
-    if render: render_report(destination, result)
+    if render: render_report(destination, result, report_options=report_options)
     else: write_json(destination/'summary.json', result)
     return destination, result
 
@@ -284,9 +284,12 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description='PCB offline postprocessing; never runs FDTD')
     parser.add_argument('--run-dir', type=Path, required=True)
     parser.add_argument('--recompute', action='store_true', help='Re-read raw probes/fields instead of reusing processed files')
+    from antenna_lab.visualization.field_roi import add_crop_arguments, crop_arguments, FieldCrop
+    add_crop_arguments(parser)
     args = parser.parse_args(argv)
     try:
-        output, result = recover_run(args.run_dir, reuse=not args.recompute)
+        FieldCrop(args.field_view,args.field_crop_threshold_db,args.field_crop_margin_mm)
+        output, result = recover_run(args.run_dir, reuse=not args.recompute, report_options=crop_arguments(args))
         print(f'Postprocessing: {output}\nStatus: {result["status"]}')
         print(json.dumps(result.get('stages', {}), indent=2))
         return int(any(v.get('status') in ('failed','blocked','partial') for v in result.get('stages', {}).values()))

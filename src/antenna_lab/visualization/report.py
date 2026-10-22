@@ -378,7 +378,7 @@ def _pcb_metadata(data):
     return '<section class="panel"><h2>Przebieg PCB i założenia</h2>'+body+'</section>'
 
 
-def render_html(data, *, plots_path=None, phase_step=None, field_components=None):
+def render_html(data, *, plots_path=None, phase_step=None, field_components=None, field_crop=None):
     from .fields import field_section
     spectrum, reference = data["spectrum"], data["reference"]
     pcb = data.get("is_pcb", False)
@@ -402,11 +402,11 @@ def render_html(data, *, plots_path=None, phase_step=None, field_components=None
         from .pcb_components import component_section
         extra_sections = geometry + stackup_section(data, plots_path, figure_image, table) + drill_section(data["geometry"],table, data["summary"].get("geometry_resolution")) + component_section(data,table) + _pcb_metadata(data)
         if (data["root"] / "fields" / "metadata.json").exists():
-            extra_sections += field_section(data, figure_image, plots_path, phase_step, field_components)
+            extra_sections += field_section(data, figure_image, plots_path, phase_step, field_components, field_crop=field_crop)
         zeros = _pcb_diagnostics(data)
     else:
         extra_sections = (_power_section(data) + _far_field(data, plots_path / 'pattern_cuts.png' if plots_path else None)
-                          + field_section(data, figure_image, plots_path, phase_step, field_components) + geometry + _metadata(data))
+                          + field_section(data, figure_image, plots_path, phase_step, field_components, field_crop=field_crop) + geometry + _metadata(data))
         zeros = _zeros(spectrum)
     note = escape(data["summary"].get("note", "Wynik roboczy; wymagana kontrola modelu i zbieżności."))
     points = len(spectrum["r"])
@@ -444,7 +444,10 @@ Odczyt i interpretacja według jawnych reguł; bez AI, usług sieciowych i ponow
 
 
 def generate_report(run_path, output=None, *, automatic=False, start_mhz=None, stop_mhz=None, step_mhz=None,
-                    variant_name=None, phase_step=None, field_components=None):
+                    variant_name=None, phase_step=None, field_components=None,
+                    field_view='active+geometry', field_crop_threshold_db=-40., field_crop_margin_mm=1.):
+    from .field_roi import FieldCrop
+    crop=FieldCrop(field_view,field_crop_threshold_db,field_crop_margin_mm)
     if phase_step not in (None, 15, 30):
         raise ValueError("Krok fazy musi wynosić 15 lub 30 stopni.")
     if field_components is not None and (len(field_components) != 2 or any(c not in (0, 1, 2) for c in field_components)):
@@ -472,7 +475,7 @@ def generate_report(run_path, output=None, *, automatic=False, start_mhz=None, s
     if automatic and not data.get("is_pcb") and data["manifest"].get("status") != "running":
         raise ValueError("Raport automatyczny wolno zapisać tylko przed zamknięciem nowego przebiegu.")
     html = render_html(data, plots_path=root / "plots" if automatic else None,
-                       phase_step=phase_step, field_components=field_components)
+                       phase_step=phase_step, field_components=field_components,field_crop=crop)
     output.parent.mkdir(parents=True, exist_ok=True)
     with output.open("x", encoding="utf-8") as stream:
         stream.write(html)

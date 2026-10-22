@@ -2445,3 +2445,17 @@ PASS: preview/design/verify zachowują diagnostyczny CSV po limicie, status
 finished_unverified / max_timesteps_reached, nigdy completed. Tylko atrapy
 silnika. Łącznie 17 różnych celowanych testów PASS; bez pełnej suite/FDTD.
 Kontrola Git: zdalne drzewo identyczne lokalnemu, bez zmian danych użytkownika.
+
+## 2026-10-22 — wspólny ROI wizualizacji pól PCB
+
+Warstwa raportu zastępuje stare XY board+6% / pionowe full-domain wspólnym
+ROI dla E/H i wszystkich faz, osobnym dla planszy/częstotliwości. Analityczne
+maksimum po fazie (wektor E, składowa H), niezależne względne progi, fizyczne
+nakładki geometrii, margines i bezpieczny fallback. Domyślnie active+geometry,
+−40 dB, 1 mm; domain i board pozostają dostępne. CLI report/postprocess.
+Rozległe halo interpolacji nie jest utożsamiane z miedzią. PNG/HTML mają
+identyczne granice, browser clip zapobiega rysowaniu nakładek poza kadrem.
+Bez zmian fizyki, siatki, normalizacji, źródeł, NPZ/HDF5 i istniejących wyników.
+8 małych testów ROI PASS; test CLI oraz regresje raportu jeszcze przed nami.
+Brak rzeczywistych NPZ spirali — obejrzano dwa załączone zrzuty, nie deklarować
+natywnego odbioru. Nie uruchomiono FDTD, PSU ani pełnej suite.

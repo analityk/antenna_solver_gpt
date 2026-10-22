@@ -106,3 +106,45 @@ API sprawdzono w przypiętych źródłach CSXCAD/openEMS, opisanych w
 [sources.md](sources.md). Sprawdzenia syntetycznymi danymi obejmują znak
 i referencję fazy, proporcje fali płaskiej, maskowanie, zapis/odczyt, skale
 diagramów i niezmienność źródeł przy raportowaniu; nie są symulacją anteny.
+
+## ROI raportów PCB — bez nowych obliczeń
+
+Wspólna warstwa EasyEDA/Gerber wyznacza prostokątny ROI osobno dla każdej
+częstotliwości i planszy xy_air/xz_feed/yz_feed. Ten sam kadr obowiązuje w
+obu panelach E/H, wszystkich fazach oraz PNG i odtwarzaczu HTML.
+
+Opcje komend `report` i `pcb.postprocess`:
+
+- `--field-view active+geometry` (domyślnie): suma obszaru aktywnego pola
+  i fizycznej geometrii widocznej w przekroju/projekcji.
+- `--field-view active`: tylko aktywność; przy braku aktywności fallback
+  do geometrii, potem obrysu PCB, następnie całego zapisanego przekroju.
+- `--field-view board`: obrys PCB i laminatu z marginesem.
+- `--field-view domain`: pełny dostępny przekrój; nie odzyskuje niezapisanych
+  próbek PML ani pełnej domeny 3D.
+- `--field-crop-threshold-db -40`: względny próg amplitudy (20 log10),
+  skończony i <=0, osobno względem maksimum E i H, bez porównywania V/m z A/m.
+- `--field-crop-margin-mm 1`: nieujemny margines, ograniczony zakresem danych.
+
+Aktywność to maksimum po całym okresie RF: analityczne maksimum normy
+chwilowego wektora E w płaszczyźnie i moduł fazora wyświetlanej składowej H.
+Obliczenie z zapisanych zespolonych fazorów obejmuje wszystkie fazy, również
+pomiędzy klatkami 15/30°. NaN/maski nie są traktowane jak aktywne pola.
+Geometrię określają istniejące nakładki fizycznej miedzi, portu, elementów
+oraz wierceń. Sam obrys płytki i rozległe halo interpolacji nie rozszerzają
+trybu active+geometry; halo nie jest maską rzeczywistej zajętości metalu.
+W XY używana jest widoczna warstwa top, bez projekcji całej buried ground.
+
+ROI zaokrągla granice na zewnątrz do istniejących próbek. Subsampling dla
+przeglądarki odbywa się dopiero potem. Widok zapisuje tryb, powód fallbacku,
+próg, margines i granice w HTML/payload. Skale kolorów pozostają stałe przez
+fazę. Nie zmieniamy NPZ/HDF5, geometrii, mesh, normalizacji ani FDTD.
+
+Ograniczenia: rozległe aktywne pole lub rzeczywista rozległa miedź mogą wymagać
+pełnego kadru. Próg nie jest estymacją szumu ani certyfikatem istotności EM.
+Brak danych w masce nie jest interpolowany. Zrzuty ekranu nie zastępują NPZ
+w rzeczywistej regresji raportowej.
+
+```cmd
+.\.venv\Scripts\python.exe -m antenna_lab report "<katalog_wynikow>" --field-view active+geometry --field-crop-threshold-db -40 --field-crop-margin-mm 1 --open
+```

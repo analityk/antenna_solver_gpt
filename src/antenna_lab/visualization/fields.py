@@ -141,7 +141,7 @@ def phase_figure(data, plane, geometry, phases, index=0, components=None):
     return fig
 
 
-def field_section(data, figure_image, plots_path=None, phase_step=None, components=None):
+def field_section(data, figure_image, plots_path=None, phase_step=None, components=None, *, field_crop=None):
     root = data["root"]
     metadata_path = root / "fields" / "metadata.json"
     title = '<section class="panel"><h2>Pola E/H w kolejnych fazach</h2>'
@@ -152,7 +152,7 @@ def field_section(data, figure_image, plots_path=None, phase_step=None, componen
         raise ValueError("Nieobsługiwana wersja metadanych E/H.")
     if metadata.get('model') == 'pcb':
         from .pcb_fields import pcb_field_section
-        return pcb_field_section(data, metadata, figure_image, plots_path, phase_step)
+        return pcb_field_section(data, metadata, figure_image, plots_path, phase_step, **({"crop":field_crop} if field_crop else {}))
     geometry = json.loads((root / "geometry.json").read_text(encoding="utf-8"))
     phases = (list(range(0, 181, phase_step)) if phase_step else
               data["config"].get("requested_outputs", {}).get("phase_degrees", list(range(0, 181, 30))))
