@@ -8,7 +8,7 @@
 **Repozytorium:** `analityk/antenna_solver_gpt`  
 **Docelowa gałąź:** `main` (chyba że użytkownik jawnie wskaże inną)  
 **Ostatnia inspekcja dokumentów:** 2026-10-22, Europe/Warsaw
-**Potwierdzony opublikowany checkpoint przed aktualizacją:** `6731e3324d581ddf334c164de4c9867363249b0a`
+**Potwierdzony opublikowany checkpoint przed aktualizacją:** `be850d9aa68b5d421ff504002811e8f0a0a216a8`
 **Uwaga:** ten SHA jest punktem historycznym, nie obietnicą, że nadal jest HEAD. Każde wznowienie rozpoczyna się sprawdzeniem Git.
 
 ## 1. Instrukcja dla nowego czatu — wykonaj po wskazaniu tego pliku
@@ -149,6 +149,9 @@ rewizje odzyskanych wyników. Szczegóły: docs/pcb-postprocess.md.
 DONE bez native: wspólny normal/recovery postprocessing, pełny zapis przed Run,
 bezpieczne osobne rewizje, odrębne statusy i raport offline.
 12 testów postprocessingu + 3 kontrolerów EasyEDA/synthetic + 1 Gerber PASS.
+Po publikacji be850d9: dodatkowo
+test_pcb_gerber_quality.GerberQualityTests.test_timestep_limit_is_unconfirmed_even_with_processed_impedance
+PASS (preview/design/verify, wyłącznie fake native). Łącznie 17 różnych testów.
 Pola odtwarzają się z zapisanych HDF5, normalizacja bez zmian, cache NPZ
 walidowany istniejącym loaderem; każdy przekrój może mieć osobny błąd.
 Legacy wymaga jawnej kompletnej specyfikacji, inaczej precyzyjny brak danych.

@@ -2434,3 +2434,14 @@ przerwania przed CalcPort przy limicie kroków dostosowano do nowego kontraktu:
 odczyt diagnostyczny dozwolony, zakończenie niepotwierdzone.
 Nie uruchomiono FDTD, PSU, FAST/coupling, pełnej suite ani benchmarków.
 Brak rzeczywistych danych Windows; nie potwierdzamy odzyskania tego przebiegu.
+
+
+### 2026-10-22 — potwierdzenie limitu kroków po publikacji
+
+be850d9aa68b5d421ff504002811e8f0a0a216a8 opublikowany na origin/main.
+Dodatkowy pojedynczy test
+`test_pcb_gerber_quality.GerberQualityTests.test_timestep_limit_is_unconfirmed_even_with_processed_impedance`
+PASS: preview/design/verify zachowują diagnostyczny CSV po limicie, status
+finished_unverified / max_timesteps_reached, nigdy completed. Tylko atrapy
+silnika. Łącznie 17 różnych celowanych testów PASS; bez pełnej suite/FDTD.
+Kontrola Git: zdalne drzewo identyczne lokalnemu, bez zmian danych użytkownika.
