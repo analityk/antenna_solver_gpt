@@ -39,6 +39,10 @@ def _fields(text):
 def command_for(action, values, *, interpreter=None):
     """No shell, no external process. Validate form and emit native CLI argv."""
     python = str(interpreter or sys.executable)
+    # The double-click launcher uses pythonw.exe (no console); child CLI
+    # MUST use python.exe so its native solver stdout/stderr reaches our log.
+    if Path(python).name.lower() == 'pythonw.exe':
+        python = str(Path(python).with_name('python.exe'))
     action = str(action)
     if action == 'report':
         run_dir = str(values.get('run_dir', '')).strip()
