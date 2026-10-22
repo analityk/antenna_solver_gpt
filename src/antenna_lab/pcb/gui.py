@@ -16,7 +16,7 @@ import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, scrolledtext, ttk
 
-from .gui_commands import cmd_display, command_for, is_matching_preparation
+from .gui_commands import cmd_display, command_for, is_matching_preparation, suggest_excitation
 
 ROOT = Path(__file__).resolve().parents[3]
 PREFS = Path.home() / '.antenna_lab_pcb_gui.json'
@@ -157,11 +157,29 @@ class PcbDesktop(tk.Tk):
         self._field(frame, 'Sweep od', 'start_mhz', 0, 1, help_text='MHz')
         self._field(frame, 'Sweep do', 'stop_mhz', 1, 1, help_text='MHz')
         self._field(frame, 'Krok sweep', 'step_mhz', 2, help_text='MHz')
+        self.match_button = ttk.Button(
+            frame, text='Dopasuj pobudzenie do sweep', command=self._match_excitation)
+        self.match_button.grid(row=2, column=3, columnspan=3, sticky='w', pady=5)
+
         ttk.Checkbutton(frame, text='Zapisz pola E i H', variable=self.var['fields_enabled']).grid(
             row=3, column=0, columnspan=2, sticky='w', pady=5)
         self._field(frame, 'Pola przy', 'fields_mhz', 3, 1, width=20, help_text='MHz, np. 1000 2000')
-        ttk.Label(frame, text='Zakres i częstotliwości dobierasz do projektu; GUI ich nie odczytuje ani nie zgaduje z nazwy pliku.',
+        ttk.Label(frame, text='Zakres i częstotliwości dobierasz do projektu. Użyteczny zakres pobudzenia to środek ± 0,8 × odcięcie.',
                   foreground='#666').grid(row=4, column=0, columnspan=6, sticky='w', pady=(4, 0))
+
+    def _match_excitation(self):
+        if self._busy:
+            return
+        try:
+            center, cutoff = suggest_excitation(
+                self.var['start_mhz'].get(), self.var['stop_mhz'].get())
+        except ValueError as exc:
+            messagebox.showerror('Niepoprawny zakres sweep', str(exc), parent=self)
+            return
+        self.var['center_mhz'].set(f'{center:g}')
+        self.var['cutoff_mhz'].set(f'{cutoff:g}')
+        self.status.set(f'Dopasowano pobudzenie: środek {center:g} MHz, '
+                        f'odcięcie {cutoff:g} MHz. Sprawdź ustawienia przed FDTD.')
 
     def _tab_solver(self, frame):
         ttk.Label(frame, text='Profil openEMS').grid(row=0, column=0, sticky='w', padx=(0, 8), pady=5)
@@ -274,6 +292,7 @@ class PcbDesktop(tk.Tk):
             button.configure(state='disabled' if busy else 'normal')
         self.stop_button.configure(state='normal' if busy else 'disabled')
         self.browse_project.configure(state='disabled' if busy else 'normal')
+        self.match_button.configure(state='disabled' if busy else 'normal')
 
     def _start(self, stage):
         if self._busy:
