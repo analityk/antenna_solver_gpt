@@ -2459,3 +2459,17 @@ Bez zmian fizyki, siatki, normalizacji, źródeł, NPZ/HDF5 i istniejących wyni
 8 małych testów ROI PASS; test CLI oraz regresje raportu jeszcze przed nami.
 Brak rzeczywistych NPZ spirali — obejrzano dwa załączone zrzuty, nie deklarować
 natywnego odbioru. Nie uruchomiono FDTD, PSU ani pełnej suite.
+
+### 2026-10-22 — odbiór ROI po publikacji checkpointu
+
+Opublikowano 8bef03fc42ac774e6051a5325ccb3ce7832cf83d.
+9 testów test_pcb_field_roi PASS (algorytm, wszystkie plansze, wspólne
+PNG/HTML/E/H/fazy, fallback i oba CLI). Pojedynczy test
+ReportTests.test_report_is_offline_escaped_and_does_not_touch_sources PASS.
+Wybrana regresja PcbFieldTests.test_fixed_scales_display_only_subsampling_and_strict_loader
+zatrzymuje się w setUp na istniejącym audycie copper fidelity, przed ROI.
+Uruchomiono również sam ten test z bazowego f1c7a5a: identyczny błąd
+inner=(2,0), modeled=(1,0) na niezmienionym mesherze. Nie zmieniano
+fizyki ani audytu tylko po to, żeby zaliczyć regresję wizualizacji.
+Nie uruchomiono pełnej suite, native FDTD ani PSU. Odbiór rzeczywistych
+NPZ Windows pozostaje lokalny; screenshot nie zastępuje takiego sprawdzenia.

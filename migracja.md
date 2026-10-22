@@ -8,7 +8,7 @@
 **Repozytorium:** `analityk/antenna_solver_gpt`  
 **Docelowa gałąź:** `main` (chyba że użytkownik jawnie wskaże inną)  
 **Ostatnia inspekcja dokumentów:** 2026-10-22, Europe/Warsaw
-**Potwierdzony opublikowany checkpoint przed aktualizacją:** `f1c7a5a268e370afcac2bbbe054a68efdb6d5851`
+**Potwierdzony opublikowany checkpoint przed aktualizacją:** `8bef03fc42ac774e6051a5325ccb3ce7832cf83d`
 **Uwaga:** ten SHA jest punktem historycznym, nie obietnicą, że nadal jest HEAD. Każde wznowienie rozpoczyna się sprawdzeniem Git.
 
 ## 1. Instrukcja dla nowego czatu — wykonaj po wskazaniu tego pliku
@@ -135,7 +135,7 @@ w raporcie końcowym. Nowy czat zawsze sam sprawdza HEAD.
 
 ## 4. Bieżący punkt wznowienia — ROI wizualizacji pól PCB
 
-Baza f1c7a5a268e370afcac2bbbe054a68efdb6d5851. Implementacja w
+Baza 8bef03fc42ac774e6051a5325ccb3ce7832cf83d. Implementacja w
 visualization/field_roi.py i pcb_fields.py. Ta sama warstwa raportów dla
 EasyEDA/Gerber, bez zmian solvera. Domyślnie active+geometry / −40 dB / 1 mm.
 Pełna specyfikacja: docs/fields.md. Dane NPZ/HDF5 nie są modyfikowane.
@@ -146,7 +146,12 @@ DONE implementacja ROI: maksimum po całym okresie z fazorów, oddzielne
 względne progi E/H, suma fizycznej geometrii i aktywności, fallback, stałe
 limity PNG/HTML dla wszystkich faz. Domain pokazuje pełny zapisany przekrój.
 Nie rozszerzać ROI samą szarą maską halo lub obrysem PCB.
-8 celowanych testów algorytmu PASS. Test CLI i małe regresje jeszcze niewykonane.
+9 testów test_pcb_field_roi PASS (w tym oba CLI);
+ReportTests.test_report_is_offline_escaped_and_does_not_touch_sources PASS.
+PcbFieldTests.test_fixed_scales_display_only_subsampling_and_strict_loader
+zatrzymuje się w setUp przed wizualizacją: copper fidelity inner=(2,0),
+modeled=(1,0). Potwierdzono ten sam błąd uruchamiając wersję testu
+z f1c7a5a na niezmienionym mesherze. Nie rozluźniano audytu geometrii.
 Realne dane pól spirali niedostępne; dwa zrzuty obejrzano, nie są testem NPZ.
 Poprzedni postprocessing: 17 testów historycznych PASS, native Windows nadal
 wymaga lokalnego odbioru; brakujące legacy artefakty nie są zgadywane.
@@ -158,7 +163,8 @@ wymaga lokalnego odbioru; brakujące legacy artefakty nie są zgadywane.
 ```
 
 Testy ukierunkowane: test_pcb_field_roi. Nie wykonywać FDTD, pełnej suite,
-PSU ani FAST. Uzupełnić wynik małej regresji CLI/raportu i opublikować.
+PSU ani FAST. Następny krok: lokalny odbiór raportu z rzeczywistych pól;
+nie ponawiać kosztownej symulacji. Problem fixture meshera jest odrębny.
 Opcje ROI działają także w pcb.postprocess; tylko prezentacja, bez wpływu na
 CalcPort, normalizację pól, maskowanie i częstotliwości.
 

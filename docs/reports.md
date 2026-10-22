@@ -146,6 +146,14 @@ Zapisane przekroje E/H są pokazywane jako diagramy fazowe, z pobieraniem PNG.
 `report ... --phase-step 15` lub `30` zmienia liczbę klatek bez FDTD;
 `--field-components x z` wybiera E_x i H_z. Nowy zapis wymaga `run --fields`.
 Stare wyniki bez pól pokazują jawny brak danych. Opis: [fields.md](fields.md).
-Nie ma tu animacji, automatycznej zmiany geometrii ani zaliczania
+Powyższe diagramy antenowe nie mają animacji; nie ma automatycznej zmiany geometrii ani zaliczania
 kontroli fizycznej na podstawie progu procentowego. Opisy powstają z jawnych
 reguł i liczb, nie z usługi AI. Stan implementacji pól pozostaje w `goal.md`.
+
+
+Raporty PCB mają odtwarzacz fazowy oraz wspólny ROI dla E/H i wszystkich
+faz danej planszy/częstotliwości. Domyślnie `--field-view active+geometry`,
+`--field-crop-threshold-db -40`, `--field-crop-margin-mm 1`.
+`--field-view domain` przywraca cały zapisany przekrój diagnostyczny.
+Kontrakt progów, fallbacków i pozostałych trybów: [fields.md](fields.md#roi-raportów-pcb--bez-nowych-obliczeń).
+Opcje zmieniają wyłącznie raport; zapisane NPZ/HDF5 pozostają nietknięte.

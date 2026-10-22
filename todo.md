@@ -1,8 +1,10 @@
 # TODO — PCB: aktualny stan i następne kroki
 
 **Bieżące zadanie:** ROI pól PCB we wspólnej warstwie raportowania.
-Implementacja active+geometry / −40 dB / 1 mm; 8 testów algorytmu PASS,
-przed odbiorem CLI i małych regresji. Kontrakt: docs/fields.md.
+Implementacja active+geometry / −40 dB / 1 mm: 9 testów ROI/CLI PASS,
+1 regresja raportu antenowego PASS. Starszy test pól zatrzymuje się w
+setUp na audycie copper fidelity także z testem z bazowego f1c7a5a;
+nie zmieniano meshera. Kontrakt: docs/fields.md.
 Bez FDTD, PSU i FAST/coupling. Postprocessing pozostaje wspólny i nie zmienia
 surowych danych. Następny lokalny krok: nowy raport z zapisanych NPZ Windows.
 
