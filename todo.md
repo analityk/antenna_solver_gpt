@@ -1,5 +1,14 @@
 # TODO — PCB: aktualny stan i następne kroki
 
+**2026-10-22: automatyczny kontrakt elektryczny .epro.** Dodano generator
+`antenna_lab.pcb.easyeda_auto_config` i domyślną autokonfigurację
+`easyeda_control` z zapisem `source-config.resolved.json`. Wartości
+instancji PCB > powiązany Device, tylko jednoznaczne jednostki R/L/C.
+Nie zgadywać metalizacji PTH; opcjonalny jawny `--pth-plating-um`.
+Nowy lokalny projekt `dif400.epro` nadal może zatrzymać importer na
+`DIMENSION`; to odrębny brak obsługi standardowej adnotacji w parserze.
+Bez FDTD, PSU, FAST. Dokumentacja: docs/pcb-easyeda.md.
+
 **Bieżące zadanie:** ROI pól PCB we wspólnej warstwie raportowania.
 Implementacja active+geometry / −40 dB / 1 mm: 9 testów ROI/CLI PASS,
 1 regresja raportu antenowego PASS. Starszy test pól zatrzymuje się w
