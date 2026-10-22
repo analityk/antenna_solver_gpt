@@ -5,10 +5,47 @@ EasyEDA Pro V2: `project.json`, `PCB/*.epcb`, `FOOTPRINT/*.efoo`, również
 embedded FOOTPRINT. Dotychczasowe samodzielne `.epcb` i Gerber pozostają
 kompatybilne. Import nie eksportuje ani nie odczytuje pośredniego Gerbera.
 
+## Automatyczne source-config z pełnego projektu .epro
+
+Nowy tryb źródłowy **nie wymaga** ręcznego `--source-config`. Dla dokładnie
+jednego oznaczonego źródła CAD (CSRC / Solver Role=source) bierze source_index
+ze źródła. Wartości R/L/C czyta najpierw z atrybutu `Value` instancji PCB,
+a gdy jest nieobecny, z jej jawnie powiązanego Device. Typ wynika z
+jednoznacznej jednostki wartości, a NIE z footprintu. Niejednoznaczne lub
+sprzeczne wartości powodują błąd przed FDTD.
+
+Kontroler zapisuje automatycznie `source-config.resolved.json` w katalogu
+przebiegu oraz pochodzenie wartości w `import.json`. `--source-config`
+nadal umożliwia użycie własnej, pełnej konfiguracji bez automatycznych zmian.
+
+Dodatkowo **samodzielny generator działa bez parsowania geometrii** (może
+więc przygotować JSON również dla archiwum z nieobsługiwanym rysunkowym
+rekordem DIMENSION, choć samo FDTD nadal wymaga obsługi tego rekordu):
+
+```cmd
+.\.venv\Scripts\python.exe -m antenna_lab.pcb.easyeda_auto_config --easyeda-project gerbs\dif400\dif400.epro --output parameters\dif400_source.local.json
+```
+
+Plik nie jest nadpisywany, jeżeli już istnieje. Brak informacji fizycznych
+nie jest wypełniany automatycznie. Jeśli projekt ma PTH, a brak zapisanej
+grubości galwanizacji, jawnie wybierz wartość np. `--pth-plating-um 25`
+(**wyłącznie świadome założenie użytkownika, nie odczyt CAD**). Można ją podać
+bezpośrednio w `easyeda_control` bez pliku JSON. Wartości R/L/C nadal są
+idealne; brak modeli pasożytniczych nie jest uzupełniany z biblioteki 3D.
+
+Przykład PREPARE-ONLY bez pliku konfiguracyjnego, dla projektu bez PTH:
+
+```cmd
+.\.venv\Scripts\python.exe -m antenna_lab.pcb.easyeda_control --easyeda-project gerbs\dif400\dif400.epro --quality preview --geometry-resolution-um 10 --fields-mhz 1500 2000 --prepare-only --center-mhz 2000 --cutoff-mhz 1900 --sweep-start-mhz 1500 --sweep-stop-mhz 2500 --sweep-step-mhz 10
+```
+
+Brak obsługi `DIMENSION` jest osobnym ograniczeniem parsera, nie jest
+naprawiany przez generator source-config.
+
 ## Source full-wave — most D4 → istniejący PCB openEMS (2026-10-22)
 
 FAST/coupling jest zamrożony. `antenna_lab.pcb.easyeda_control` przyjmuje
-`.epro` i **wymagany** `--source-config`. Korzysta z D4, walidacji canonical,
+`.epro` i opcjonalny `--source-config` (automatyka opisana powyżej). Korzysta z D4, walidacji canonical,
 jednej normalizacji i istniejącej geometry resolution. Następnie wywołuje
 `make_gerber_mesh_anchor_plan` / `make_pcb_domain_mesh(gerber_quality=...)`:
 historyczna nazwa oznacza istniejący feature-aware mesher CopperPolygon,

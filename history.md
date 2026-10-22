@@ -2473,3 +2473,15 @@ inner=(2,0), modeled=(1,0) na niezmienionym mesherze. Nie zmieniano
 fizyki ani audytu tylko po to, żeby zaliczyć regresję wizualizacji.
 Nie uruchomiono pełnej suite, native FDTD ani PSU. Odbiór rzeczywistych
 NPZ Windows pozostaje lokalny; screenshot nie zastępuje takiego sprawdzenia.
+
+### 2026-10-22 — generowanie source-config z pełnego EasyEDA .epro
+
+Wprowadzono powtarzalny generator elektronicznego kontraktu źródła z
+rozwiązanych instancji CAD oraz tryb automatyczny w EasyEDA full-wave CLI.
+Priorytet Value instancji PCB, dopiero potem jawnie referencjonowany Device;
+rodzaj idealnego R/L/C identyfikowany przez jednostkę, nigdy po footprint.
+Wieloźródłowe i sprzeczne/niekompletne dane są zatrzymywane jawnie.
+Opcjonalna metalizacja PTH wymaga parametru od użytkownika, nie heurystyki.
+Konfiguracja wynikowa jest zachowana w artefaktach przebiegu; generator
+działa samodzielnie przed konwersją geometrii. Nie ingerowano w fizykę,
+mesher, FAST/coupling ani PSU; nie uruchomiono FDTD.
