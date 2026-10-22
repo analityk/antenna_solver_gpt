@@ -42,6 +42,7 @@ class PcbDesktop(tk.Tk):
         self._busy = False
         self._cancelled = False
         self._command_prepared = None
+        self._active_command = None
         self._current_run = None
         self._current_stage = None
         self._stage_report = False
@@ -307,6 +308,7 @@ class PcbDesktop(tk.Tk):
                 return
         self._save_preferences()
         self._current_stage = stage
+        self._active_command = list(command)
         self._current_run = None if stage in ('prepare', 'run') else self._current_run
         self._cancelled = False
         self._set_busy(True)
@@ -361,10 +363,11 @@ class PcbDesktop(tk.Tk):
             self._log(f'Kod zakończenia {code}. Żadne ponowne FDTD nie jest uruchamiane automatycznie.\n', 'error')
             return
         if stage == 'prepare':
-            self._command_prepared = command_for('prepare', self._values())
+            # Use the command actually executed, even if GUI inputs changed during Run.
+            self._command_prepared = self._active_command
         if stage in ('prepare', 'run') and self._current_run:
             self._describe_result(self._current_run)
-        self.status.set(f'Etap {stage} zakończony bez błędu.')
+        self.status.set(f'Etap {stage}: proces zakończony (kod 0). Nie oznacza fizycznej walidacji.')
         if stage == 'run' and self.var['open_after_run'].get() and self._current_run:
             self._log('Raport: generowanie z istniejących wyników, bez nowego FDTD.\n', 'info')
             self._start('report')
