@@ -133,6 +133,22 @@ utworzeniem. W nagłówku zapisuj SHA ostatniego *już potwierdzonego*
 commita bazowego, a opublikowany SHA nowego commita podawaj po publikacji
 w raporcie końcowym. Nowy czat zawsze sam sprawdza HEAD.
 
+## Nowy checkpoint — automatyczna konfiguracja źródła EasyEDA
+
+Dla pełnego `.epro` kontroler PCB potrafi bez `--source-config` zbudować
+źródłowy kontrakt portu i R/L/C z atrybutów instancji / referencjonowanego
+Device. Zapisuje `source-config.resolved.json` w katalogu nowego przebiegu.
+Samodzielny generator `python -m antenna_lab.pcb.easyeda_auto_config
+--easyeda-project PATH --output FILE` nie uruchamia FDTD ani nie wymaga
+przejścia parsera fizycznej geometrii. PTH-plating nadal wymaga jawnej
+wartości; `--pth-plating-um` nie jest zgadywane. Zakres: tylko .epro,
+bez zmian mesha/openEMS/FAST/PSU.
+
+Dla lokalnego `gerbs/dif400/dif400.epro` wcześniejsza inspekcja zatrzymała
+się na `DIMENSION e4`: to osobny problem parsera, którego sam generator nie
+naprawia. Nie ma lokalnej kopii tego nowego archiwum w środowisku asystenta;
+nie deklarować jego importu ani FDTD jako PASS.
+
 ## 4. Bieżący punkt wznowienia — ROI wizualizacji pól PCB
 
 Baza 8bef03fc42ac774e6051a5325ccb3ce7832cf83d. Implementacja w
