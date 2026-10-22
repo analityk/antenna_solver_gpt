@@ -1,6 +1,24 @@
 # antenna_solver_gpt
 
 Lokalny program do parametrycznego modelowania anten oraz struktur PCB.
+
+## PCB GUI (Windows 11)
+
+Dla pełnych projektów EasyEDA Pro `.epro` dostępna jest aplikacja okienkowa:
+**dwuklik `PCB_GUI.bat`** w katalogu repozytorium albo:
+
+```bat
+.\.venv\Scripts\python.exe -m antenna_lab.pcb.gui
+```
+
+Wskaż plik projektu, wykonaj inspekcję, dobierz częstotliwości, profil
+i pola, uruchom PREPARE-ONLY/FDTD, a następnie wygeneruj raport E/H
+z fazami co 15° i kadrowaniem `active+geometry`. GUI pokazuje
+polecenia CMD i log na żywo, a konfiguracja elektryczna jest domyślnie
+wyprowadzana z `.epro`. Bez osobnego solvera i bez powtórnego FDTD
+przy zmianie raportu. Szczegóły: [GUI PCB](docs/pcb-gui.md).
+
+
 Pierwszy model antenowy to **Quados 8 przy dokładnie 1420 MHz**, z czterema
 połączonymi gałęziami i skończonym reflektorem. Pełny solver EM używa
 **openEMS** na Windows 11; dla obsługiwanego podzbioru PCB istnieje także

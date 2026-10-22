@@ -1,5 +1,16 @@
 # TODO — PCB: aktualny stan i następne kroki
 
+**2026-10-23: pierwsza aplikacja okienkowa PCB (Tkinter).**
+`PCB_GUI.bat` lub `python -m antenna_lab.pcb.gui` uruchamia formularz
+.epro → inspect-source → PREPARE-ONLY → FDTD → report, z konfiguracją
+częstotliwości, profilu, pól, override openEMS, PTH, logiem oraz podglądem
+CMD. Moduł `gui_commands.py` zawiera walidację i budowę argv bez shell.
+Kontrola GUI i natywnego solvera na docelowym Windows nadal OPEN;
+testy offline zapisane w `tests/test_pcb_gui_commands.py`.
+Nie wykonano FDTD/PSU/FAST. Dokumentacja: docs/pcb-gui.md.
+Następny krok użytkownika: GUI dla lokalnego dif4001.epro, PREPARE-ONLY,
+dopiero po audycie pełne FDTD i raport. GUI nie zastępuje walidacji fizyki.
+
 **2026-10-22: automatyczny kontrakt elektryczny .epro.** Dodano generator
 `antenna_lab.pcb.easyeda_auto_config` i domyślną autokonfigurację
 `easyeda_control` z zapisem `source-config.resolved.json`. Wartości

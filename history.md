@@ -2485,3 +2485,24 @@ Opcjonalna metalizacja PTH wymaga parametru od użytkownika, nie heurystyki.
 Konfiguracja wynikowa jest zachowana w artefaktach przebiegu; generator
 działa samodzielnie przed konwersją geometrii. Nie ingerowano w fizykę,
 mesher, FAST/coupling ani PSU; nie uruchomiono FDTD.
+
+### 2026-10-23 — interfejs Windows GUI do istniejącej ścieżki PCB
+
+**Powód:** wieloetapowa praca CLI (wybór .epro, inspekcja, sweep, profil,
+pola, PREPARE-ONLY, FDTD i raport) wymagała ręcznego przepisywania długich
+poleceń. Wprowadzono aplikację Tkinter z formularzami, logiem z procesu
+potomnego i jawnym podglądem odpowiadających jej komend. Windows launcher
+`PCB_GUI.bat` uruchamia okno, procesy CLI używają standardowego interpretera
+z dostępem do stdout/stderr. Bezpośrednie wywołanie native solvera pozostaje
+w istniejącym backendzie.
+
+**Architektura/fizyka:** GUI tylko orkiestruje publiczne CLI, czyta istniejące
+raporty i zapisuje lokalne preferencje w katalogu domowym. Nie zmienia
+geometrii, meshera, modelu źródła, FDTD, normalizacji E/H, parsera .epro,
+liczby iteracji ani JSON kontraktu solvera. FDTD wymaga potwierdzenia, a
+niezgodne lub pominięte PREPARE-ONLY wywołuje ostrzeżenie.
+
+**Weryfikacja/ograniczenia:** napisano celowane offline testy generatora argv
+oraz walidacji. Brak wykonywalnego GUI testu na Windows w środowisku asystenta;
+nie uruchamiano native FDTD, PSU, FAST ani pełnej suite. Rozwiązanie pozostaje
+otwarte do odbioru na rzeczywistym komputerze użytkownika.
