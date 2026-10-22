@@ -184,7 +184,7 @@ class ControlTests(unittest.TestCase):
         def prepare(g,s,path):
             calls.append(path)
             path.write_text('<model/>')
-            return engine,self.csx,port,self.mesh,None,{'test':'preparation'}
+            return engine,self.csx,port,self.mesh,resolve_pcb_lumped_port(g,self.mesh,s),{'test':'preparation'}
         with patch.object(control,'prepare_pcb_xml_model',side_effect=prepare):
             result=control.run_synthetic_control(output)
         self.assertEqual(calls,[output/'native/model.xml'])

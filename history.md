@@ -2416,3 +2416,21 @@ nie zakaz odczytu sond. Port, pola i raport mają osobne statusy.
 Dodano małe testy kontraktu; w tym checkpointcie jeszcze nieuruchomione.
 Nie zmieniono geometrii/fizyki/meshera, nie uruchomiono native ani PSU.
 Legacy bez kompletnej specyfikacji odrzucany z listą braków, bez zgadywania.
+
+
+### 2026-10-22 — regresje postprocessingu i granic kontrolerów
+
+Po publikacji 6731e3324d581ddf334c164de4c9867363249b0a wykonano 8 testów
+postprocessingu (PASS), następnie rozszerzono je do 12, wszystkie PASS.
+3 celowane testy EasyEDA/synthetic początkowo ujawniły nieaktualne atrapy
+port_spec=None; zaktualizowano atrapy do rzeczywistego kontraktu, 3 PASS.
+Dodatkowo pojedynczy istniejący Gerber pipeline fake-native PASS.
+Testy obejmują rzeczywisty odczyt/maskowanie syntetycznych zespolonych E/H,
+ponowne użycie NPZ bez native, generowanie offline HTML z unconfirmed,
+niemodyfikowanie oryginałów, XML hash i deterministyczne wartości.
+Wspólny report pokazuje statusy etapów i nie wymaga fikcyjnego completed.
+Błędy pojedynczych płaszczyzn nie blokują innych. Test historycznie żądający
+przerwania przed CalcPort przy limicie kroków dostosowano do nowego kontraktu:
+odczyt diagnostyczny dozwolony, zakończenie niepotwierdzone.
+Nie uruchomiono FDTD, PSU, FAST/coupling, pełnej suite ani benchmarków.
+Brak rzeczywistych danych Windows; nie potwierdzamy odzyskania tego przebiegu.

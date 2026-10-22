@@ -514,3 +514,13 @@ ponownie albo użytkownik musi dopuścić wersjonowanie małej próbki.
 rekordów, resolve 2/2 footprintów i 4/4 PAD_NET oraz matematyka
 geometrii, bez uruchamiania kodu projektu, pełnej suite,
 natywnego FDTD lub benchmarków.
+
+
+## Ponowne przetwarzanie full-wave
+
+EasyEDA i Gerber używają wspólnego kontraktu [pcb-postprocess.md](pcb-postprocess.md).
+`pcb-run.json` zapisuje pełną specyfikację przed Run. CLI `pcb.postprocess`
+nie wymaga ponownego importu .epro ani FDTD. Błąd statystyk nie blokuje
+odczytu portu; status zakończenia czasowego pozostaje wtedy niepotwierdzony.
+Pola i raport mają oddzielne statusy. Legacy bez wymaganych artefaktów jest
+odrzucany z listą braków — nie odtwarzamy parametrów z bieżącego profilu.

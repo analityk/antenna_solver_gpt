@@ -116,6 +116,21 @@ def restore_inputs(manifest):
         mesh = _restore(PcbDomainMesh, manifest['domain_mesh'])
         spec = _restore(PcbLumpedPortSpec, manifest['port'])
         validate_pcb_simulation_settings(settings)
+        import math
+        axes = [getattr(mesh, a+'_lines_m') for a in 'xyz']
+        if any(len(a)<2 or any(not math.isfinite(v) for v in a) or
+               any(x>=y for x,y in zip(a,a[1:])) for a in axes):
+            raise ValueError('domain_mesh requires finite strictly increasing complete axes')
+        shape = tuple(len(a)-1 for a in axes)
+        if shape!=mesh.shape_cells or math.prod(shape)!=mesh.cell_count:
+            raise ValueError('domain_mesh shape/cell_count inconsistent with saved axes')
+        if spec.exc_dir!='x' or spec.start_m[2]!=0. or spec.stop_m[2]!=0.:
+            raise ValueError('unsupported saved planar port contract')
+        for axis,lo,hi in zip(axes,spec.start_m,spec.stop_m):
+            if lo not in axis or hi not in axis:
+                raise ValueError('saved port boundary missing from saved mesh')
+        if spec.reference_impedance_ohm!=settings.reference_impedance_ohm:
+            raise ValueError('saved port reference differs from simulation settings')
     except (KeyError, TypeError, ValueError) as exc:
         raise ConfigurationError(f'Incomplete/invalid saved PCB contract: {exc}') from exc
     return geometry, settings, mesh, spec
@@ -127,11 +142,17 @@ def process_results(manifest, native, output, *, port=None, execution=None):
     geometry, settings, mesh, spec = restore_inputs(manifest)
     output = Path(output)
     result = dict(manifest.get('context', {}).get('summary', {}))
+    for key in ('frequency_hz','reference_impedance_ohm','resistance_ohm','reactance_ohm',
+                's11_real','s11_imag','s11_magnitude','s11_db','swr','fields',
+                'field_port_reference','native_statistics','stages'):
+        result.pop(key, None)
     result.update(status='postprocess_failed', validation_status='unverified',
                   preparation=manifest['preparation'], simulation_settings=manifest['simulation_settings'])
     stages = {'engine': execution or {'status':'not_recorded'}, 'port': {'status':'pending'},
               'fields': {'status':'not_requested'}, 'report': {'status':'not_requested'}}
-    _, termination = pcb_termination_evidence(settings, native)
+    statistics, termination = pcb_termination_evidence(settings, native)
+    if statistics is not None:
+        result['native_statistics'] = statistics
     stages['temporal_completion'] = termination
     result['termination_status'] = termination['status']
     field_data = manifest['preparation'].get('fields', {})
@@ -157,36 +178,61 @@ def process_results(manifest, native, output, *, port=None, execution=None):
             try:
                 from tempfile import TemporaryDirectory
                 from antenna_lab.solvers.pcb_fields import finish_pcb_fields
-                # Never leave half-written arrays masquerading as a complete field set.
-                with TemporaryDirectory(dir=output, prefix='field-processing-') as temporary:
-                    result['fields'] = finish_pcb_fields(geometry, mesh, field_data['planes'], frequencies,
-                        result['field_port_reference'], temporary, native_dir=native)
-                    if (output/'fields').exists():
-                        raise ConfigurationError('Refusing to overwrite an existing field artifact set.')
-                    shutil.move(str(Path(temporary)/'fields'), str(output/'fields'))
-                stages['fields'] = {'status':'processed'}
+                if not field_data.get('planes'):
+                    raise ConfigurationError('Missing saved field-plane layout.')
+                if (output/'fields').exists():
+                    raise ConfigurationError('Refusing to overwrite an existing field artifact set.')
+                combined = None
+                failures = {}
+                for plane in field_data['planes']:
+                    try:
+                        with TemporaryDirectory(dir=output, prefix='field-processing-') as temporary:
+                            converted = finish_pcb_fields(geometry, mesh, [plane], frequencies,
+                                result['field_port_reference'], temporary, native_dir=native)
+                            if combined is None:
+                                combined = dict(converted, planes=[])
+                                (output/'fields').mkdir()
+                            combined['planes'].extend(converted['planes'])
+                            shutil.move(str(Path(temporary)/'fields'/(plane['name']+'.npz')),
+                                        str(output/'fields'/(plane['name']+'.npz')))
+                    except Exception as exc:
+                        failures[plane['name']] = f'{type(exc).__name__}: {exc}'
+                if combined:
+                    combined['failed_planes'] = failures
+                    write_json(output/'fields/metadata.json', combined)
+                    result['fields'] = combined
+                stages['fields'] = {'status': 'partial' if failures and combined else
+                                    'failed' if failures else 'processed'}
+                if failures:
+                    stages['fields']['reason'] = str(failures)
             except Exception as exc:
                 stages['fields'] = {'status':'failed', 'reason':f'{type(exc).__name__}: {exc}'}
+    if result.get('status') == 'completed' and stages['engine'].get('status') != 'returned':
+        result['status'] = 'finished_unverified'
     result['stages'] = stages
     result['warnings'] = list(result.get('warnings', []))
     for name, state in stages.items():
         if state.get('reason'):
             result['warnings'].append(f"{name}: {state['reason']}")
-    if stages['port']['status']=='processed' and stages['fields']['status']=='failed':
+    if stages['port']['status']=='processed' and stages['fields']['status'] in ('failed','partial'):
         result['status']='postprocess_partial'
     write_json(output/'summary.json', result)
     return result
 
 
-def render_report(output, result):
+def render_report(output, result, *, phase_step=None):
     try:
         from antenna_lab.visualization.report import generate_report
-        path = generate_report(output, automatic=True)
+        path = generate_report(output, automatic=True, **({'phase_step':phase_step} if phase_step else {}))
         result['stages']['report'] = {'status':'generated', 'path':str(path)}
         print(f'Raport HTML: {path}')
     except Exception as exc:
         result['stages']['report'] = {'status':'failed', 'reason':f'{type(exc).__name__}: {exc}'}
-    write_json(Path(output)/'summary.json', result)
+        result.setdefault('warnings', []).append(f'Report: {type(exc).__name__}: {exc}; FDTD artifacts preserved.')
+    try:
+        write_json(Path(output)/'summary.json', result)
+    except OSError as exc:
+        print(f'Report status could not be saved: {exc}; prior result artifacts preserved.')
 
 
 def recover_run(run_dir, *, render=True, reuse=True):
@@ -199,8 +245,17 @@ def recover_run(run_dir, *, render=True, reuse=True):
         summary = read_json(root/'summary.json')
         requested = summary.get('preparation', {}).get('fields', {}).get('frequency_hz', [])
         field_meta = root/'fields/metadata.json'
-        complete_fields = not requested or (field_meta.is_file() and all(
-            (root/'fields'/(p['name']+'.npz')).is_file() for p in read_json(field_meta)['planes']))
+        complete_fields = not requested
+        if requested and field_meta.is_file():
+            from antenna_lab.visualization.fields import load_plane
+            metadata = read_json(field_meta)
+            expected_names = {p['name'] for p in summary['preparation']['fields']['planes']}
+            complete_fields = {p['name'] for p in metadata['planes']} == expected_names
+            try:
+                for plane in metadata['planes']:
+                    load_plane(root/'fields'/(plane['name']+'.npz'), plane, requested)
+            except (OSError, ValueError, KeyError):
+                complete_fields = False
         if summary.get('frequency_hz') and complete_fields:
             from antenna_lab.visualization.report_data import load_report_data
             load_report_data(root)  # Validate saved spectrum before treating it as reusable.
@@ -234,7 +289,7 @@ def main(argv=None):
         output, result = recover_run(args.run_dir, reuse=not args.recompute)
         print(f'Postprocessing: {output}\nStatus: {result["status"]}')
         print(json.dumps(result.get('stages', {}), indent=2))
-        return int(any(v.get('status') in ('failed','blocked') for v in result.get('stages', {}).values()))
+        return int(any(v.get('status') in ('failed','blocked','partial') for v in result.get('stages', {}).values()))
     except (ConfigurationError, OSError, ValueError) as exc:
         print(f'PCB postprocessing: {exc}')
         return 1

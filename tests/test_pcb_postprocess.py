@@ -14,6 +14,9 @@ from antenna_lab.pcb.postprocess import (save_preparation, load_preparation, rec
 from antenna_lab.solvers.pcb_mesh import make_pcb_domain_mesh
 
 
+from antenna_lab.solvers.openems_pcb import restore_pcb_port_reader as native_reader_factory
+
+
 class ProbeReader:
     uf_tot = (50., 100., 50.+50j)
     if_tot = (1., 1., 1.)
@@ -91,7 +94,7 @@ class PostprocessTests(TestCase):
         self.assertEqual((output/'impedance.csv').read_bytes(),(destination/'impedance.csv').read_bytes())
 
     def test_fields_failure_does_not_lose_spectrum_and_report_is_independent(self):
-        manifest=dict(self.manifest,preparation=dict(self.meta,fields={'frequency_hz':[1.42e9],'planes':[]}))
+        manifest=dict(self.manifest,preparation=dict(self.meta,fields={'frequency_hz':[1.42e9],'planes':[{'name':'xy_air'}]}))
         with patch('antenna_lab.solvers.pcb_fields.finish_pcb_fields',side_effect=FileNotFoundError('fields_xy_air_E.h5')):
             result=process_results(manifest,self.native,self.root,port=self.reader)
         self.assertEqual(result['stages']['fields']['status'],'failed')
@@ -126,3 +129,66 @@ class PostprocessTests(TestCase):
         with self.assertRaisesRegex(ConfigurationError,'SHA256'):load_preparation(self.root)
         alternate=self.root/'openems';alternate.mkdir();(alternate/'model.xml').write_text('<fake/>')
         with self.assertRaisesRegex(ConfigurationError,'exactly one'):load_preparation(self.root)
+
+    def test_successful_field_detachment_and_offline_reuse(self):
+        import numpy as np
+        from antenna_lab.solvers.pcb_fields import pcb_field_layout
+        layout=pcb_field_layout(self.geometry,self.mesh,self.settings,(1.42e9,))
+        manifest=dict(self.manifest,preparation=dict(self.meta,fields={'frequency_hz':[1.42e9],'planes':layout}))
+        def surface(path,frequency):
+            plane=next(p for p in layout if Path(path).name in p['native_files'].values())
+            lines=[np.array([x for x in getattr(self.mesh,a+'_lines_m') if lo<=x<=hi])
+                   for a,lo,hi in zip('xyz',plane['start_m'],plane['stop_m'])]
+            return lines,np.ones((3,*(len(a) for a in lines)),dtype=complex)
+        with patch('antenna_lab.solvers.pcb_fields._read_surface',side_effect=surface):
+            result=process_results(manifest,self.native,self.root,port=self.reader)
+        self.assertEqual(result['stages']['fields']['status'],'processed')
+        for plane in layout:self.assertTrue((self.root/'fields'/(plane['name']+'.npz')).is_file())
+        calls=self.reader.calls
+        with patch('antenna_lab.solvers.openems_pcb.restore_pcb_port_reader',side_effect=AssertionError('No native')):
+            output,reused=recover_run(self.root,render=False)
+        self.assertEqual(self.reader.calls,calls)
+        self.assertEqual(reused['stages']['postprocess']['status'],'reused')
+        self.assertEqual((self.root/'fields/xy_air.npz').read_bytes(),(output/'fields/xy_air.npz').read_bytes())
+
+    def test_legacy_complete_explicit_contract(self):
+        from antenna_lab.pcb.postprocess import write_json
+        (self.root/'pcb-run.json').unlink()
+        write_json(self.root/'mesh.json',asdict(self.mesh))
+        write_json(self.root/'summary.json',{'simulation_settings':asdict(self.settings),'preparation':self.meta})
+        _,result=recover_run(self.root,render=False)
+        self.assertEqual(result['stages']['port']['status'],'processed')
+
+    def test_native_reader_factory_never_calls_run_or_writes_xml(self):
+        from types import SimpleNamespace
+        factory=native_reader_factory
+        class Grid:
+            def __init__(self):self.axes={}
+            def SetDeltaUnit(self,v):self.unit=v
+            def GetDeltaUnit(self):return self.unit
+            def SetLines(self,a,v):self.axes[a]=v
+            def GetLines(self,a):return self.axes[a]
+        grid=Grid();csx=SimpleNamespace(GetGrid=lambda:grid)
+        calls=[];reader=self.reader
+        class Engine:
+            def SetCSX(self,value):calls.append(('SetCSX',value))
+            def AddLumpedPort(self,*args,**kwargs):calls.append(('port',args,kwargs));return reader
+            def Run(self,*a,**k):raise AssertionError('FDTD forbidden')
+            def Write2XML(self,*a,**k):raise AssertionError('XML modification forbidden')
+        with patch('antenna_lab.solvers.openems.native_modules',return_value=(
+            SimpleNamespace(openEMS=Engine),SimpleNamespace(ContinuousStructure=lambda:csx))):
+            self.assertIs(factory(self.spec,self.mesh),reader)
+        self.assertEqual([c[0] for c in calls],['SetCSX','port'])
+        self.assertEqual(calls[1][1][2],list(self.spec.start_m))
+        self.assertEqual(calls[1][1][3],list(self.spec.stop_m))
+        for a in 'xyz':self.assertEqual(tuple(grid.axes[a]),getattr(self.mesh,a+'_lines_m'))
+
+    def test_offline_report_includes_unconfirmed_execution_and_stage_status(self):
+        output,result=recover_run(self.root,render=True)
+        self.assertEqual(result['stages']['report']['status'],'generated')
+        text=(output/'report.html').read_text()
+        self.assertIn('Raport PCB',text)
+        self.assertIn('unconfirmed',text)
+        self.assertIn('temporal_completion',text)
+        self.assertIn('not_recorded',text)
+        self.assertTrue((output/'plots/impedance.png').is_file())

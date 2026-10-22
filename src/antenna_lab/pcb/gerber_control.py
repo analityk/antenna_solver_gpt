@@ -211,16 +211,15 @@ def run_gerber_control(config_path, output_dir, *, prepare_only=False, quality=N
             diagnostics['termination_status'] = result.get('termination_status', 'unconfirmed')
             if 'native_statistics' in result:
                 diagnostics['actual_iterations'] = result['native_statistics']['number_of_iterations']
-            if result.get('stages', {}).get('port', {}).get('status') == 'failed':
-                raise ConfigurationError(result['stages']['port']['reason'])
-            result['note'] = result['note'].replace('First synthetic PCB FDTD control result.', 'PCB FDTD result imported from Gerber geometry.')
-            result.update(sampled_diagnostics(result))
+            result['note'] = result.get('note', '').replace('First synthetic PCB FDTD control result.', 'PCB FDTD result imported from Gerber geometry.')
+            if 'frequency_hz' in result:
+                result.update(sampled_diagnostics(result))
         if prepare_only:
             diagnostics['termination_status'] = 'not_run'
         result.update(diagnostics)
         result['import'] = metadata
         _write_json(output/'summary.json', result)
-        if not prepare_only:
+        if not prepare_only and 'frequency_hz' in result:
             print_sweep_summary(result)
     except (Exception, KeyboardInterrupt) as exc:
         if output.is_dir():
@@ -249,19 +248,8 @@ def run_gerber_control(config_path, output_dir, *, prepare_only=False, quality=N
                 _write_json(output/'geometry.json', geometry.as_dict())
             _write_json(output/'import.json', metadata)
     if not prepare_only:
-        # Match antenna best-effort reporting: presentation never invalidates FDTD.
-        try:
-            from antenna_lab.visualization.report import generate_report
-            report = generate_report(output, automatic=True, phase_step=settings.runtime.report_phase_step_deg)
-            print(f'Raport HTML: {report}', flush=True)
-        except Exception as exc:
-            warning = f'Nie utworzono raportu HTML: {type(exc).__name__}: {exc}. Wyniki FDTD są zachowane; użyj polecenia report.'
-            result.setdefault('warnings', []).append(warning)
-            print(warning, file=sys.stderr, flush=True)
-            try:
-                _write_json(output/'summary.json', result)
-            except OSError as write_error:
-                print(f'Nie zapisano ostrzeżenia raportu: {write_error}; ukończony wynik pozostaje zachowany.', file=sys.stderr)
+        from .postprocess import render_report
+        render_report(output,result,phase_step=settings.runtime.report_phase_step_deg)
     return json.loads(json.dumps(result, allow_nan=False))
 
 
@@ -321,7 +309,8 @@ def main(argv=None):
         print(f"Status: {result['status']}; validation_status: unverified\n{output.resolve()/'summary.json'}")
         if not args.prepare_only:
             print(output.resolve()/'impedance.csv')
-        return 0
+        return int(result['status'] in ('postprocess_failed','postprocess_partial') or
+                   result.get('termination_status') in ('max_timesteps_reached','max_time_reached'))
     except (ConfigurationError, OSError, RuntimeError, ValueError, KeyboardInterrupt) as exc:
         print(f'PCB Gerber: {exc}', file=sys.stderr)
         return 1

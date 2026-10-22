@@ -1009,10 +1009,11 @@ Nie zmieniamy siatki dla mieszanego BC: nieaktywne pasy PML są zwykłą przestr
 a PEC/PMC/MUR leżą na zewnętrznej granicy. Metadane wskazują aktywne ściany PML.
 Zmienia to fizykę brzegów tylko po jawnej zmianie użytkownika.
 
-Statystyki domyślnie ON; przy OFF wynik ma `finished_unverified` oraz
-`not_established_statistics_disabled`, nie potwierdzone zakończenie. Osiągnięcie
-NrTS lub włączenie limitu MaxTime kończącego przed zanikiem jest wykrywane
-przed CalcPort, jeżeli są statystyki. Profile nie są certyfikatem zbieżności.
+Statystyki domyślnie ON. Ich brak lub niepoprawność daje `unconfirmed`,
+nie potwierdzone zakończenie. NrTS/MaxTime są oceniane oddzielnie od odczytu
+sond: również nieukończony przebieg może mieć diagnostyczne Z, ale nigdy
+status `completed`. Profile nie są certyfikatem zbieżności.
+Wspólny zapis przed Run i odzyskiwanie bez FDTD: [pcb-postprocess.md](pcb-postprocess.md).
 
 API sprawdzono w dokumentacji openEMS 0.37.0-rc3 i przypiętym źródle:
 https://docs.openems.de/en/latest/python/openEMS/openEMS.html

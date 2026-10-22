@@ -136,22 +136,21 @@ class GerberQualityTests(unittest.TestCase):
         self.assertIsNone(summary['actual_iterations'])
         self.assertGreater(summary['estimated_excitation_steps'],1)
 
-    def test_timestep_limit_is_failed_without_calcport_or_impedance(self):
+    def test_timestep_limit_is_unconfirmed_even_with_processed_impedance(self):
         for q in ('preview','design','verify'):
             s,_=gerber_quality_settings(q);engine=RunEngine(iterations=s.max_timesteps)
             out=self.fixture.root/('failed_'+q)
             with patch('antenna_lab.solvers.openems.native_modules',return_value=(
                 SimpleNamespace(openEMS=lambda **kw:engine),SimpleNamespace(ContinuousStructure=CSX))),\
                     contextlib.redirect_stdout(io.StringIO()):
-                with self.assertRaisesRegex(ConfigurationError,'temporal termination'):
-                    control.run_gerber_control(self.fixture.config_path,out,quality=q,field_frequency_hz=())
-            self.assertEqual(engine.port.calls,[])
-            self.assertFalse((out/'impedance.csv').exists())
+                control.run_gerber_control(self.fixture.config_path,out,quality=q,field_frequency_hz=())
+            self.assertEqual(len(engine.port.calls),1)
+            self.assertTrue((out/'impedance.csv').exists())
             summary=json.loads((out/'summary.json').read_text())
-            self.assertEqual(summary['status'],'failed')
+            self.assertEqual(summary['status'],'finished_unverified')
             self.assertEqual(summary['termination_status'],'max_timesteps_reached')
             self.assertEqual(summary['actual_iterations'],s.max_timesteps)
-            self.assertNotIn('resistance_ohm',summary)
+            self.assertEqual(summary['stages']['port']['status'],'processed')
 
     def test_cli_profile_default_and_explicit(self):
         for args,q in (([],'design'),(['--quality','preview'],'preview'),(['--quality','verify'],'verify')):

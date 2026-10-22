@@ -49,7 +49,10 @@ class EasyEdaControlTests(unittest.TestCase):
             raise AssertionError('Must keep feature-aware source-stackup path')
         mesh=make_pcb_domain_mesh(geometry,settings,gerber_quality='preview')
         Path(xml_path).write_text('<test-native-boundary/>')
-        return object(),object(),object(),mesh,None,{'xml':{'parse_status':'passed','test_fake':True}}
+        from antenna_lab.pcb.port import resolve_pcb_lumped_port
+        from test_pcb_postprocess import ProbeReader
+        spec=resolve_pcb_lumped_port(geometry,mesh,settings,gerber_quality='preview')
+        return object(),object(),ProbeReader(),mesh,spec,{'port':asdict(spec),'xml':{'parse_status':'passed','test_fake':True}}
 
     def test_prepare_canonical_projection_profiles_and_provenance_without_gerbers(self):
         original=self.project.read_bytes()
@@ -83,13 +86,11 @@ class EasyEdaControlTests(unittest.TestCase):
             self.assertTrue((native/'model.xml').exists())
             self.assertTrue(kwargs['dump_statistics'])
             self.assertFalse(kwargs.get('exact_endcriteria',False))
-            f=list(settings.result_frequency_hz);n=len(f)
-            return dict(frequency_hz=f,reference_impedance_ohm=50.,resistance_ohm=[50.]*n,
-                reactance_ohm=[0.]*n,s11_real=[0.]*n,s11_imag=[0.]*n,s11_magnitude=[0.]*n,
-                s11_db=[None]*n,swr=[1.]*n,mesh={'shape_cells':mesh.shape_cells,'cell_count':mesh.cell_count},
-                native_statistics={'number_of_iterations':100},note='First synthetic PCB FDTD control result.')
+            self.assertTrue((native.parent/'pcb-run.json').is_file())
+            (native/'openEMS_stats.txt').write_text('100 %number of iterations\n1e-12 %timestep (s)\n1e-10 %total numerical time (s)\n')
+            return {'status':'returned'}
         with patch('antenna_lab.pcb.control.prepare_pcb_xml_model',side_effect=self.fake_prepare), \
-             patch('antenna_lab.pcb.control.run_pcb_fdtd',side_effect=fake_run) as run, \
+             patch('antenna_lab.pcb.control.execute_pcb_fdtd',side_effect=fake_run) as run, \
              patch('antenna_lab.visualization.report.generate_report',side_effect=RuntimeError('test report failure')):
             result=self.run_case()
         self.assertEqual(run.call_count,1)

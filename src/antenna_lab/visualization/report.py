@@ -368,6 +368,12 @@ def _pcb_metadata(data):
     body+='<p>Chropowatość miedzi: pominięta. Soldermask, paste i silkscreen pominięto. PTH/NPTH są modelowane tylko gdy zapisane w sekcji Drills / vias; brak wierceń nie dowodzi kompletności modelu. E/H, NF2FF i bilans mocy: not recorded.</p>'
     if (data['root']/'fields/metadata.json').exists():
         body = body.replace('E/H, NF2FF i bilans mocy: not recorded.', 'E/H: zapisane przekroje poniżej. NF2FF i bilans mocy: not recorded.')
+    if s.get('stages'):
+        body += '<h3>Etapy wykonania i analizy</h3>'+table(
+            ['Etap','Stan','Dowód / ograniczenie'],
+            [(name,state.get('status','not_recorded'),state.get('reason',''))
+             for name,state in s['stages'].items()])
+        body += '<p>Poprawny odczyt sond nie potwierdza zakończenia czasowego ani walidacji fizycznej.</p>'
     body+=''.join('<p class="status">'+escape(str(w))+'</p>' for w in data['warnings'])
     return '<section class="panel"><h2>Przebieg PCB i założenia</h2>'+body+'</section>'
 
@@ -460,8 +466,9 @@ def generate_report(run_path, output=None, *, automatic=False, start_mhz=None, s
                             simulation_completed=automatic)
     if variant_name:
         data["variant_name"] = variant_name
-    if automatic and data.get("is_pcb") and data["execution_status"] != "completed":
-        raise ValueError("Automatyczny raport PCB wymaga ukończonego przebiegu.")
+    if (automatic and data.get("is_pcb") and data["execution_status"] != "completed"
+            and data["summary"].get("stages", {}).get("port", {}).get("status") != "processed"):
+        raise ValueError("Automatyczny raport PCB wymaga poprawnie przetworzonych danych portu.")
     if automatic and not data.get("is_pcb") and data["manifest"].get("status") != "running":
         raise ValueError("Raport automatyczny wolno zapisać tylko przed zamknięciem nowego przebiegu.")
     html = render_html(data, plots_path=root / "plots" if automatic else None,

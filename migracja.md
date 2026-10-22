@@ -8,7 +8,7 @@
 **Repozytorium:** `analityk/antenna_solver_gpt`  
 **Docelowa gałąź:** `main` (chyba że użytkownik jawnie wskaże inną)  
 **Ostatnia inspekcja dokumentów:** 2026-10-22, Europe/Warsaw
-**Potwierdzony opublikowany checkpoint przed aktualizacją:** `2529d04190a06ada0423d0110d0711a4fa412853`
+**Potwierdzony opublikowany checkpoint przed aktualizacją:** `6731e3324d581ddf334c164de4c9867363249b0a`
 **Uwaga:** ten SHA jest punktem historycznym, nie obietnicą, że nadal jest HEAD. Każde wznowienie rozpoczyna się sprawdzeniem Git.
 
 ## 1. Instrukcja dla nowego czatu — wykonaj po wskazaniu tego pliku
@@ -139,13 +139,18 @@ Baza abc0707e9ea8ef21013ed16c7c8704d320f6f567. Aktualne zadanie:
 odseparować wykonanie od analizy istniejących sond/HDF5 dla EasyEDA i Gerber.
 Nie rozwijać FAST, PSU, fizyki ani meshera. Nie uruchamiać FDTD.
 
-Checkpoint przed testami: pcb-run.json przed Run, execution.json,
+Opublikowany checkpoint 6731e3324d581ddf334c164de4c9867363249b0a:
+pcb-run.json przed Run, execution.json,
 shared process_results, CLI pcb.postprocess, niezależne statusy i osobne
 rewizje odzyskanych wyników. Szczegóły: docs/pcb-postprocess.md.
 
 ## 5. DONE / PARTIAL / OPEN
 
-Implementacja checkpointu gotowa do małych testów, jeszcze niepotwierdzona.
+DONE bez native: wspólny normal/recovery postprocessing, pełny zapis przed Run,
+bezpieczne osobne rewizje, odrębne statusy i raport offline.
+12 testów postprocessingu + 3 kontrolerów EasyEDA/synthetic + 1 Gerber PASS.
+Pola odtwarzają się z zapisanych HDF5, normalizacja bez zmian, cache NPZ
+walidowany istniejącym loaderem; każdy przekrój może mieć osobny błąd.
 Legacy wymaga jawnej kompletnej specyfikacji, inaczej precyzyjny brak danych.
 Realnych surowych wyników Windows nie ma tutaj; nie twierdzić, że odzyskano
 raport użytkownika. Wymagana kontrola natywnego CalcPort na jego środowisku.
@@ -156,9 +161,13 @@ raport użytkownika. Wymagana kontrola natywnego CalcPort na jego środowisku.
 .\.venv\Scripts\python.exe -X utf8 -m unittest discover -s tests -p test_pcb_postprocess.py -v
 ```
 
-W tym checkpointcie testów jeszcze nie wykonano. Nie uruchamiać pełnej suite,
-FDTD, benchmarków, PSU ani coupling. Po celowanych regresjach zaktualizować
-przekazanie i opublikować wyniki. CLI:
+Wykonano test_pcb_postprocess (12 testów), dwa wybrane testy
+test_pcb_easyeda_control, test_pcb_control.ControlTests.test_high_level_prepares_once_and_retains_native
+i test_pcb_gerber.GerberTests.test_single_run_pipeline_native_fakes_normal_policy_and_output.
+Pierwsza próba granic: 3 błędy starych atrap z port_spec=None, po poprawce PASS.
+Nie uruchamiać pełnej suite,
+FDTD, benchmarków, PSU ani coupling. Następny krok: lokalna weryfikacja CLI na kopii wyników Windows i ustalenie
+kompletności starszego przebiegu. Nie uruchamiać ponownie FDTD. CLI:
 `python -m antenna_lab.pcb.postprocess --run-dir <katalog>`.
 
 ## 7. Dokumenty, decyzje i ograniczenia wymagające zachowania

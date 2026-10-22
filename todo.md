@@ -1,8 +1,9 @@
 # TODO — PCB: aktualny stan i następne kroki
 
 **Bieżące zadanie:** wspólny postprocessing PCB bez ponownego FDTD.
-Checkpoint implementacji przed testami; kontrakt `docs/pcb-postprocess.md`.
-Priorytet: małe regresje odzyskiwania i lokalny odbiór danych Windows.
+Wspólny kontrakt i małe regresje PASS; opis `docs/pcb-postprocess.md`.
+Priorytet: lokalny odbiór danych Windows, bez ponownego FDTD.
+Legacy bez jawnych ustawień/pełnej siatki/specyfikacji portu pozostaje fail-closed.
 FAST/coupling oraz PSU poza zakresem. Poniższy opis mostu jest historyczny.
 
 Stan na 2026-10-22. **Decyzja użytkownika: podstawowym wejściem geometrii

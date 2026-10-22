@@ -1,7 +1,7 @@
 """Thin D4 project -> existing feature-aware PCB openEMS workflow.
 
 No manufacturing files, reduced solver, new mesh policy or native run loop.
-Source snapshots are flushed on exit, including failures: run_control_model
+Source snapshots are saved before Run and also on exit, including failures: run_control_model
 owns an initially empty directory and writes the existing native/results tree.
 """
 import argparse
@@ -178,14 +178,13 @@ def run_easyeda_control(project_path, output_dir, *, source_config, source_pcb_i
             diagnostics['termination_status'] = result.get('termination_status', 'unconfirmed')
             if 'native_statistics' in result:
                 diagnostics['actual_iterations'] = result['native_statistics']['number_of_iterations']
-            if result.get('stages', {}).get('port', {}).get('status') == 'failed':
-                raise ConfigurationError(result['stages']['port']['reason'])
-            result['note']=result['note'].replace('First synthetic PCB FDTD control result.',
+            result['note']=result.get('note', '').replace('First synthetic PCB FDTD control result.',
                                                    'PCB FDTD result imported from EasyEDA project geometry.')
-            result.update(sampled_diagnostics(result))
+            if 'frequency_hz' in result:
+                result.update(sampled_diagnostics(result))
         result.update(diagnostics)
         result['import']=provenance
-        if not prepare_only:print_sweep_summary(result)
+        if not prepare_only and 'frequency_hz' in result:print_sweep_summary(result)
     except (Exception,KeyboardInterrupt) as exc:
         if isinstance(exc,QuantizationError):
             diagnostics['geometry_resolution']=dict(exc.audit,requested_um=geometry_resolution_um,quantum_nm=grid.quantum_nm)
@@ -206,17 +205,8 @@ def run_easyeda_control(project_path, output_dir, *, source_config, source_pcb_i
         _write_json(output/'import.json',provenance)
         _write_json(output/'summary.json',result)
     if not prepare_only:
-        # Existing offline PCB report, with the same best-effort solve protection.
-        try:
-            from antenna_lab.visualization.report import generate_report
-            report=generate_report(output,automatic=True,phase_step=settings.runtime.report_phase_step_deg)
-            print(f'Raport HTML: {report}',flush=True)
-        except Exception as exc:
-            warning=f'Nie utworzono raportu HTML: {type(exc).__name__}: {exc}. Wyniki FDTD zachowane.'
-            result.setdefault('warnings',[]).append(warning)
-            print(warning,file=sys.stderr,flush=True)
-            try:_write_json(output/'summary.json',result)
-            except OSError as error:print(f'Nie zapisano ostrzeżenia raportu: {error}',file=sys.stderr)
+        from .postprocess import render_report
+        render_report(output,result,phase_step=settings.runtime.report_phase_step_deg)
     return json.loads(json.dumps(result,allow_nan=False))
 
 
@@ -258,7 +248,8 @@ def main(argv=None):
             sweep_request=request if sweep and tuple(profile.settings.result_frequency_hz)==tuple(band['result_frequency_hz']) else None)
         print(f"Status: {result['status']}; validation_status: unverified\n{output.resolve()/'summary.json'}")
         if not args.prepare_only:print(output.resolve()/'impedance.csv')
-        return 0
+        return int(result['status'] in ('postprocess_failed','postprocess_partial') or
+                   result.get('termination_status') in ('max_timesteps_reached','max_time_reached'))
     except (ConfigurationError,OSError,RuntimeError,ValueError,KeyboardInterrupt) as exc:
         print(f'PCB EasyEDA: {exc}',file=sys.stderr);return 1
 
