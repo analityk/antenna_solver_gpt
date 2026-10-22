@@ -87,6 +87,12 @@ class GuiCommandTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Krok fazy'):
             self.cmd('report',phase_step='10')
 
+    def test_desktop_pythonw_launches_console_python_for_child_solver(self):
+        args = command_for('prepare', BASE,
+                           interpreter=r'C:\\dev\\.venv\\Scripts\\pythonw.exe')
+        self.assertTrue(args[0].lower().endswith('python.exe'))
+        self.assertNotIn('pythonw.exe', args[0].lower())
+
     def test_inspect_can_select_pcb_and_frequency_split_variants(self):
         inspect=self.cmd('inspect',pcb_id='board-1')
         self.assertEqual(inspect[-2:],['--source-pcb-id','board-1'])
