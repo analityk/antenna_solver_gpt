@@ -133,6 +133,17 @@ utworzeniem. W nagłówku zapisuj SHA ostatniego *już potwierdzonego*
 commita bazowego, a opublikowany SHA nowego commita podawaj po publikacji
 w raporcie końcowym. Nowy czat zawsze sam sprawdza HEAD.
 
+## Poprawka GUI: excitation guard (2026-10-23)
+
+Nowe GUI początkowo stosowało center ± cutoff, a backend wymaga
+center ± 0.8×cutoff. Dla center=600/cutoff=500/sweep=100–900
+zatrzymywał się dopiero solver. Dodano wcześniejszą walidację w
+`gui_commands.py`, komunikat z właściwymi granicami i przycisk
+`Dopasuj pobudzenie do sweep`. Przycisk wylicza center=(lo+hi)/2,
+cutoff=(hi−lo)/1.6 tylko po akcji użytkownika. Dla podanego przypadku
+500/500 MHz. Dodano celowany test regresyjny. Nie zmieniono fizyki,
+solverów, mesha ani PTH. Bez FDTD.
+
 ## Nowy checkpoint — Windows PCB GUI (2026-10-23)
 
 Na bazie narzędzi PCB dodano `src/antenna_lab/pcb/gui.py` (Tkinter),
