@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import math
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 import re
 import subprocess
 import sys
@@ -41,8 +41,8 @@ def command_for(action, values, *, interpreter=None):
     python = str(interpreter or sys.executable)
     # The double-click launcher uses pythonw.exe (no console); child CLI
     # MUST use python.exe so its native solver stdout/stderr reaches our log.
-    if Path(python).name.lower() == 'pythonw.exe':
-        python = str(Path(python).with_name('python.exe'))
+    if PureWindowsPath(python).name.lower() == 'pythonw.exe':
+        python = python[:-len('pythonw.exe')] + 'python.exe'
     action = str(action)
     if action == 'report':
         run_dir = str(values.get('run_dir', '')).strip()
