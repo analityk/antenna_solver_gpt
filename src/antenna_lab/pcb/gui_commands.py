@@ -32,7 +32,7 @@ def _nonnegative(text, name):
 
 
 def _fields(text):
-    parts = re.split(r'[;,\\s]+', text.strip()) if text.strip() else []
+    parts = re.split(r'[;,\s]+', text.strip()) if text.strip() else []
     return [_positive(x, 'Częstotliwości pól MHz') for x in parts]
 
 
