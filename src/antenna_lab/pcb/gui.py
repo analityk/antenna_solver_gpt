@@ -328,6 +328,9 @@ class PcbDesktop(tk.Tk):
                 text=True, encoding='utf-8', errors='replace',
                 bufsize=1, shell=False)
             self._process = process
+            # Stop may be requested before Popen returns; honor that request.
+            if self._cancelled and process.poll() is None:
+                process.terminate()
             assert process.stdout is not None
             for line in process.stdout:
                 self._events.put(('line', stage, line))
