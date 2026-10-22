@@ -84,3 +84,20 @@ Weryfikacja czystej warstwy komend:
 ```bat
 .\.venv\Scripts\python.exe -X utf8 -m unittest discover -s tests -p test_pcb_gui_commands.py -v
 ```
+
+## Dopasowanie pasma pobudzenia do sweep
+
+Sweep określa częstotliwości, w których mają powstać wykresy Z/S11;
+środek i odcięcie opisują osobno szerokopasmowe pobudzenie solvera.
+Backend wymaga: `sweep ⊆ [center − 0.8·cutoff, center + 0.8·cutoff]`.
+GUI stosuje **identyczną walidację przed PREPARE-ONLY/FDTD** i podaje
+dozwolony zakres oraz zalecaną poprawkę w komunikacie.
+
+Przycisk **Dopasuj pobudzenie do sweep** po jawnej decyzji użytkownika
+wylicza `center=(sweep_start+sweep_stop)/2` i
+`cutoff=(sweep_stop−sweep_start)/1.6`. Ustawienia nie są zmieniane
+samoczynnie podczas uruchamiania solvera. Dla sweep 100–900 MHz dostajemy
+center=500 MHz, cutoff=500 MHz; trzy pola E/H przy 200/500/800 MHz
+pozostają poprawne. Do oceny dokładności częstotliwości brzegowych
+stosuj niezależne sprawdzenia zbieżności; spełnienie guardu nie jest
+walidacją fizyki.
