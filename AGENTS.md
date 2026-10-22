@@ -252,3 +252,12 @@ Dla dłuższych prac powtarzaj checkpoint po samodzielnych, istotnych etapach.
 „Czy nowy czat, znając tylko `migracja.md`, potrafi ustalić aktualny stan,
 przyczynę bieżącej przeszkody, najbliższe zadanie oraz źródła weryfikacji?”.
 Jeśli nie — popraw przekazanie stanu przed zakończeniem.
+
+## Mechanizmy wielokrotnego użytku
+
+Błąd pojedynczego przebiegu jest dowodem klasy problemów. Przed zmianą określ
+odpowiedzialność architektoniczną i napraw przyczynę we właściwej warstwie.
+Kod produkcyjny nie może zależeć od nazwy projektu, pliku czy numeru wyniku.
+Normalny przebieg i odzyskiwanie używają tych samych obliczeń; zachowuj dane
+źródłowe, provenance i rozdzielaj dowody wykonania od walidacji fizycznej.
+Jednorazowa diagnostyka jest osobnym, jawnie zamówionym zakresem.

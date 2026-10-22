@@ -13,7 +13,7 @@ from antenna_lab.pcb.frequency import add_frequency_arguments, frequency_argumen
 from antenna_lab.pcb.model import BoardOutline, CopperPolygon, PcbGeometry, PcbPort, Substrate
 from antenna_lab.pcb.simulation import PcbSimulationSettings, validate_pcb_simulation_settings
 from antenna_lab.pcb.transform import normalize_port_orientation
-from antenna_lab.solvers.openems_pcb import prepare_pcb_xml_model, run_pcb_fdtd, write_pcb_port_results
+from antenna_lab.solvers.openems_pcb import prepare_pcb_xml_model, run_pcb_fdtd, execute_pcb_fdtd, write_pcb_port_results
 
 
 def make_synthetic_control_case(
@@ -77,7 +77,7 @@ def run_synthetic_control(output_dir, *,
 
 
 def run_control_model(geometry: PcbGeometry, settings: PcbSimulationSettings, output_dir, *,
-                      port_edge_mode='aligned', exact_endcriteria=False, dump_statistics=False, gerber_quality=None, field_frequency_hz=(), copper_config=None, expected_domain_mesh=None) -> dict:
+                      port_edge_mode='aligned', exact_endcriteria=False, dump_statistics=False, gerber_quality=None, field_frequency_hz=(), copper_config=None, expected_domain_mesh=None, run_context=None) -> dict:
     """Run a supplied control geometry/settings pair in an isolated directory."""
     validate_pcb_simulation_settings(settings)
     output = Path(output_dir).resolve()
@@ -100,16 +100,10 @@ def run_control_model(geometry: PcbGeometry, settings: PcbSimulationSettings, ou
     if exact_endcriteria: run_options['exact_endcriteria'] = True
     if dump_statistics: run_options['dump_statistics'] = True
     if field_frequency_hz: run_options['field_frequency_hz'] = field_frequency_hz
-    result = run_pcb_fdtd(engine, csx, port, mesh, settings, native, **run_options)
-    result['mesh'].update(min_step_m=mesh.min_step_m, max_step_m=mesh.max_step_m,
-                          worst_growth_ratio=mesh.worst_growth_ratio)
-    result['preparation'] = metadata
-    result['simulation_settings'] = asdict(settings)
-    if field_frequency_hz:
-        from antenna_lab.solvers.pcb_fields import finish_pcb_fields
-        result['fields'] = finish_pcb_fields(geometry, mesh, metadata['fields']['planes'],
-            metadata['fields']['frequency_hz'], result['field_port_reference'], output)
-    return write_pcb_port_results(result, output)
+    from .postprocess import save_preparation, process_results
+    manifest = save_preparation(output, geometry, settings, mesh, spec, metadata, context=run_context)
+    execution = execute_pcb_fdtd(engine, csx, port, mesh, settings, native, **run_options)
+    return process_results(manifest, native, output, port=port, execution=execution)
 
 
 

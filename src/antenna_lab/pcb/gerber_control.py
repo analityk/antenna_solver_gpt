@@ -190,23 +190,29 @@ def run_gerber_control(config_path, output_dir, *, prepare_only=False, quality=N
             output.mkdir(parents=True, exist_ok=True)
             native = output/'native'
             native.mkdir()
-            _, _, _, native_mesh, _, preparation = prepare_pcb_xml_model(geometry, settings, native/'model.xml', gerber_quality=quality, copper_config=config, **field_options)
+            _, _, _, native_mesh, port_spec, preparation = prepare_pcb_xml_model(geometry, settings, native/'model.xml', gerber_quality=quality, copper_config=config, **field_options)
             if native_mesh != mesh:
                 raise ConfigurationError("Native PCB mesh differs from geometry-resolution preflight mesh.")
+            from .postprocess import save_preparation
+            save_preparation(output,geometry,settings,native_mesh,port_spec,preparation,
+                context={'summary':dict(diagnostics,import_metadata=metadata),
+                         'artifacts':{'geometry.source.json':source.as_dict(),
+                             'geometry.normalized_source.json':normalized_source.as_dict(),
+                             'import.json':metadata}})
             result = dict(status='prepared', validation_status='unverified', preparation=preparation,
                 simulation_settings=asdict(settings), mesh={'shape_cells': mesh.shape_cells, 'cell_count': mesh.cell_count})
         else:
             result = run_control_model(geometry, settings, output, gerber_quality=quality,
-                                       exact_endcriteria=exact, dump_statistics=settings.runtime.dump_statistics, copper_config=config, expected_domain_mesh=mesh, **field_options)
-            if settings.runtime.dump_statistics:
+                                       exact_endcriteria=exact, dump_statistics=settings.runtime.dump_statistics, copper_config=config, expected_domain_mesh=mesh,
+                                       run_context={'summary':dict(diagnostics,import_metadata=metadata),
+                                           'artifacts':{'geometry.source.json':source.as_dict(),
+                                               'geometry.normalized_source.json':normalized_source.as_dict(),
+                                               'import.json':metadata}}, **field_options)
+            diagnostics['termination_status'] = result.get('termination_status', 'unconfirmed')
+            if 'native_statistics' in result:
                 diagnostics['actual_iterations'] = result['native_statistics']['number_of_iterations']
-                if not 0 < diagnostics['actual_iterations'] < settings.max_timesteps:
-                    raise ConfigurationError('Gerber native termination not established: timestep limit reached.')
-                diagnostics['termination_status'] = 'completed_before_limit'
-                result['status'] = 'completed'
-            else:
-                diagnostics['termination_status'] = 'not_established_statistics_disabled'
-                result['status'] = 'finished_unverified'
+            if result.get('stages', {}).get('port', {}).get('status') == 'failed':
+                raise ConfigurationError(result['stages']['port']['reason'])
             result['note'] = result['note'].replace('First synthetic PCB FDTD control result.', 'PCB FDTD result imported from Gerber geometry.')
             result.update(sampled_diagnostics(result))
         if prepare_only:

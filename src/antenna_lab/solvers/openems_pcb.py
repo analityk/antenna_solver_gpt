@@ -264,7 +264,7 @@ def prepare_pcb_xml_model(geometry: PcbGeometry, settings: PcbSimulationSettings
     return engine, csx, port, mesh, spec, metadata
 
 
-def run_pcb_fdtd(engine, csx, port, domain_mesh: PcbDomainMesh,
+def execute_pcb_fdtd(engine, csx, port, domain_mesh: PcbDomainMesh,
                  settings: PcbSimulationSettings, native_dir, *, exact_endcriteria=False, dump_statistics=False, field_frequency_hz=()) -> dict:
     """Execute an already prepared control model; port ratios remain unverified."""
     import os
@@ -292,20 +292,81 @@ def run_pcb_fdtd(engine, csx, port, domain_mesh: PcbDomainMesh,
         options['dump_statistics'] = True
         if (native_dir/'openEMS_stats.txt').exists():
             raise ConfigurationError('PCB Run: istnieją stare openEMS_stats.txt; użyj nowego katalogu.')
+    from antenna_lab.pcb.postprocess import write_json
+    evidence = native_dir.parent/'execution.json'
+    if evidence.exists():
+        raise ConfigurationError(f'Refusing to overwrite execution evidence: {evidence}')
+    write_json(evidence, {'status':'started', 'run_options':options})
     cwd = Path.cwd()
     try:
         status = engine.Run(str(native_dir), cleanup=False, numThreads=settings.threads, **options)
+        if status not in (None, 0):
+            raise RuntimeError(f'PCB Run: openEMS returned {status!r}; preserve native files.')
+    except BaseException as exc:
+        write_json(evidence, {'status':'failed_or_interrupted', 'error':str(exc), 'run_options':options})
+        raise
     finally:
         os.chdir(cwd)
-    if status not in (None, 0):
-        raise RuntimeError(f'PCB Run: openEMS zwrócił kod {status!r}; sprawdź pliki natywne w {native_dir}.')
+    result = {'status':'returned', 'return_code':status, 'run_options':options}
+    write_json(evidence, result)
+    return result
+
+
+def run_pcb_fdtd(engine, csx, port, domain_mesh, settings, native_dir, **options):
+    """Compatibility wrapper; execution and electrical postprocessing are separate."""
+    execution = execute_pcb_fdtd(engine, csx, port, domain_mesh, settings, native_dir, **options)
+    result = postprocess_pcb_port(port, domain_mesh, settings, native_dir,
+                                 field_frequency_hz=options.get('field_frequency_hz', ()))
+    result['stages']['engine'] = execution
+    return result
+
+
+def restore_pcb_port_reader(spec, mesh):
+    """Recreate the public native port reader from saved SI specification.
+
+    No CAD import, mesh construction, XML write or Run. The engine is only the
+    documented factory/owner of the native LumpedPort and its CalcPort method.
+    """
+    from .openems import native_modules
+    ems, csx_module = native_modules()
+    csx = csx_module.ContinuousStructure()
+    grid = csx.GetGrid()
+    grid.SetDeltaUnit(1.0)
+    for axis in 'xyz':
+        grid.SetLines(axis, list(getattr(mesh, axis+'_lines_m')))
+    engine = ems.openEMS()
+    engine.SetCSX(csx)
+    port = engine.AddLumpedPort(spec.port_nr, spec.reference_impedance_ohm,
+        list(spec.start_m), list(spec.stop_m), spec.exc_dir, spec.excite, priority=spec.priority)
+    _audit_port_grid(csx, mesh, context='restoring read-only PCB port')
+    if port is None:
+        raise ConfigurationError('Native PCB port reader could not be restored.')
+    return port
+
+
+def pcb_termination_evidence(settings, native_dir):
+    native_dir = Path(native_dir)
+    termination = {'status': 'unconfirmed'}
     statistics = None
-    if dump_statistics:
+    try:
         statistics = read_pcb_native_statistics(native_dir/'openEMS_stats.txt')
-        if settings.runtime and settings.runtime.max_time_s and statistics['total_numerical_time_s'] + statistics['fdtd_timestep_s'] >= settings.runtime.max_time_s:
-            raise ConfigurationError('PCB: temporal termination not established; physical MaxTime reached.')
+        termination['status'] = 'completed_before_limit'
         if statistics['number_of_iterations'] >= settings.max_timesteps:
-            raise ConfigurationError('PCB: temporal termination not established; iterations >= max_timesteps.')
+            termination['status'] = 'max_timesteps_reached'
+        if settings.runtime and settings.runtime.max_time_s and statistics['total_numerical_time_s'] + statistics['fdtd_timestep_s'] >= settings.runtime.max_time_s:
+            termination['status'] = 'max_time_reached'
+    except ConfigurationError as exc:
+        termination['reason'] = str(exc)
+    return statistics, termination
+
+
+def postprocess_pcb_port(port, domain_mesh, settings, native_dir, *, field_frequency_hz=()):
+    """Read existing probes only. Shared electrical calculation for run and recovery."""
+    import numpy as np
+    from .pcb_fields import validate_field_frequencies
+    field_frequency_hz = validate_field_frequencies(field_frequency_hz, settings)
+    native_dir = Path(native_dir)
+    statistics, termination = pcb_termination_evidence(settings, native_dir)
     frequencies = np.asarray(settings.result_frequency_hz, dtype=float)
     calc_frequencies = np.asarray(sorted(set((*frequencies, *field_frequency_hz)))) if field_frequency_hz else frequencies
     port.CalcPort(str(native_dir), calc_frequencies, ref_impedance=settings.reference_impedance_ohm)
@@ -326,7 +387,7 @@ def run_pcb_fdtd(engine, csx, port, domain_mesh: PcbDomainMesh,
     if field_frequency_hz:
         from .pcb_fields import voltage_scale
         field_voltage = voltage[np.searchsorted(calc_frequencies,field_frequency_hz)]
-        voltage_scale(field_voltage)  # Reject unusable references before field export.
+        # The field stage validates its reference independently of impedance.
         field_reference = dict(frequency_hz=list(field_frequency_hz),
             voltage_real=field_voltage.real.tolist(), voltage_imag=field_voltage.imag.tolist())
         selected = np.searchsorted(calc_frequencies, frequencies)
@@ -364,9 +425,9 @@ def run_pcb_fdtd(engine, csx, port, domain_mesh: PcbDomainMesh,
         result['field_port_reference'] = field_reference
     if statistics is not None:
         result['native_statistics'] = statistics
-        result['run_options'] = dict(exact_endcriteria=exact_endcriteria, dump_statistics=dump_statistics)
-    if settings.runtime is not None:
-        result['run_options'] = dict(options, numThreads=settings.threads)
+    result['termination_status'] = termination['status']
+    result['stages'] = {'temporal_completion': termination, 'port': {'status': 'processed'}}
+    result['status'] = 'completed' if termination['status'] == 'completed_before_limit' else 'finished_unverified'
     return result
 
 

@@ -133,69 +133,33 @@ utworzeniem. W nagłówku zapisuj SHA ostatniego *już potwierdzonego*
 commita bazowego, a opublikowany SHA nowego commita podawaj po publikacji
 w raporcie końcowym. Nowy czat zawsze sam sprawdza HEAD.
 
-## 4. Bieżący punkt wznowienia — EasyEDA source full-wave
+## 4. Bieżący punkt wznowienia — ogólny postprocessing PCB
 
-**Decyzja 2026-10-22: FAST/coupling FROZEN. Nie realizować PCB-015C.**
-Jedyny realny zakres: `gerbs/emtest4/spirala.epro`, bez PSU i bez Gerberów.
-Baza: `56ebe378e020bba29391e33696ac3ff1188f8e5b`.
+Baza abc0707e9ea8ef21013ed16c7c8704d320f6f567. Aktualne zadanie:
+odseparować wykonanie od analizy istniejących sond/HDF5 dla EasyEDA i Gerber.
+Nie rozwijać FAST, PSU, fizyki ani meshera. Nie uruchamiać FDTD.
 
-Dodano cienki `pcb.easyeda_control` łączący istniejące D4 z istniejącym
-feature-aware PCB mesh/openEMS. Kolejność: import/resolve/materialize →
-source_layout_geometry z jawnym config → validate → normalize raz →
-apply_geometry_resolution → feature-aware mesh/preflight → prepare XML lub
-run_control_model. Nie zmieniono meshera, profili, równań, fizyki, materiałów,
-PTH, source/komponentów. Source-config z port/plating/R1 jest wymagany;
-niewymodelowany pasywny element nie może być pominięty. Nie tworzono
-ResolvedPcbConfig/Gerber fallback. Pełny kontrakt: docs/pcb-easyeda.md.
+Checkpoint przed testami: pcb-run.json przed Run, execution.json,
+shared process_results, CLI pcb.postprocess, niezależne statusy i osobne
+rewizje odzyskanych wyników. Szczegóły: docs/pcb-postprocess.md.
 
-Katalog `outcomes/pcb_easyeda/spirala_NNN`, wspólny allocator; --output wygrywa.
-Snapshoty źródła i audytu zapisują się także przy błędzie, z failed_stage.
-Przed native wyświetlane są istniejące mesh/cost metadane. Guardów nie obchodzić.
-Wzrost kosztu/duży mesh ma być zgłoszony użytkownikowi, nie optymalizowany.
+## 5. DONE / PARTIAL / OPEN
 
-## 5. Stan DONE/PARTIAL/OPEN i następny krok
+Implementacja checkpointu gotowa do małych testów, jeszcze niepotwierdzona.
+Legacy wymaga jawnej kompletnej specyfikacji, inaczej precyzyjny brak danych.
+Realnych surowych wyników Windows nie ma tutaj; nie twierdzić, że odzyskano
+raport użytkownika. Wymagana kontrola natywnego CalcPort na jego środowisku.
 
-- **DONE implementacja/testy bez native:** checkpoint mostu opublikowany przed
-  testami: `2529d04190a06ada0423d0110d0711a4fa412853`.
-  `test_pcb_easyeda_control`: 5 PASS; pojedynczy istniejący test Gerber CLI: PASS.
-- Mały syntetyczny .epro przeszedł prawdziwy feature-aware mesh i preflight,
-  potem atrapę granicy XML; istniejący run_control_model zapisał CSV z fake
-  wyniku bez wywołania natywnego solvera. Błąd raportu nie psuje ukończonego wyniku.
-- Realny `spirala.epro`: canonical równe D4, normalize/projection PASS,
-  2 PTH i R1 zachowane. Zatrzymano celowo w mockowanej granicy planu kotwic.
-  **Pełnej siatki realnej spirali nie liczono; shape/cell_count pozostają nieznane.**
-  Koszt i ewentualny istniejący guard ma pokazać Windows prepare-only.
-- Brak port/plating/R1 jest sprawdzony jako fail-closed przed meshem/native.
-  Nie czytano produkcyjnych Gerberów, source archive SHA pozostał niezmieniony.
-- **OPEN:** realny native prepare-only spirali na Windows, potem decyzja o
-  pierwszym preview FDTD. Nie deklarować udanego XML/siatki realnej spirali
-  na podstawie fake testu. Nie uruchamiać native/FDTD zdalnie.
-- D3 metryka/graf i guardy FAST pozostają historycznie działające, ale frozen.
-  36.373621555 mm osi i dawne 7/2 testy nie są odbiorem full-wave.
-- Archiwum Git: d94187520eaf519afd6fa3ba8625a3aa43d2b03a9a9178a924ac98586e504132;
-  lokalny wariant użytkownika af91f861... nie był tutaj badany.
-
-## 6. Polecenia użytkownika i dowody
-
-Minimalny jawny source-config oraz dwie pełne komendy CMD są w
-`docs/pcb-easyeda.md`, sekcja Source full-wave. Testowe 25 µm / 49.9 Ω nie
-są domyślnymi wartościami kodu ani odczytem z Device. CSRC=source 0.
-
-Tani test lokalny:
+## 6. Następne sprawdzenie
 
 ```cmd
-.\.venv\Scripts\python.exe -X utf8 -m unittest discover -s tests -p test_pcb_easyeda_control.py -v
+.\.venv\Scripts\python.exe -X utf8 -m unittest discover -s tests -p test_pcb_postprocess.py -v
 ```
 
-Faktycznie wykonane:
-- `python -X utf8 -m unittest test_pcb_easyeda_control -v`: **5 PASS**.
-- `python -X utf8 -m unittest test_pcb_gerber.GerberTests.test_cli_and_preflight_failure_before_native -v`: **1 PASS** (mała syntetyczna regresja niezmienionego CLI).
-- `git diff --check`, SHA archiwum i kontrola listy zmian.
-Nie wykonano native XML/FDTD, pełnej suite, realnego mesh spirali, benchmarków,
-FAST/coupling ani PSU. Poprzednie testy FAST są w history.md; nie powtarzać ich przy okazji.
-Kod zadania: `pcb/easyeda_control.py`, `tests/test_pcb_easyeda_control.py`.
-Istniejące punkty integracji: pcb/control.py, solvers/openems_pcb.py,
-solvers/pcb_mesh.py i solvers/profiles.py — bez zmian implementacji.
+W tym checkpointcie testów jeszcze nie wykonano. Nie uruchamiać pełnej suite,
+FDTD, benchmarków, PSU ani coupling. Po celowanych regresjach zaktualizować
+przekazanie i opublikować wyniki. CLI:
+`python -m antenna_lab.pcb.postprocess --run-dir <katalog>`.
 
 ## 7. Dokumenty, decyzje i ograniczenia wymagające zachowania
 

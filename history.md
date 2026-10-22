@@ -2405,3 +2405,14 @@ Nie zmieniono żadnego pliku istniejącego meshera, profili, solvera, parsera
 ani Gerber CLI. Aktualne dokumenty: README, todo, history, pcb-easyeda,
 pcb-reduced (zamrożenie), migracja. Następny krok: lokalny prepare-only,
 raport realnego kosztu lub istniejącego guardu, bez automatycznej optymalizacji.
+
+## 2026-10-22 — wspólny postprocessing PCB: checkpoint przed testami
+
+Oddzielono wykonanie openEMS od CalcPort, dodano trwały pcb-run.json przed
+Run, wspólny procesor EasyEDA/Gerber oraz CLI odzyskiwania bez FDTD. Dane
+odzyskane trafiają do osobnej rewizji, surowe artefakty i pierwotne summary
+pozostają nienaruszone. Brak stats oznacza niepotwierdzone zakończenie,
+nie zakaz odczytu sond. Port, pola i raport mają osobne statusy.
+Dodano małe testy kontraktu; w tym checkpointcie jeszcze nieuruchomione.
+Nie zmieniono geometrii/fizyki/meshera, nie uruchomiono native ani PSU.
+Legacy bez kompletnej specyfikacji odrzucany z listą braków, bez zgadywania.

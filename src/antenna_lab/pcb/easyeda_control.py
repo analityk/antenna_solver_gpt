@@ -157,10 +157,14 @@ def run_easyeda_control(project_path, output_dir, *, source_config, source_pcb_i
         stage='native_preparation' if prepare_only else 'native_run'
         if prepare_only:
             native=output/'native';native.mkdir()
-            _,_,_,native_mesh,_,preparation=prepare_pcb_xml_model(
+            _,_,_,native_mesh,port_spec,preparation=prepare_pcb_xml_model(
                 geometry,settings,native/'model.xml',gerber_quality=profile.name,**field_options)
             if native_mesh!=mesh:
                 raise ConfigurationError('Native PCB mesh differs from source preflight mesh.')
+            from .postprocess import save_preparation
+            save_preparation(output,geometry,settings,native_mesh,port_spec,preparation,
+                context={'summary':dict(diagnostics,import_metadata=provenance),
+                         'artifacts':dict(snapshots, **{'import.json':provenance})})
             result=dict(status='prepared',preparation=preparation)
             diagnostics['termination_status']='not_run'
             print(f"XML: {native/'model.xml'}",flush=True)
@@ -168,17 +172,14 @@ def run_easyeda_control(project_path, output_dir, *, source_config, source_pcb_i
             # Keep output empty until this existing controller has claimed it.
             result=run_control_model(geometry,settings,output,gerber_quality=profile.name,
                 expected_domain_mesh=mesh,exact_endcriteria=settings.runtime.exact_endcriteria,
-                dump_statistics=settings.runtime.dump_statistics,**field_options)
-            if settings.runtime.dump_statistics:
-                iterations=result['native_statistics']['number_of_iterations']
-                diagnostics['actual_iterations']=iterations
-                if not 0<iterations<settings.max_timesteps:
-                    raise ConfigurationError('PCB native termination not established: timestep limit reached.')
-                diagnostics['termination_status']='completed_before_limit'
-                result['status']='completed'
-            else:
-                diagnostics['termination_status']='not_established_statistics_disabled'
-                result['status']='finished_unverified'
+                dump_statistics=settings.runtime.dump_statistics,
+                run_context={'summary':dict(diagnostics,import_metadata=provenance),
+                             'artifacts':dict(snapshots, **{'import.json':provenance})},**field_options)
+            diagnostics['termination_status'] = result.get('termination_status', 'unconfirmed')
+            if 'native_statistics' in result:
+                diagnostics['actual_iterations'] = result['native_statistics']['number_of_iterations']
+            if result.get('stages', {}).get('port', {}).get('status') == 'failed':
+                raise ConfigurationError(result['stages']['port']['reason'])
             result['note']=result['note'].replace('First synthetic PCB FDTD control result.',
                                                    'PCB FDTD result imported from EasyEDA project geometry.')
             result.update(sampled_diagnostics(result))

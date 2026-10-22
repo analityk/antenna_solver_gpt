@@ -1,5 +1,10 @@
 # TODO — PCB: aktualny stan i następne kroki
 
+**Bieżące zadanie:** wspólny postprocessing PCB bez ponownego FDTD.
+Checkpoint implementacji przed testami; kontrakt `docs/pcb-postprocess.md`.
+Priorytet: małe regresje odzyskiwania i lokalny odbiór danych Windows.
+FAST/coupling oraz PSU poza zakresem. Poniższy opis mostu jest historyczny.
+
 Stan na 2026-10-22. **Decyzja użytkownika: podstawowym wejściem geometrii
 PCB jest kompletny projekt EasyEDA Pro V2 `.epro`** (ZIP z `project.json`,
 `PCB/*.epcb`, `FOOTPRINT/*.efoo`). Pojedynczy `.epcb` służy do

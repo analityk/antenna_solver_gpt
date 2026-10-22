@@ -103,3 +103,11 @@ i atomowo zastępuje poprawny model. Tab lub utrata fokusu nie uruchamia apply.
 EditorState zachowuje pełną precyzję nietkniętych wartości. Zmiana samej
 częstotliwości nie przebudowuje geometrii; zatwierdzenie bez zmian nie rysuje
 ponownie wykresu. Eksport PNG używa FigureCanvasAgg bez dodatkowego okna.
+
+## Trwała granica wykonania PCB
+
+PCB używa jednego postprocessingu w `pcb/postprocess.py` dla kontrolerów
+EasyEDA/Gerber i odzyskiwania. `pcb-run.json` powstaje przed Run, a silnik
+jest oddzielony od odczytu sond, pól i raportowania. Statusy engine, temporal,
+port, fields i report są niezależne. CLI, artefakty i ograniczenia starszych
+wyników: [pcb-postprocess.md](pcb-postprocess.md).

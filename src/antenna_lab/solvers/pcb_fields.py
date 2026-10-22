@@ -133,9 +133,10 @@ def voltage_scale(voltage):
     return scale
 
 
-def finish_pcb_fields(geometry,mesh,layout,frequencies,reference,output):
+def finish_pcb_fields(geometry,mesh,layout,frequencies,reference,output, *, native_dir=None):
     """Read raw native HDF5 unchanged; save full complex Cartesian components."""
     frequencies=np.asarray(frequencies,float);layout=deepcopy(layout);output=Path(output)
+    native_dir = Path(native_dir) if native_dir is not None else output/'native'
     if not np.array_equal(frequencies,np.asarray(reference['frequency_hz'])):
         raise ConfigurationError('PCB fields: voltage reference frequencies do not match field frequencies.')
     voltage=np.asarray(reference['voltage_real'])+1j*np.asarray(reference['voltage_imag'])
@@ -147,7 +148,7 @@ def finish_pcb_fields(geometry,mesh,layout,frequencies,reference,output):
         fields={k:[] for k in 'EH'};reference_lines=None
         for i,f in enumerate(frequencies):
             for kind in 'EH':
-                lines,raw=_read_surface(output/'native'/plane['native_files'][kind],f)
+                lines,raw=_read_surface(native_dir/plane['native_files'][kind],f)
                 if reference_lines is None:
                     for a,line,lo,hi in zip(axes,lines,plane['start_m'],plane['stop_m']):
                         expected=a[(a>=lo)&(a<=hi)]
