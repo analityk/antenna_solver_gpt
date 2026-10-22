@@ -36,6 +36,18 @@ def _fields(text):
     return [_positive(x, 'Częstotliwości pól MHz') for x in parts]
 
 
+def suggest_excitation(start_mhz, stop_mhz):
+    """Center and Gaussian cutoff spanning the requested sweep under the 0.8 guard.
+
+    Only a GUI suggestion: no automatic changes to the physical experiment.
+    """
+    start = _positive(start_mhz, 'Początek sweep')
+    stop = _positive(stop_mhz, 'Koniec sweep')
+    if stop <= start:
+        raise ValueError('Koniec sweep musi być większy niż początek.')
+    return (start + stop) / 2, (stop - start) / (2 * 0.8)
+
+
 def command_for(action, values, *, interpreter=None):
     """No shell, no external process. Validate form and emit native CLI argv."""
     python = str(interpreter or sys.executable)
@@ -86,8 +98,18 @@ def command_for(action, values, *, interpreter=None):
     step = _positive(values.get('step_mhz', ''), 'Krok sweep')
     if high <= low or step > high - low:
         raise ValueError('Zakres sweep musi mieć dodatnią długość i co najmniej dwa punkty.')
-    if low < center - cutoff - 1e-9 or high > center + cutoff + 1e-9:
-        raise ValueError('Zakres sweep leży poza pasmem pobudzenia center ± cutoff.')
+    # Match the backend guard: usable result frequencies lie inside
+    # center ± 0.8 × cutoff, not the full nominal Gaussian bandwidth.
+    guard = 0.8 * cutoff
+    tolerance = 1e-9 * max(1., abs(center), abs(cutoff))
+    if low < center - guard - tolerance or high > center + guard + tolerance:
+        proposed_center, proposed_cutoff = suggest_excitation(low, high)
+        raise ValueError(
+            f'Sweep {low:g}–{high:g} MHz jest poza dopuszczalnym pasmem '
+            f'pobudzenia {center-guard:g}–{center+guard:g} MHz '
+            f'(środek ± 0.8 × odcięcie). Kliknij "Dopasuj pobudzenie do sweep" '
+            f'lub ustaw środek {proposed_center:g} MHz i odcięcie '
+            f'{proposed_cutoff:g} MHz.')
     n = (high - low) / step
     if abs(n - round(n)) > 1e-7:
         raise ValueError('Krok sweep musi dzielić zakres dokładnie (punkt końcowy).')

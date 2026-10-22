@@ -1,5 +1,12 @@
 # TODO — PCB: aktualny stan i następne kroki
 
+**2026-10-23: GUI — zgodność pasma pobudzenia i sweep.**
+Poprawiono walidację z center ± cutoff na rzeczywiste ograniczenie
+backendu center ± 0.8×cutoff. GUI daje komunikat z aktualnym pasmem
+i przycisk jawnego dopasowania center/cutoff do sweep. Test regresyjny
+dla sweep 100–900 MHz, center=600/cutoff=500 oraz dopasowania na 500/500.
+Bez wpływu na fizykę; bez FDTD.
+
 **2026-10-23: pierwsza aplikacja okienkowa PCB (Tkinter).**
 `PCB_GUI.bat` lub `python -m antenna_lab.pcb.gui` uruchamia formularz
 .epro → inspect-source → PREPARE-ONLY → FDTD → report, z konfiguracją

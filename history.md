@@ -2506,3 +2506,14 @@ niezgodne lub pominięte PREPARE-ONLY wywołuje ostrzeżenie.
 oraz walidacji. Brak wykonywalnego GUI testu na Windows w środowisku asystenta;
 nie uruchamiano native FDTD, PSU, FAST ani pełnej suite. Rozwiązanie pozostaje
 otwarte do odbioru na rzeczywistym komputerze użytkownika.
+
+### 2026-10-23 — naprawa niespójnej walidacji pobudzenia w PCB GUI
+
+Użytkownik zgłosił błąd konfiguracji dla center=600 MHz,
+cutoff=500 MHz, sweep=100–900 MHz. GUI błędnie uznało ten zakres
+za dozwolony, choć walidacja backendu dopuszcza jedynie
+center ± 0.8×cutoff, czyli 200–1000 MHz. Naprawiono walidację
+przed uruchomieniem CLI oraz dodano przycisk świadomego dopasowania
+center/cutoff do żądanego sweep. Przycisk nie zmienia fizyki w tle;
+nie zmieniano solvera ani interpretacji widma. Dodano test offline.
+Bez FDTD, PSU, FAST i pełnej suite.

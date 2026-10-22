@@ -1,7 +1,7 @@
 """Targeted offline GUI command tests; no Tk display and no FDTD."""
 import unittest
 
-from antenna_lab.pcb.gui_commands import command_for, is_matching_preparation, cmd_display
+from antenna_lab.pcb.gui_commands import command_for, is_matching_preparation, cmd_display, suggest_excitation
 
 
 BASE = {
@@ -75,6 +75,23 @@ class GuiCommandTests(unittest.TestCase):
         for updates, fragment in cases:
             with self.subTest(updates=updates), self.assertRaisesRegex(ValueError, fragment):
                 self.cmd('run', **updates)
+
+    def test_excitation_matches_80_percent_backend_guard(self):
+        values = dict(BASE, center_mhz='600', cutoff_mhz='500',
+                      start_mhz='100', stop_mhz='900', step_mhz='10',
+                      fields_mhz='200 500 800')
+        with self.assertRaisesRegex(ValueError, '200–1000 MHz'):
+            command_for('prepare', values, interpreter='python.exe')
+        center, cutoff = suggest_excitation('100', '900')
+        self.assertEqual((center, cutoff), (500., 500.))
+        values['center_mhz'] = str(center)
+        values['cutoff_mhz'] = str(cutoff)
+        args = command_for('prepare', values, interpreter='python.exe')
+        self.assertIn('--prepare-only', args)
+        self.assertEqual(args[args.index('--fields-mhz')+1:],
+                         ['200.0', '500.0', '800.0', '--prepare-only'])
+        with self.assertRaisesRegex(ValueError, 'większy'):
+            suggest_excitation('900', '100')
 
     def test_report_offline_crop_animation_with_open(self):
         args = self.cmd('report')
