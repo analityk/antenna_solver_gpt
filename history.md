@@ -2576,6 +2576,25 @@ i POUR na warstwie 16. Jest to odrębny wymóg modelu
 wielowarstwowego. Bez odgórnego usuwania warstw i bez
 fikcyjnej gotowości do pełnego EM.
 
+### 2026-10-23 — czytelność raportu i jawny brak HDF5 po przerwanym FDTD
+
+Użytkownik obejrzał odzyskany raport po przerwanym `stripline2_006`:
+`Rozwiązany profil openEMS` zajmował cały ekran pełnym JSON, a fioletowe
+pionowe linie w stackupie przedstawiały via umieszczone w arbitralnych X.
+To schemat warstw, nie rzeczywisty przekrój przez wiercenia. Profil jest
+teraz zwiniętym `<details>`, z nazwą i limitem komórek w nagłówku;
+pełny oryginalny JSON, w tym SHA/provenance, pozostaje dostępny na klik.
+Z rysunku usunięto fikcyjne pionowe przelotki; rzeczywiste wiercenia
+pozostają w tabeli Drills/vias i geometrii.
+
+Ustalono, że sześć natywnych plików E/H HDF5 ma grupę `FieldData/FD`
+z częstotliwościami, ale bez datasetów `f0...`. Czytnik rozróżnia teraz
+pusty zestaw (brak widm po przerwaniu) od nieznanego układu HDF5.
+Port odzyskany (`processed`), temporalne zakończenie `unconfirmed`, więc
+raport nie dowodzi zbieżności ani fizycznego rezonansu. Dodano testy
+regresyjne profilu/stackupu i pustego FD. Brak nowych obliczeń FDTD,
+bez zmian siatki, pól, danych surowych, geometrii i modelu EM.
+
 ### 2026-10-23 — adapter wielowarstwowego EasyEDA i warstwy EM GUI
 
 Realny stripline1.epro ujawnił ograniczenie adaptera D4 do top /
