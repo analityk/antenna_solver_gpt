@@ -294,7 +294,6 @@ class PcbDesktop(tk.Tk):
             self.material_status.set('Nie udało się odczytać warstw: '+str(exc))
             self._log('Warstwy: '+str(exc)+'\n','error')
             return
-        from antenna_lab.core.config import ConfigurationError
         for widget in self.material_list.winfo_children():
             widget.destroy()
         self._material_editors={}
@@ -304,11 +303,6 @@ class PcbDesktop(tk.Tk):
             ttk.Label(self.material_list,text=header,font=('Segoe UI',9,'bold')).grid(
                 row=0,column=j,sticky='w',padx=(0,15),pady=(0,4))
         layers={v['id']:v for v in source.semantics['layers']}
-        z=0.0
-        index=0
-        for item in stack['copper_layers']+stack['dielectric_layers']:
-            # Render in exact physical Z order rather than grouping materials.
-            pass
         elements=[('copper',s,s['z_m']) for s in stack['copper_layers']]
         elements += [('dielectric',d,d['z_max_m']) for d in stack['dielectric_layers']]
         elements.sort(key=lambda x:(-x[2],x[0]!='copper'))
@@ -316,8 +310,7 @@ class PcbDesktop(tk.Tk):
             lid=item['layer_id'];thickness=(item['thickness_m'] if kind=='copper' else
                                            item['z_max_m']-item['z_min_m'])
             role=(item['role'] if kind=='copper' else 'dielektryk')
-            info=(f'{lid} · {item["name"]}' if kind=='dielectric' else
-                  f'{lid} · {item["name"]}')
+            info=f'{lid} · {item["name"]}'
             for col,value in enumerate((info,role,f'{level*1e3:.3f}',f'{thickness*1e3:.3f}')):
                 ttk.Label(self.material_list,text=value).grid(row=row,column=col,
                     sticky='w',padx=(0,20),pady=2)
