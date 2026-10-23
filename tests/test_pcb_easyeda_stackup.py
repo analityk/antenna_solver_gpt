@@ -76,7 +76,7 @@ class EasyEdaStackupTests(unittest.TestCase):
         d=sample();d['layers'][0]['type']='WILDCARD'
         with self.assertRaisesRegex(ConfigurationError,'unknown physical layer kind'):
             source_physical_stackup(d)
-        d=sample();d['layer_physics'][5]['epsilon_r']=float('nan')
+        d=sample();d['layer_physics'][6]['epsilon_r']=float('nan')
         with self.assertRaisesRegex(ConfigurationError,'invalid material parameter'):
             describe_source_stackup(d,'sha')
 
