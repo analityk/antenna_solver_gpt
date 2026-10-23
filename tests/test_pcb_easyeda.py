@@ -172,6 +172,67 @@ class EasyEdaTests(unittest.TestCase):
         with self.assertRaisesRegex(ConfigurationError,'polygon subtype'):
             parse_easyeda_source(encoded(items))
 
+    def test_curved_poured_semicircles_are_real_holes(self):
+        from shapely.geometry import Point, Polygon
+        items=records()
+        outer=items[-1][5][0]
+        hole=[-5,0,'ARC',180,5,0,'ARC',180,-5,0]
+        items[-1][5]=[outer,hole]
+        source=parse_easyeda_source(encoded(items))
+        rings=source.semantics['poured'][0]['rings_xy_m']
+        self.assertEqual(len(rings),2)
+        self.assertGreater(len(rings[1]),80)
+        from antenna_lab.pcb.easyeda_model import complex_copper_shape
+        fill=complex_copper_shape(rings,'sample')
+        self.assertFalse(fill.covers(Point(0,0)))
+        self.assertTrue(fill.covers(Point(-.008,0)))
+        self.assertEqual(len(fill.interiors),1)
+
+    def test_mixed_rounded_rectangular_arc_L_poured_hole(self):
+        from shapely.geometry import Point
+        from antenna_lab.pcb.easyeda_model import complex_copper_shape
+        items=records()
+        outer=items[-1][5][0]
+        # Rounded rectangular aperture, two semicircular ends and two lines.
+        hole=[-5,5,'ARC',90,0,10,'L',5,10,'ARC',90,10,5,
+              'L',10,-5,'ARC',90,5,-10,'L',-5,-10,
+              'ARC',90,-10,-5,'L',-10,0,'ARC',90,-5,5]
+        items[-1][5]=[outer,hole]
+        rings=parse_easyeda_source(encoded(items)).semantics['poured'][0]['rings_xy_m']
+        self.assertGreater(len(rings[1]),20)
+        shape=complex_copper_shape(rings,'rounded aperture')
+        self.assertFalse(shape.covers(Point(0,0)))
+
+    def test_real_repository_stripline_poured_arcs_and_provenance(self):
+        import zipfile
+        from shapely.geometry import Point
+        from antenna_lab.pcb.easyeda_model import complex_copper_shape
+        path=Path(__file__).resolve().parents[1]/'gerbs/stripline1/stripline1.epro'
+        if not path.is_file(): self.skipTest('real stripline1.epro not available')
+        with zipfile.ZipFile(path) as archive:
+            pcb=next(name for name in archive.namelist()
+                     if name.startswith('PCB/') and name.endswith('.epcb'))
+            raw=archive.read(pcb)
+        source=parse_easyeda_source(raw,source_file=f'{path}!{pcb}')
+        pours={p['id']:p for p in source.semantics['poured']}
+        self.assertEqual(len(pours['e102']['rings_xy_m']),6)
+        self.assertEqual(len(pours['e103']['rings_xy_m']),6)
+        for id in ('e102','e103'):
+            shape=complex_copper_shape(pours[id]['rings_xy_m'],id)
+            self.assertTrue(shape.is_valid)
+            self.assertGreaterEqual(len(shape.interiors),5)
+            self.assertFalse(shape.covers(Point(20.966e-2*0.0254,58.5e-2*0.0254)))
+        self.assertEqual(pours['e102']['record_index'],230)
+
+    def test_curved_poured_zero_sweep_and_bad_segment_fail_closed(self):
+        items=records()
+        items[-1][5].append([-5,0,'ARC',0,5,0,'ARC',180,-5,0])
+        with self.assertRaisesRegex(ConfigurationError,'degenerate/unsupported ARC'):
+            parse_easyeda_source(encoded(items))
+        items[-1][5][-1]=[-5,0,'C',0,5,0]
+        with self.assertRaisesRegex(ConfigurationError,'unsupported polygon segment'):
+            parse_easyeda_source(encoded(items))
+
     def test_pour_boundary_is_not_filled_without_poured(self):
         src=parse_easyeda_source(encoded(records()[:-1]))
         with self.assertRaisesRegex(ConfigurationError,'materialized POURED geometry unavailable'):
