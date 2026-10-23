@@ -17,6 +17,8 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, scrolledtext, ttk
 
 from .gui_commands import cmd_display, command_for, is_matching_preparation, suggest_excitation
+from .gui_project_settings import (
+    project_parameters_dir, read_project_settings, write_project_settings)
 
 ROOT = Path(__file__).resolve().parents[3]
 PREFS = Path.home() / '.antenna_lab_pcb_gui.json'
@@ -48,13 +50,40 @@ class PcbDesktop(tk.Tk):
         self._stage_report = False
         self._ready = False
         values = dict(DEFAULTS)
+        self._active_project = None
+        self._parameters_dir = None
+        self._startup_warning = None
+        saved = {}
         try:
-            saved = json.loads(PREFS.read_text(encoding='utf-8'))
-            if isinstance(saved, dict):
-                values.update({k: v for k, v in saved.items()
-                               if k in DEFAULTS and isinstance(v, type(DEFAULTS[k]))})
+            record = json.loads(PREFS.read_text(encoding='utf-8'))
+            if isinstance(record, dict):
+                saved = {k: v for k, v in record.items()
+                         if k in DEFAULTS and type(v) is type(DEFAULTS[k])}
+                for k in ('project', 'csxcad_path'):
+                    if k in saved:
+                        values[k] = saved[k]
         except (OSError, ValueError, TypeError):
             pass
+        initial = str(values['project']).strip()
+        if initial and Path(initial).is_file():
+            try:
+                directory = project_parameters_dir(initial, ROOT)
+                directory.mkdir(parents=True, exist_ok=True)
+                per_project = read_project_settings(directory, Path(initial).parent, DEFAULTS)
+                if per_project is not None:
+                    values.update(per_project)
+                else:
+                    # One-time compatibility for settings stored by the older
+                    # global GUI. Future writes use only the project sidecar.
+                    values.update({k: v for k, v in saved.items()
+                                   if k not in ('project', 'csxcad_path')})
+                self._active_project = str(Path(initial).resolve())
+                self._parameters_dir = directory
+                values['project'] = self._active_project
+            except (OSError, ValueError) as exc:
+                self._startup_warning = str(exc)
+        self.parameters_path = tk.StringVar(
+            value=str(self._parameters_dir) if self._parameters_dir else 'Wybierz plik .epro')
         self.var = {key: (tk.BooleanVar(value=value) if isinstance(value, bool)
                           else tk.StringVar(value=value))
                     for key, value in values.items() if key != 'overrides'}
@@ -67,6 +96,9 @@ class PcbDesktop(tk.Tk):
         self.preview_mode.trace_add('write', lambda *_: self._refresh_preview())
         self._ready = True
         self._refresh_preview()
+        if self._startup_warning:
+            self.status.set('Parametry projektu: '+self._startup_warning)
+            self._log(self._startup_warning+'\n', 'error')
         self.after(100, self._drain_events)
         self.protocol('WM_DELETE_WINDOW', self._on_close)
 
@@ -87,9 +119,18 @@ class PcbDesktop(tk.Tk):
         project_row = ttk.Frame(outer)
         project_row.pack(fill='x', pady=(0, 8))
         ttk.Label(project_row, text='Plik .epro:').pack(side='left', padx=(0, 8))
-        ttk.Entry(project_row, textvariable=self.var['project']).pack(side='left', fill='x', expand=True)
+        self.project_entry = ttk.Entry(project_row, textvariable=self.var['project'])
+        self.project_entry.pack(side='left', fill='x', expand=True)
+        self.project_entry.bind('<Return>', self._commit_project_entry)
+        self.project_entry.bind('<FocusOut>', self._commit_project_entry)
         self.browse_project = ttk.Button(project_row, text='Wybierz projekt…', command=self._choose_project)
         self.browse_project.pack(side='left', padx=(8, 0))
+
+        params_row = ttk.Frame(outer)
+        params_row.pack(fill='x', pady=(0, 10))
+        ttk.Label(params_row, text='Katalog parametrów projektu:').pack(side='left', padx=(0, 8))
+        ttk.Label(params_row, textvariable=self.parameters_path).pack(side='left', fill='x', expand=True)
+        ttk.Button(params_row, text='Otwórz parametry', command=self._open_parameter_dir).pack(side='right')
 
         notebook = ttk.Notebook(outer)
         notebook.pack(fill='x', pady=(0, 9))
@@ -193,7 +234,7 @@ class PcbDesktop(tk.Tk):
         ttk.Label(frame, text='CSXCAD_INSTALL_PATH').grid(row=4, column=0, sticky='w', pady=5)
         ttk.Entry(frame, textvariable=self.var['csxcad_path'], width=50).grid(
             row=4, column=1, columnspan=3, sticky='we')
-        ttk.Label(frame, text='Konfiguracja źródła').grid(row=5, column=0, sticky='w', pady=5)
+        ttk.Label(frame, text='Konfiguracja źródła (opcjonalnie)').grid(row=5, column=0, sticky='w', pady=5)
         ttk.Entry(frame, textvariable=self.var['source_config'], width=50).grid(
             row=5, column=1, columnspan=3, sticky='we')
         ttk.Button(frame, text='Wskaż JSON…', command=self._choose_config).grid(row=5, column=4, padx=10)
@@ -232,25 +273,86 @@ class PcbDesktop(tk.Tk):
         values['overrides'] = self.overrides_text.get('1.0', 'end-1c')
         return values
 
+    def _save_current_project(self):
+        if self._parameters_dir is None or self._active_project is None:
+            return
+        write_project_settings(self._parameters_dir, Path(self._active_project).parent,
+                               self._values(), DEFAULTS)
+
     def _save_preferences(self):
         try:
-            PREFS.write_text(json.dumps(self._values(), indent=2, ensure_ascii=False)+'\n',
+            self._save_current_project()
+            # The install directory is machine-wide; only project-specific
+            # simulation values live in parameters/<project folder>.
+            data = {'project': self._active_project or '',
+                    'csxcad_path': self.var['csxcad_path'].get()}
+            PREFS.write_text(json.dumps(data, indent=2, ensure_ascii=False)+'\n',
                              encoding='utf-8')
-        except OSError as exc:
-            self._log(f'Nie zapisano preferencji GUI: {exc}\n', 'error')
+        except (OSError, ValueError) as exc:
+            self._log(f'Nie zapisano ustawień GUI: {exc}\n', 'error')
+
+    def _activate_project(self, selected, *, show_error=True):
+        if self._busy:
+            return False
+        path = Path(str(selected).strip()).expanduser()
+        if not path.is_absolute():
+            path = ROOT / path
+        path = path.resolve()
+        if not path.is_file() or path.suffix.lower() != '.epro':
+            if show_error:
+                messagebox.showerror('Plik EasyEDA', 'Wskaż istniejący plik .epro.', parent=self)
+            else:
+                self.status.set('Wybierz istniejący projekt .epro.')
+            return False
+        if str(path) == self._active_project:
+            return True
+        try:
+            directory = project_parameters_dir(path, ROOT)
+            directory.mkdir(parents=True, exist_ok=True)
+            stored = read_project_settings(directory, path.parent, DEFAULTS)
+            # Save old values only after validating the new directory. This
+            # also saves edits when switching between sibling EPRO documents.
+            self._save_current_project()
+        except (OSError, ValueError) as exc:
+            if show_error:
+                messagebox.showerror('Katalog parametrów', str(exc), parent=self)
+            self.status.set('Nie udało się przełączyć parametrów: '+str(exc))
+            return False
+        values = dict(DEFAULTS)
+        values.update(stored or {})
+        global_install = self.var['csxcad_path'].get()
+        self._active_project = str(path)
+        self._parameters_dir = directory
+        self.parameters_path.set(str(directory))
+        self.var['project'].set(str(path))
+        for name, value in values.items():
+            if name in ('project', 'csxcad_path', 'overrides'):
+                continue
+            self.var[name].set(value)
+        self.var['csxcad_path'].set(global_install)
+        self.overrides_text.delete('1.0', 'end')
+        self.overrides_text.insert('1.0', values['overrides'])
+        self._command_prepared = None
+        self.status.set('Projekt: '+path.name+' | parametry: '+str(directory))
+        self._log('Parametry projektu: '+str(directory)+'\n', 'info')
+        self._refresh_preview()
+        return True
+
+    def _commit_project_entry(self, _event=None):
+        if self._busy:
+            return
+        selected = self.var['project'].get().strip()
+        if selected and selected != self._active_project:
+            self._activate_project(selected, show_error=False)
 
     def _choose_project(self):
         initial = self.var['project'].get()
         file = filedialog.askopenfilename(
-            title='Wybierz projekt EasyEDA Pro', initialdir=str(Path(initial).parent) if initial else str(ROOT),
+            title='Wybierz projekt EasyEDA Pro',
+            initialdir=str(Path(initial).parent) if initial else str(ROOT),
             filetypes=[('Projekt EasyEDA Pro', '*.epro'), ('Wszystkie pliki', '*.*')])
         if file:
-            if file != self.var['project'].get():
-                self.var['source_config'].set('')
-                self.var['pth_plating_um'].set('')
-                self._command_prepared = None
-            self.var['project'].set(file)
-            self.status.set('Wybrano projekt. Inspekcja sprawdzi model źródłowy bez FDTD.')
+            self._activate_project(file)
 
     def _choose_config(self):
         file = filedialog.askopenfilename(
@@ -292,10 +394,14 @@ class PcbDesktop(tk.Tk):
             button.configure(state='disabled' if busy else 'normal')
         self.stop_button.configure(state='normal' if busy else 'disabled')
         self.browse_project.configure(state='disabled' if busy else 'normal')
+        self.project_entry.configure(state='disabled' if busy else 'normal')
         self.match_button.configure(state='disabled' if busy else 'normal')
 
     def _start(self, stage):
         if self._busy:
+            return
+        if stage != 'report' and not self._activate_project(
+                self.var['project'].get(), show_error=True):
             return
         values = self._values()
         try:
@@ -445,16 +551,26 @@ class PcbDesktop(tk.Tk):
                 self._log(f'Nie można przerwać procesu: {exc}\n', 'error')
         self.status.set('Wysłano prośbę o przerwanie procesu.')
 
+    def _open_parameter_dir(self):
+        if self._parameters_dir is None or not self._parameters_dir.is_dir():
+            messagebox.showerror('Parametry', 'Najpierw wybierz projekt .epro.', parent=self)
+            return
+        self._open_directory(self._parameters_dir)
+
+    @staticmethod
+    def _open_directory(path):
+        if sys.platform == 'win32':
+            os.startfile(str(path))
+        else:
+            import webbrowser
+            webbrowser.open(Path(path).resolve().as_uri())
+
     def _open_folder(self):
         folder = str(self.var['run_dir'].get()).strip()
         if not folder or not Path(folder).is_dir():
             messagebox.showerror('Katalog', 'Wskaż istniejący katalog wyników.', parent=self)
             return
-        if sys.platform == 'win32':
-            os.startfile(folder)
-        else:
-            import webbrowser
-            webbrowser.open(Path(folder).resolve().as_uri())
+        self._open_directory(folder)
 
     def _on_close(self):
         if self._busy:
