@@ -288,7 +288,7 @@ potwierdza rozdzielone skale. Nie jest to EasyEDA Standard ani format Pro V3.
 
 DOCTYPE, HEAD, CANVAS, LAYER, LAYER_PHYS, NET, LINE, ARC, VIA, PAD_NET,
 COMPONENT i ATTR. POLY: niezaokrąglone R (dowolny obrót) i proste
-kontury L. POUR / POURED: **wiele konturów L/R z regułą nonzero**
+kontury L. POUR / POURED: **wiele konturów L/R (także jawne R isCCW) z regułą nonzero**
 (oddzielne wyspy, dziury według orientacji/winding); tylko prawdziwe
 materializowane wypełnienie POURED jest fizyczną miedzią, a POUR wyznacza
 granicę. POURED nadal wymaga fill=true i stroke=0; termiczne spoke,
