@@ -258,8 +258,18 @@ class PcbDesktop(tk.Tk):
     def _tab_materials(self, frame):
         ttk.Label(frame,text='Warstwy fizyczne z pliku EasyEDA (bez maski, silk, pasty i dokumentacji):').pack(
             anchor='w')
-        self.material_list=ttk.Frame(frame)
-        self.material_list.pack(fill='x', pady=(7,5))
+        list_container=ttk.Frame(frame)
+        list_container.pack(fill='x', pady=(7,5))
+        self.material_canvas=tk.Canvas(list_container,height=188,highlightthickness=0)
+        layer_scroll=ttk.Scrollbar(list_container,orient='vertical',
+                                   command=self.material_canvas.yview)
+        self.material_canvas.configure(yscrollcommand=layer_scroll.set)
+        self.material_canvas.pack(side='left',fill='x',expand=True)
+        layer_scroll.pack(side='right',fill='y')
+        self.material_list=ttk.Frame(self.material_canvas)
+        self.material_canvas.create_window((0,0),window=self.material_list,anchor='nw')
+        self.material_list.bind('<Configure>',lambda _:
+            self.material_canvas.configure(scrollregion=self.material_canvas.bbox('all')))
         self.material_status=tk.StringVar(value='Wybierz projekt .epro, aby zobaczyć warstwy.')
         ttk.Label(frame,textvariable=self.material_status,foreground='#666',
                   wraplength=1050).pack(anchor='w')
