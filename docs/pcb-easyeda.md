@@ -5,6 +5,50 @@ EasyEDA Pro V2: `project.json`, `PCB/*.epcb`, `FOOTPRINT/*.efoo`, również
 embedded FOOTPRINT. Dotychczasowe samodzielne `.epcb` i Gerber pozostają
 kompatybilne. Import nie eksportuje ani nie odczytuje pośredniego Gerbera.
 
+## Wiele warstw EasyEDA — fizyczne LAYER_PHYS bez warstw technologicznych (2026-10-23)
+
+Importer rozpoznaje faktyczny stos z **kolejności rekordów LAYER_PHYS**:
+TOP / SUBSTRATE / SIGNAL lub PLANE / SUBSTRATE / ... / BOTTOM.
+Predefiniowane, nieużywane numery InnerXX nie tworzą miedzi.
+Górna miedź ma z=0, kolejne powierzchnie leżą na granicach kolejnych
+dielektryków poniżej zera. Wszystkie miedzi są oddzielnymi powierzchniami
+PEC bez geometrycznej grubości; rzeczywiste grubości z CAD pozostają
+jedynie metadanymi materiału. Model zachowuje źródłowe ID warstw,
+grubości, ślady, pady, POURED z otworami oraz przelotki. Otwory PTH
+wymagają dotychczasowej **jawnej** grubości galwanizacji.
+
+Fizyczne warstwy SUBSTRATE są jedynymi dielektrykami FDTD.
+Silk, pasta, stencil, solder mask i inne jednoznacznie znane warstwy
+pomocnicze **nie są modelowane**. Maska antylutownicza pozostaje
+odłożona do jawnego przyszłego modelu przybliżonej przenikalności
+efektywnej; nie zmieniaj dziś εr podłoża przez ukryty współczynnik.
+Nieznane typy warstw fizycznych są blokowane zamiast automatycznie
+pomijane.
+
+**Nie wolno zgadywać εr:** w realnym `stripline1.epro` trzy dielektryki
+(361, 362, 363) mają εr=0 w LAYER_PHYS. Jest to brak danych
+elektromagnetycznych, nie fizyczna εr=0. `--inspect-source` zachowuje
+i wypisuje stos wraz z listą brakujących wartości, a PREPARE-ONLY/FDTD
+zostaje zatrzymany, dopóki użytkownik świadomie ich nie uzupełni.
+W GUI służy do tego zakładka **Warstwy EM** z polami εr/tanδ. Odpowiada
+temu opcjonalna jawna flaga CLI powtarzana dla każdej warstwy:
+
+```bat
+.\.venv\Scripts\python.exe -m antenna_lab.pcb.easyeda_control --easyeda-project gerbs\stripline1\stripline1.epro --quality design --geometry-resolution-um 10 --fields-mhz 1000 2000 --center-mhz 1500 --cutoff-mhz 1400 --sweep-start-mhz 1000 --sweep-stop-mhz 2000 --sweep-step-mhz 100 --pth-plating-um 25 --dielectric-material 361:4.2:0.02 --dielectric-material 362:4.2:0.02 --dielectric-material 363:4.2:0.02 --prepare-only
+```
+
+Wartości **4.2/0.02 i 25 µm są wyłącznie przykładem jawnych
+założeń użytkownika, nie danymi z `.epro` ani zweryfikowanym materiałem**.
+Źródłowe εr/tanδ z poprawnego CAD mają pierwszeństwo, jeśli nie ma
+jawnych nadpisań. Użytkownik może też użyć `dielectrics` w pełnym
+`--source-config` (wtedy nie łączyć z oddzielnymi flagami).
+
+Test regresyjny `tests/test_pcb_easyeda_stackup.py` analizuje prawdziwy
+`gerbs/stripline1/stripline1.epro`: TOP(1), Inner1(15), Inner2(16),
+BOTTOM(2) i trzy SUBSTRATE(361,362,363). Sam poprawny import geometryczny
+nie oznacza poprawności S11; nadal wymagane są audyty portu, siatki,
+weryfikacja czasu FDTD i zbieżność EM.
+
 ## Automatyczne source-config z pełnego projektu .epro
 
 Nowy tryb źródłowy **nie wymaga** ręcznego `--source-config`. Dla dokładnie
