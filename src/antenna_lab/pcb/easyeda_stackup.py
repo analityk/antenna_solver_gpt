@@ -167,3 +167,24 @@ def describe_source_stackup(data, source_sha256, overrides=None, *, require_mate
                 ignored_layers=src['ignored_layers'],missing_materials=missing,
                 soldermask_model='omitted; effective permittivity model deferred',
                 copper_geometry_model='PEC surfaces; foil thickness is material metadata only')
+
+def parse_source_dielectric_materials(specs):
+    """CLI/GUI data grammar: LAYER_ID:epsilon_r:loss_tangent, no defaults."""
+    result={}
+    for value in specs:
+        text=str(value)
+        pieces=text.split(':')
+        if len(pieces)!=3 or not pieces[0].isdigit():
+            raise ConfigurationError(f'EasyEDA dielectric material {text!r}: '
+                                     'expected LAYER_ID:epsilon_r:loss_tangent.')
+        key=str(int(pieces[0]))
+        if key in result:
+            raise ConfigurationError(f'EasyEDA dielectric material: duplicate layer {key}.')
+        try:
+            eps=float(pieces[1]);loss=float(pieces[2])
+        except ValueError as exc:
+            raise ConfigurationError(f'EasyEDA dielectric {key}: invalid numeric material data.') from exc
+        if not isfinite(eps) or eps<1 or not isfinite(loss) or loss<0:
+            raise ConfigurationError(f'EasyEDA dielectric {key}: require epsilon_r>=1 and loss_tangent>=0.')
+        result[key]=dict(epsilon_r=eps,loss_tangent=loss)
+    return result
