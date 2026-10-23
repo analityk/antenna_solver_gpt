@@ -24,6 +24,7 @@ ROOT = Path(__file__).resolve().parents[3]
 PREFS = Path.home() / '.antenna_lab_pcb_gui.json'
 DEFAULTS = {
     'project': '', 'pcb_id': '', 'source_config': '', 'pth_plating_um': '',
+    'dielectric_materials': '',
     'quality': 'design', 'geometry_um': '10', 'center_mhz': '1500',
     'cutoff_mhz': '1400', 'start_mhz': '1000', 'stop_mhz': '2000',
     'step_mhz': '100', 'fields_enabled': True, 'fields_mhz': '1000 2000',
@@ -88,6 +89,7 @@ class PcbDesktop(tk.Tk):
                           else tk.StringVar(value=value))
                     for key, value in values.items() if key != 'overrides'}
         self.overrides_initial = values['overrides']
+        self._material_editors = {}
         self.preview_mode = tk.StringVar(value='prepare')
         self.status = tk.StringVar(value='Wskaż plik .epro i rozpocznij od inspekcji.')
         self._make_widgets()
@@ -95,6 +97,8 @@ class PcbDesktop(tk.Tk):
             v.trace_add('write', lambda *_: self._refresh_preview())
         self.preview_mode.trace_add('write', lambda *_: self._refresh_preview())
         self._ready = True
+        if self._active_project:
+            self._refresh_materials_for_project()
         self._refresh_preview()
         if self._startup_warning:
             self.status.set('Parametry projektu: '+self._startup_warning)
@@ -137,12 +141,15 @@ class PcbDesktop(tk.Tk):
         notebook.pack(fill='x', pady=(0, 9))
         tab_exp = ttk.Frame(notebook, padding=12)
         tab_solver = ttk.Frame(notebook, padding=12)
+        tab_layers = ttk.Frame(notebook, padding=12)
         tab_report = ttk.Frame(notebook, padding=12)
         notebook.add(tab_exp, text='  Eksperyment i pola  ')
         notebook.add(tab_solver, text='  Solver i źródło  ')
+        notebook.add(tab_layers, text='  Warstwy EM  ')
         notebook.add(tab_report, text='  Raport  ')
         self._tab_experiment(tab_exp)
         self._tab_solver(tab_solver)
+        self._tab_materials(tab_layers)
         self._tab_report(tab_report)
 
         workflow = ttk.Frame(outer)
@@ -248,6 +255,94 @@ class PcbDesktop(tk.Tk):
         self.overrides_text.grid(row=8, column=0, columnspan=5, sticky='we')
         self.overrides_text.bind('<KeyRelease>', lambda _: self._refresh_preview())
 
+    def _tab_materials(self, frame):
+        ttk.Label(frame,text='Warstwy fizyczne z pliku EasyEDA (bez maski, silk, pasty i dokumentacji):').pack(
+            anchor='w')
+        self.material_list=ttk.Frame(frame)
+        self.material_list.pack(fill='x', pady=(7,5))
+        self.material_status=tk.StringVar(value='Wybierz projekt .epro, aby zobaczyć warstwy.')
+        ttk.Label(frame,textvariable=self.material_status,foreground='#666',
+                  wraplength=1050).pack(anchor='w')
+        ttk.Label(frame,text='Wartości εr=0 w CAD oznaczają brak modelu materiału. '
+                  'Wpisz wybraną przenikalność; 0 nie będzie automatycznie zamieniane na FR-4. '
+                  'Soldermaska: pominięta (jej przybliżony model będzie osobnym etapem).',
+                  wraplength=1050,foreground='#666').pack(anchor='w',pady=(6,0))
+        ttk.Button(frame,text='Odczytaj warstwy ponownie',
+                   command=self._refresh_materials_for_project).pack(anchor='w',pady=(7,0))
+
+    def _sync_material_inputs(self):
+        """Only explicitly entered valid material rows become CLI overrides."""
+        specs=[]
+        for lid, (er, tangent) in self._material_editors.items():
+            if er.get().strip():
+                specs.append(f'{lid}:{er.get().strip()}:{tangent.get().strip()}')
+        self.var['dielectric_materials'].set(';'.join(specs))
+        self._refresh_preview()
+
+    def _refresh_materials_for_project(self):
+        if not self._active_project:
+            return
+        from .easyeda_project import load_easyeda_project,materialize_project_source
+        from .easyeda_stackup import describe_source_stackup,parse_source_dielectric_materials
+        try:
+            source=materialize_project_source(load_easyeda_project(self._active_project))
+            stack=describe_source_stackup(source.semantics,source.source_sha256)
+            present=self.var['dielectric_materials'].get()
+            already=parse_source_dielectric_materials(
+                [s.strip() for s in present.split(';') if s.strip()])
+        except (OSError,ValueError,RuntimeError) as exc:
+            self.material_status.set('Nie udało się odczytać warstw: '+str(exc))
+            self._log('Warstwy: '+str(exc)+'\n','error')
+            return
+        from antenna_lab.core.config import ConfigurationError
+        for widget in self.material_list.winfo_children():
+            widget.destroy()
+        self._material_editors={}
+        heads=('Kolejność / warstwa CAD','Rola EM','Położenie Z [mm]','Grubość [mm]',
+               'εr (edytuj)','tanδ (edytuj)')
+        for j,header in enumerate(heads):
+            ttk.Label(self.material_list,text=header,font=('Segoe UI',9,'bold')).grid(
+                row=0,column=j,sticky='w',padx=(0,15),pady=(0,4))
+        layers={v['id']:v for v in source.semantics['layers']}
+        z=0.0
+        index=0
+        for item in stack['copper_layers']+stack['dielectric_layers']:
+            # Render in exact physical Z order rather than grouping materials.
+            pass
+        elements=[('copper',s,s['z_m']) for s in stack['copper_layers']]
+        elements += [('dielectric',d,d['z_max_m']) for d in stack['dielectric_layers']]
+        elements.sort(key=lambda x:(-x[2],x[0]!='copper'))
+        for row,(kind,item,level) in enumerate(elements,1):
+            lid=item['layer_id'];thickness=(item['thickness_m'] if kind=='copper' else
+                                           item['z_max_m']-item['z_min_m'])
+            role=(item['role'] if kind=='copper' else 'dielektryk')
+            info=(f'{lid} · {item["name"]}' if kind=='dielectric' else
+                  f'{lid} · {item["name"]}')
+            for col,value in enumerate((info,role,f'{level*1e3:.3f}',f'{thickness*1e3:.3f}')):
+                ttk.Label(self.material_list,text=value).grid(row=row,column=col,
+                    sticky='w',padx=(0,20),pady=2)
+            if kind=='dielectric':
+                values=already.get(str(lid),{})
+                eps=item['epsilon_r']
+                eps_val=str(values['epsilon_r']) if 'epsilon_r' in values else (
+                    f'{eps:g}' if eps>=1 else '')
+                loss=values.get('loss_tangent',item['loss_tangent'])
+                er_var=tk.StringVar(value=eps_val)
+                loss_var=tk.StringVar(value=f'{loss:g}')
+                self._material_editors[str(lid)]=(er_var,loss_var)
+                ttk.Entry(self.material_list,textvariable=er_var,width=12).grid(
+                    row=row,column=4,sticky='w')
+                ttk.Entry(self.material_list,textvariable=loss_var,width=12).grid(
+                    row=row,column=5,sticky='w')
+        for er,tangent in self._material_editors.values():
+            er.trace_add('write',lambda *_:self._sync_material_inputs())
+            tangent.trace_add('write',lambda *_:self._sync_material_inputs())
+        self.material_status.set(
+            f'Odczytano {len(stack["copper_layers"])} warstwy miedzi, '
+            f'{len(stack["dielectric_layers"])} dielektryki. '
+            f'Pominięto {len(stack["ignored_layers"])} warstw nie-EM. '
+            'Zapis wartości materiałowych następuje razem z ustawieniami projektu.')
+
     def _tab_report(self, frame):
         ttk.Label(frame, text='Katalog FDTD:').grid(row=0, column=0, sticky='w', pady=7)
         ttk.Entry(frame, textvariable=self.var['run_dir'], width=90).grid(
@@ -345,6 +440,7 @@ class PcbDesktop(tk.Tk):
         self._command_prepared = None
         self.status.set('Projekt: '+path.name+' | parametry: '+str(directory))
         self._log('Parametry projektu: '+str(directory)+'\n', 'info')
+        self._refresh_materials_for_project()
         # A newly created parameters directory is immediately useful: it
         # contains a real settings file even before inspection/FDTD.
         try:
