@@ -152,6 +152,18 @@ class EasyEdaTests(unittest.TestCase):
         with self.assertRaisesRegex(ConfigurationError, 'leaves its source POUR boundary'):
             build_source_layout(src)
 
+    def test_easyeda_rectangle_winding_flag_determines_aperture(self):
+        from antenna_lab.pcb.easyeda import polygon_ring
+        from antenna_lab.pcb.easyeda_model import complex_copper_shape
+        from shapely.geometry import Point
+        outer=polygon_ring(['R',-50,50,100,100,0,0],'outer',poured=True)
+        inner_ccw=polygon_ring(['R',-10,10,20,20,0,1],'hole',poured=True)
+        inner_cw=polygon_ring(['R',-10,10,20,20,0,0],'island',poured=True)
+        self.assertFalse(complex_copper_shape([outer,inner_ccw],'aperture').covers(Point(0,0)))
+        self.assertTrue(complex_copper_shape([outer,inner_cw],'nested').covers(Point(0,0)))
+        with self.assertRaisesRegex(ConfigurationError,'rounded corner'):
+            polygon_ring(['R',0,0,10,10,0,0,1],'round',poured=True)
+
     def test_thermal_strokes_and_curved_poured_contours_fail_closed(self):
         items=records();items[-1][3]=0.5
         with self.assertRaisesRegex(ConfigurationError,'only filled, unstroked'):
