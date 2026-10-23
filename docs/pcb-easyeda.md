@@ -287,11 +287,24 @@ potwierdza rozdzielone skale. Nie jest to EasyEDA Standard ani format Pro V3.
 ## Zakres parsera pojedynczego .epcb (legacy D0/D1)
 
 DOCTYPE, HEAD, CANVAS, LAYER, LAYER_PHYS, NET, LINE, ARC, VIA, PAD_NET,
-COMPONENT i ATTR. POLY/POUR: niezaokrąglone R (dowolny obrót) i proste kontury
-L; POURED: pojedynczy wypełniony, niestrokowany kontur. Raw pola pozostają
-niezmienione. Unknown records są zachowane i blokują canonical solve, chyba że
-są rozpoznanym metadata edytora lub mają prefiks META_. Unsupported footprint,
-complex fill rule czy thermal-spoke nie stają się domyślnie pełną miedzią.
+COMPONENT i ATTR. POLY: niezaokrąglone R (dowolny obrót) i proste
+kontury L. POUR / POURED: **wiele konturów L/R z regułą nonzero**
+(oddzielne wyspy, dziury według orientacji/winding); tylko prawdziwe
+materializowane wypełnienie POURED jest fizyczną miedzią, a POUR wyznacza
+granicę. POURED nadal wymaga fill=true i stroke=0; termiczne spoke,
+grid/LINE fill, łuki/Bezier/CIRCLE oraz niepoprawne kontury pozostają
+jawnym UNSUPPORTED. Dla wielu wysp osobne fizyczne identyfikatory przewodnika
+nie zmieniają pierwotnych ID/rekordów źródłowych.
+Raw pola, wartości i źródłowe SHA pozostają niezmienione. Unknown records
+są zachowane i blokują canonical solve, chyba że są rozpoznanym metadata
+edytora lub mają prefiks META_. Nie ma topologicznego repair ani domyślnej
+zamiany nieznanego wypełnienia na pełną miedź.
+
+Ta poprawka dotyczy **klasy wielu konturów POURED/POUR**, nie konkretnego
+pliku `stripline1.epro` czy ID `e102`. Rzeczywisty projekt lokalny może
+zawierać inne warianty konturów nadal nieobsługiwane. Dokumentacja formatu:
+[Complex Polygon](https://github.com/easyeda/easyeda-file-format-v2/blob/main/docs/en/pcb/polygon-system/complex-polygon.md),
+[POURED](https://github.com/easyeda/easyeda-file-format-v2/blob/main/docs/en/pcb/polygon-system/poured.md).
 
 Materiał nie jest oceniany jako „typowa PCB”: epsilon_r=1 i gruby dielektryk
 są legalne. Zakres przybliżenia microstrip nadal należy do solvera, nie parsera.
