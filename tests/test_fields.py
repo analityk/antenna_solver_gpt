@@ -48,6 +48,20 @@ class FieldTests(unittest.TestCase):
         self.axes, self.mesh = make_mesh(self.geometry, self.config)
         self.layout = field_layout(self.geometry, self.axes, self.mesh, self.config)
 
+    def test_empty_field_data_after_interruption_is_not_called_unsupported_format(self):
+        from antenna_lab.solvers.power import _read_surface
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'fields_E.h5'
+            with h5py.File(path, 'w') as dump:
+                mesh = dump.create_group('Mesh')
+                mesh.attrs['mesh_type'] = 0
+                for axis in 'xyz':
+                    mesh.create_dataset(axis, data=[0., 1.])
+                fd = dump.create_group('FieldData/FD')
+                fd.attrs['frequency'] = [1.5e9]
+            with self.assertRaisesRegex(RuntimeError, 'Brak próbek widmowych w FieldData/FD'):
+                _read_surface(path, 1.5e9)
+
     def test_both_models_use_existing_nodes_and_correct_native_dump_modes(self):
         for filename in ("biquad_1420mhz", "quados8_1420mhz_aligned_feed"):
             config = load_config(ROOT / "parameters" / f"{filename}.json")
