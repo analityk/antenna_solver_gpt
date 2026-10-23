@@ -18,6 +18,11 @@ polecenia CMD i log na żywo, a konfiguracja elektryczna jest domyślnie
 wyprowadzana z `.epro`. Bez osobnego solvera i bez powtórnego FDTD
 przy zmianie raportu. Szczegóły: [GUI PCB](docs/pcb-gui.md).
 
+Po wskazaniu `.epro` GUI automatycznie tworzy i pokazuje katalog
+`parameters/<folder_projektu>/`, a wszystkie pliki `.epro` w tym samym
+folderze używają wspólnych ustawień eksperymentu i solvera.
+
+
 
 Pierwszy model antenowy to **Quados 8 przy dokładnie 1420 MHz**, z czterema
 połączonymi gałęziami i skończonym reflektorem. Pełny solver EM używa

@@ -133,6 +133,22 @@ utworzeniem. W nagłówku zapisuj SHA ostatniego *już potwierdzonego*
 commita bazowego, a opublikowany SHA nowego commita podawaj po publikacji
 w raporcie końcowym. Nowy czat zawsze sam sprawdza HEAD.
 
+## Checkpoint GUI: parametry automatycznie przypisane do folderu CAD (2026-10-23)
+
+GUI wcześniej przechowywało formularz w globalnym pliku użytkownika,
+nie przełączając ustawień solvera przy nowym `.epro`. Aktualnie dodano
+`pcb/gui_project_settings.py`: katalog `parameters/<folder_projektu>/`
+(identyfikacja folderem pod `gerbs`, nie pojedynczym plikiem .epro).
+Wybór pliku tworzy katalog jeśli potrzeba, pokazuje go pod ścieżką
+projektu, a lokalny `gui-settings.json` zapisuje atomowo wartości
+eksperymentu, jakości, pól, override i fabrykacyjnych założeń PTH.
+Wszystkie `.epro` z jednego folderu używają tych samych ustawień;
+nie przenosi się specyficznego manualnego source-config, source PCB ID
+ani poprzedniego katalogu wyników. `CSXCAD_INSTALL_PATH` i globalny
+TOML pozostają ustawieniami instalacji. Lokalne pliki gui-settings
+wykluczono z Git. Testy offline dodane; odbiór Windows GUI/FDTD nie
+został wykonany w środowisku asystenta. Bez zmian geometrii/EM/FAST/PSU.
+
 ## Poprawka GUI: excitation guard (2026-10-23)
 
 Nowe GUI początkowo stosowało center ± cutoff, a backend wymaga

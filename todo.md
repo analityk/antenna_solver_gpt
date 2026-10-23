@@ -1,5 +1,16 @@
 # TODO — PCB: aktualny stan i następne kroki
 
+**2026-10-23: projektowe katalogi ustawień w Windows GUI.**
+Potwierdzony poprzedni stan: wszystkie pola formularza (w tym solver)
+były w jednym `~/.antenna_lab_pcb_gui.json`, bez zmiany przy wyborze
+innego `.epro`. GUI teraz automatycznie wyznacza katalog
+`parameters/<ścieżka folderu pod gerbs>/`, tworzy go, pokazuje ścieżkę
+i zachowuje tam `gui-settings.json`; wiele `.epro` z jednego folderu
+współdzieli ustawienia eksperymentu/solver, ale nie ręczny source-config
+ani stary katalog wyników. Globalne CSXCAD i TOML pozostają globalne.
+Testy offline sidecar i reguł katalogów dodane; natywne otwarcie
+GUI Windows i FDTD po zmianie nieuruchomione. Dokumentacja: docs/pcb-gui.md.
+
 **2026-10-23: GUI — zgodność pasma pobudzenia i sweep.**
 Poprawiono walidację z center ± cutoff na rzeczywiste ograniczenie
 backendu center ± 0.8×cutoff. GUI daje komunikat z aktualnym pasmem
