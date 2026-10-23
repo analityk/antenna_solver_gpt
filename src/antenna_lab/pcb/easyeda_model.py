@@ -92,25 +92,26 @@ def build_source_layout(source):
     if data['unsupported_records']:
         raise ConfigurationError('EasyEDA '+data['unsupported_records'][0])
     layers={r['id']:r for r in data['layers']}
-    role={i:{'TOP':'top','BOTTOM':'bottom','OUTLINE':'outline','SUBSTRATE':'dielectric'}.get(r['type'],'omitted')
+    from .easyeda_stackup import describe_source_stackup
+    stack=describe_source_stackup(data,source.source_sha256)
+    role={i:stack['role_by_layer_id'].get(i,
+          'outline' if r['type']=='OUTLINE' else
+          'dielectric' if r['type']=='SUBSTRATE' else 'omitted')
           for i,r in layers.items()}
     boards=[p for p in data['polygons'] if role[p['layer_id']]=='outline']
-    if len(boards)!=1:raise ConfigurationError('EasyEDA source board outline: require one closed POLY R/L contour.')
+    if len(boards)!=1:
+        raise ConfigurationError('EasyEDA source board outline: require one closed POLY R/L contour.')
     board=BoardOutline(tuple(map(tuple,boards[0]['ring_xy_m'])))
-    for entry in data['layer_physics']:
-        typ=layers[entry['layer_id']]['type']
-        if typ in ('SIGNAL','PLANE'):
-            raise ConfigurationError(f"EasyEDA LAYER_PHYS {entry['layer_id']}: inner stackup unsupported by source canonical checkpoint; not omitted.")
-    physical=[r for r in data['layer_physics'] if role[r['layer_id']] in ('top','bottom','dielectric')]
-    if [role[r['layer_id']] for r in physical]!=['top','dielectric','bottom']:
-        raise ConfigurationError('EasyEDA source stackup: require ordered top / one LAYER_PHYS substrate / bottom; no default laminate.')
-    top,d,bottom=physical
-    if d['thickness_m']<=0 or d['epsilon_r']<1 or min(top['thickness_m'],bottom['thickness_m'])<=0:
-        raise ConfigurationError('EasyEDA source LAYER_PHYS: positive thicknesses and dielectric epsilon_r >= 1 required.')
-    height=d['thickness_m'];z={'top':0.,'bottom':-height}
-    dielectric=DielectricLayer(board,-height,0.,d['epsilon_r'],d['loss_tangent'],d['material'] or 'source_substrate')
-    sheets=tuple(CopperLayer(r,z[r],'pec',p['thickness_m'],58e6,source.source_sha256)
-                 for r,p in (('top',top),('bottom',bottom)))
+    z={p['role']:p['z_m'] for p in stack['copper_layers']}
+    # Unresolved CAD epsilon is allowed in source INSPECTION only.
+    # A full-wave solve validates materials before canonical geometry.
+    dielectric_layers=[dict(outline=asdict(board),z_min_m=d['z_min_m'],
+          z_max_m=d['z_max_m'],epsilon_r=d['epsilon_r'],loss_tangent=d['loss_tangent'],
+          name=d['name']) for d in stack['dielectric_layers']]
+    dielectric=DielectricLayer(**dielectric_layers[0])
+    sheets=tuple(CopperLayer(p['role'],p['z_m'],'pec',p['thickness_m'],
+                           p['conductivity_s_m'],p['source_sha256'])
+                 for p in stack['copper_layers'])
     shapes=[]
     def add(id,net,layer,shape,kind):
         if role[layer] not in z:raise ConfigurationError(f'EasyEDA {id}: unsupported physical layer {layer}.')
@@ -169,7 +170,7 @@ def build_source_layout(source):
             if r==orr and net!=on and shape.intersects(other):
                 raise ConfigurationError(f'EasyEDA source short: {id}/{oid}, nets {net}/{on}.')
     copper=[];owners={};conductor_nets={}
-    for r in ('top','bottom'):
+    for r in z:
         for net in sorted({n for _,n,rr,_,_ in shapes if rr==r}):
             entries=[s for s in shapes if s[1]==net and s[2]==r]
             merged=union_all([s[3] for s in entries])
@@ -202,11 +203,14 @@ def build_source_layout(source):
                     ('available externally but this subset does not instantiate it' if candidate else 'unavailable')+
                     f'; footprint={footprint!r}; no pads inferred from tracks'))
     assumptions=['source copper: PEC zero-thickness; supplied copper thickness retained as material metadata',
+                 'dielectric layers: only SUBSTRATE; soldermask omitted pending effective-epsilon model',
                  'conductivity 58 MS/m is unused PEC metadata, not manufacturer-verified',
                  'soldermask/paste/silkscreen omitted; raw LAYER_PHYS retained',
                  'source absolute pads: ideal terminal regions; pad parasitics and internal lead impedance omitted']
     return dict(design_source='easyeda_source',manufacturing_validation='not_requested',
-        outline=asdict(board),dielectric=asdict(dielectric),copper_layers=[asdict(s) for s in sheets],
+        outline=asdict(board),dielectric=asdict(dielectric),
+        dielectric_layers=dielectric_layers,copper_layers=[asdict(s) for s in sheets],
+        source_stackup=stack,
         copper=[asdict(c) for c in copper],routes=[asdict(r) for r in routes],pads=[asdict(p) for p in pads],
         vias=[asdict(v) for v in source.vias],conductor_nets=conductor_nets,
         feature_owners=owners,feature_kinds={id:kind for id,_,_,_,kind in shapes},source_semantics=data,assumptions=assumptions,
@@ -229,7 +233,7 @@ def _contact_audit(shapes, owners, data, source):
         pads.append(dict(pad_id=id,net=net,layer_role=role,conductor_id=owners[id],
                          physical_contacts=sorted(contacts),ownership_status='passed'))
     return dict(status='passed',meaning='physical ownership/short audit, not electromagnetic validation',
-                pads=pads,via_pad_owners={v.id:{r:owners[v.id+':'+r] for r in ('top','bottom')} for v in source.vias})
+                pads=pads,via_pad_owners={v.id:{r:owners[v.id+':'+r] for r in sorted({role for id,net,role,shape,kind in shapes if id.startswith(v.id+':')})} for v in source.vias})
 
 
 def source_layout_geometry(layout,override):
@@ -240,8 +244,8 @@ def source_layout_geometry(layout,override):
     """
     if layout['missing_dependencies']:
         raise ConfigurationError('EasyEDA missing source dependency: '+layout['missing_dependencies'][0]['message'])
-    if not isinstance(override,dict) or set(override)-{'port','drills','component_values'}:
-        raise ConfigurationError('EasyEDA source override accepts only port, optional drills and explicit component_values; source owns stackup/materials.')
+    if not isinstance(override,dict) or set(override)-{'port','drills','component_values','dielectrics'}:
+        raise ConfigurationError('EasyEDA source override accepts port, drills, component_values and explicit dielectric material values only.')
     if sum(c['role']=='source' for c in layout.get('resolved_components',()))>1:
         raise ConfigurationError('EasyEDA FAST has one excitation; multiple CAD sources unsupported, not omitted.')
     p=override.get('port')
@@ -257,18 +261,26 @@ def source_layout_geometry(layout,override):
         if len(n)!=2 or len(pos)!=2 or width<=0:raise ValueError('invalid XY/width')
     except (KeyError,TypeError,ValueError) as exc:raise ConfigurationError(f'EasyEDA explicit source port: {exc}') from exc
     board=BoardOutline(tuple(map(tuple,layout['outline']['vertices_xy_m'])))
-    d=layout['dielectric'];dielectric=DielectricLayer(board,d['z_min_m'],d['z_max_m'],d['epsilon_r'],d['loss_tangent'],d['name'])
+    from .easyeda_stackup import describe_source_stackup
+    stack=describe_source_stackup(layout['source_semantics'],layout['source_sha256'],
+                                  override.get('dielectrics'),require_materials=True)
+    dielectrics=tuple(DielectricLayer(board,d['z_min_m'],d['z_max_m'],d['epsilon_r'],
+                        d['loss_tangent'],d['name']) for d in stack['dielectric_layers'])
+    first=dielectrics[0]
     from .source_ir import SourceRoutePrimitive
     geometry=PcbGeometry('pcb',board,[CopperPolygon(**c) for c in layout['copper']],
-        Substrate(board,d['z_min_m'],d['z_max_m'],d['epsilon_r'],d['loss_tangent']),PcbPort('easyeda_source',n,pos,width),
-        assumptions=layout['assumptions'],dielectric_layers=(dielectric,),
+        Substrate(board,first.z_min_m,first.z_max_m,first.epsilon_r,first.loss_tangent),
+        PcbPort('easyeda_source',n,pos,width),
+        assumptions=layout['assumptions'],dielectric_layers=dielectrics,
         copper_layers=tuple(CopperLayer(**c) for c in layout['copper_layers']),
         source_routes=tuple(SourceRoutePrimitive(**r) for r in layout['routes']),
         source_pads=tuple(SourcePad(**p) for p in layout['pads']),
         design_source=dict(kind='easyeda_source',source_file=layout['source_file'],source_sha256=layout['source_sha256'],
             conductor_nets=layout['conductor_nets'],feature_owners=layout['feature_owners'],
             feature_kinds=layout['feature_kinds'],resolved_components=layout.get('resolved_components',[]),
-            project_provenance=layout.get('project_provenance'),source_pad_provenance=layout.get('source_pad_provenance',[]),contact_audit=layout.get('contact_audit'),manufacturing_validation='not_requested',override=override))
+            project_provenance=layout.get('project_provenance'),source_pad_provenance=layout.get('source_pad_provenance',[]),
+            contact_audit=layout.get('contact_audit'),manufacturing_validation='not_requested',
+            resolved_source_stackup=stack,override=override))
     geometry.components=_source_components(layout,geometry,override.get('component_values',{}))
     if layout['vias'] or layout.get('footprint_drills'):
         settings=override.get('drills',{})

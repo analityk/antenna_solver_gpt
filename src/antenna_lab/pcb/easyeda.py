@@ -278,10 +278,12 @@ def parse_easyeda_source(raw,*,source_file='<memory>'):
             raise ConfigurationError(f'EasyEDA {label}: malformed/unsupported record: {exc}') from exc
     if display is None:raise ConfigurationError('EasyEDA missing CANVAS display metadata.')
     from dataclasses import replace
+    from .easyeda_stackup import source_physical_stackup
+    stack=source_physical_stackup(dict(layers=list(layers.values()),layer_physics=physical))
     def role(id):
         if id not in layers:raise ConfigurationError(f'EasyEDA unresolved LAYER {id!r}.')
-        kind=layers[id]['type']
-        return {'TOP':'top','BOTTOM':'bottom','OUTLINE':'outline'}.get(kind,'unsupported:'+kind)
+        return stack['role_by_layer_id'].get(id,
+            'outline' if layers[id]['type']=='OUTLINE' else 'unsupported:'+layers[id]['type'])
     routes=tuple(replace(r,layer_role=role(r.layer_id)) for r in routes)
     for r in (*routes,*vias):
         if r.net not in nets:raise ConfigurationError(f'EasyEDA {r.id}: undeclared net {r.net!r}.')

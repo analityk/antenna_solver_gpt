@@ -43,7 +43,7 @@ def _write_json(path, value):
 
 
 def run_easyeda_control(project_path, output_dir, *, source_config=None, source_pcb_id=None,
-                       pth_plating_um=None, prepare_only=False, quality=None, geometry_resolution_um=10,
+                       pth_plating_um=None, dielectric_materials=None, prepare_only=False, quality=None, geometry_resolution_um=10,
                        resolved_profile=None, sweep_request=None, **frequency_settings):
     """Use D4 unchanged; all electrical overrides are explicit source-config data."""
     if isinstance(geometry_resolution_um, bool) or geometry_resolution_um not in (100,10,1,.1):
@@ -86,11 +86,11 @@ def run_easyeda_control(project_path, output_dir, *, source_config=None, source_
             stage='source_config_auto'
             from .easyeda_auto_config import derive_source_config
             overrides,evidence=derive_source_config(
-                project,bindings=bindings,pth_plating_um=pth_plating_um)
+                project,bindings=bindings,pth_plating_um=pth_plating_um,dielectric_materials=dielectric_materials)
             snapshots['source-config.resolved.json']=overrides
             provenance['source_config']=dict(origin='project_auto',resolved=overrides,evidence=evidence)
-        elif pth_plating_um is not None:
-            raise ConfigurationError('--pth-plating-um applies to automatic source-config only.')
+        elif pth_plating_um is not None or dielectric_materials:
+            raise ConfigurationError('Explicit source-config may not be combined with auto PTH/dielectric overrides.')
         stage='source_import'
         source_ir=materialize_project_source(project)
         snapshots['source_ir.json']=source_ir.as_dict()
@@ -226,6 +226,7 @@ def main(argv=None):
     parser.add_argument('--source-pcb-id')
     parser.add_argument('--source-config',type=Path,help='Optional explicit override; otherwise derive from EasyEDA CAD.')
     parser.add_argument('--pth-plating-um',type=float,help='Explicit plating assumption for automatic config; never inferred.')
+    parser.add_argument('--dielectric-material',action='append',default=[],metavar='LAYER_ID:ER:TAN_DELTA',help='Explicit dielectric values absent from EasyEDA CAD (repeat for each layer).')
     parser.add_argument('--output',type=Path)
     parser.add_argument('--geometry-resolution-um',type=float,choices=(100,10,1,.1),default=10)
     parser.add_argument('--quality',choices=('preview','design','verify'))
@@ -253,8 +254,11 @@ def main(argv=None):
         if profile is None:
             print('Cancelled before native preparation/FDTD.');return 0
         output=args.output or allocate_output_dir(args.easyeda_project,Path('outcomes/pcb_easyeda'))
+        from .easyeda_stackup import parse_source_dielectric_materials
+        dielectric_materials=parse_source_dielectric_materials(args.dielectric_material)
         result=run_easyeda_control(args.easyeda_project,output,source_config=args.source_config,
-            source_pcb_id=args.source_pcb_id,pth_plating_um=args.pth_plating_um,prepare_only=args.prepare_only,
+            source_pcb_id=args.source_pcb_id,pth_plating_um=args.pth_plating_um,
+            dielectric_materials=dielectric_materials,prepare_only=args.prepare_only,
             geometry_resolution_um=args.geometry_resolution_um,resolved_profile=profile,
             sweep_request=request if sweep and tuple(profile.settings.result_frequency_hz)==tuple(band['result_frequency_hz']) else None)
         print(f"Status: {result['status']}; validation_status: unverified\n{output.resolve()/'summary.json'}")

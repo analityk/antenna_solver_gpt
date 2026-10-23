@@ -126,12 +126,26 @@ def command_for(action, values, *, interpreter=None):
         cmd.extend(['--source-pcb-id', pcb_id])
     config = str(values.get('source_config', '')).strip()
     plating = str(values.get('pth_plating_um', '')).strip()
+    dielectric_text=str(values.get('dielectric_materials','')).strip()
+    dielectric_specs=[v.strip() for v in re.split(r'[;\\n]+',dielectric_text) if v.strip()]
+    if dielectric_specs:
+        from .easyeda_stackup import parse_source_dielectric_materials
+        try:
+            parsed=parse_source_dielectric_materials(dielectric_specs)
+        except Exception as exc:
+            from antenna_lab.core.config import ConfigurationError
+            if not isinstance(exc,ConfigurationError):
+                raise
+            raise ValueError(str(exc)) from exc
     if config:
-        if plating:
-            raise ValueError('Przy ręcznej source-config nie dodawaj --pth-plating-um.')
+        if plating or dielectric_specs:
+            raise ValueError('Ręczna source-config nie może łączyć się z PTH/dielectric GUI overrides.')
         cmd.extend(['--source-config', config])
-    elif plating:
-        cmd.extend(['--pth-plating-um', str(_positive(plating, 'Metalizacja PTH µm'))])
+    else:
+        if plating:
+            cmd.extend(['--pth-plating-um', str(_positive(plating, 'Metalizacja PTH µm'))])
+        for spec in dielectric_specs:
+            cmd.extend(['--dielectric-material',spec])
     if values.get('fields_enabled', True):
         fields = _fields(str(values.get('fields_mhz', '')))
         if not fields:

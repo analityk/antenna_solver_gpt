@@ -84,9 +84,26 @@ def run_reduced(input_path, output_dir, *, pcb_config=None, geometry_resolution_
             _json(output/'import.json',provenance)
             summary['provenance']=provenance
             if inspect_source:
-                summary.update(status='source_inspected',canonical_status='missing_dependencies' if layout['missing_dependencies'] else 'physical_layout_ready',
+                stack=layout.get('source_stackup',{})
+                missing=stack.get('missing_materials',[])
+                summary.update(status='source_inspected',
+                    canonical_status=('missing_dependencies' if layout['missing_dependencies'] else
+                                      'dielectric_materials_required' if missing else 'physical_layout_ready'),
                     source_route_count=len(ir.routes),source_via_count=len(ir.vias),
-                    board_bounds_m=list(_polygon_bounds(layout['outline']['vertices_xy_m'])))
+                    board_bounds_m=list(_polygon_bounds(layout['outline']['vertices_xy_m'])),
+                    physical_stackup=dict(copper_layers=stack.get('copper_layers',[]),
+                        dielectric_layers=stack.get('dielectric_layers',[]),
+                        ignored_layers=stack.get('ignored_layers',[]),
+                        missing_materials=missing,modeling=stack.get('soldermask_model')))
+                if stack.get('dielectric_layers'):
+                    print('EasyEDA EM physical stackup: '
+                          f"{len(stack['copper_layers'])} copper sheets, "
+                          f"{len(stack['dielectric_layers'])} dielectrics; "
+                          f"{len(stack['ignored_layers'])} editor/mask/paste layers excluded.",flush=True)
+                if missing:
+                    print('Missing CAD dielectric epsilon_r for IDs: '+
+                          ', '.join(str(v['layer_id']) for v in missing)+
+                          '; enter physical material values before full-wave FDTD.',flush=True)
                 _json(output/'summary.json',summary)
                 return summary
             override={} if source_config is None else json.loads(Path(source_config).read_text(encoding='utf-8-sig'))

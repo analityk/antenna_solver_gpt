@@ -1,5 +1,18 @@
 # TODO — PCB: aktualny stan i następne kroki
 
+**2026-10-23: wielowarstwowy EasyEDA source → istniejący PCB openEMS.**
+Rozszerzono tylko adapter źródłowy: kolejność aktywnego stackupu z
+LAYER_PHYS, z=0 dla TOP, rzeczywiste role inner1/inner2..., osobne
+SUBSTRATE/PEC, źródłowe provenance i inspekcja nawet przy brakującym
+εr. GUI pokazuje zakładkę Warstwy EM i jawne εr/tanδ; CLI dopuszcza
+powtarzalną flagę `--dielectric-material`. Pomiń silk, mask, paste,
+courtyard/stencil; soldermask effective εr pozostaje DEFERRED.
+Nie zgadywać parametrów materiałowych ani PTH-plating.
+Realny stripline1 ma εr=0 dla 361/362/363 i wymaga decyzji
+użytkownika, nie autouzupełnienia. Małe testy offline dodane, lecz
+Windows native PREPARE/FDTD nie uruchomione; kontrola przyszłych
+realnych wyników EM pozostaje otwarta. Bez PSU/FAST/coupling.
+
 **2026-10-23: rzeczywista przyczyna `stripline1.epro` — łuki
 w POURED.** Repozytoryjny `gerbs/stripline1/stripline1.epro` (13 264 B)
 zawiera w PCB rekord 230 `POURED e102`: 1 kontur prostokątny

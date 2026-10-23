@@ -60,6 +60,23 @@ z `.epro` i zapisuje kontrakt w plikach wyniku. **Nie zgadujemy**
 niezapisanej w CAD grubości PTH: opcjonalne pole `PTH metalizacja`
 to jawnie podana przez użytkownika wartość w µm.
 
+## Zakładka Warstwy EM
+
+Po wskazaniu `.epro` GUI odczytuje rzeczywisty `LAYER_PHYS` bez
+uruchamiania FDTD. Pokazuje miedź (TOP, aktywne fizycznie SIGNAL/PLANE,
+BOTTOM), warstwy dielektryczne SUBSTRATE z Z/grubością oraz εr/tanδ.
+Świadomie pomija silk, paste, mask, stencil i inne nieelektryczne
+warstwy edytora. Nie dodaje soldermaski ani jej wpływu na εr —
+to przyszły, jawnie przybliżony model.
+
+Jeżeli EasyEDA nie dostarczył fizycznej εr (np. 0), pole pozostaje
+puste. Użytkownik uzupełnia dokładnie brakujące wartości w tabeli;
+GUI generuje `--dielectric-material ID:epsilon_r:tan_delta` dla
+odpowiednich warstw i utrwala w projektowych `gui-settings.json`.
+Nie tworzy się ręcznie konfiguracji JSON i nie stosuje niewidocznych
+domyślnych materiałów. Nieprawidłowa εr lub nieznany ID blokują
+PREPARE-ONLY/FDTD przed rozpoczęciem kosztownych obliczeń.
+
 ## Katalog parametrów przypisany automatycznie do projektu
 
 Dla typowej ścieżki `gerbs/dif4002/dif4002.epro` GUI tworzy lub otwiera

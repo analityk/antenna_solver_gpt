@@ -40,7 +40,7 @@ def _passive_value(ref, value):
     return kind
 
 
-def derive_source_config(project, *, bindings=None, pth_plating_um=None):
+def derive_source_config(project, *, bindings=None, pth_plating_um=None, dielectric_materials=None):
     """Return (source-config JSON object, CAD evidence) without parsing PCB shapes.
 
     The latter makes this usable even when a new non-electrical PCB record is not
@@ -79,6 +79,13 @@ def derive_source_config(project, *, bindings=None, pth_plating_um=None):
         kind = _passive_value(ref, value)
         config['component_values'][ref] = {'kind': kind, 'value': value.strip()}
         evidence['component_value_origins'][ref] = origin
+    if dielectric_materials:
+        from .easyeda_stackup import parse_source_dielectric_materials
+        if isinstance(dielectric_materials,dict):
+            config['dielectrics']=dielectric_materials
+        else:
+            config['dielectrics']=parse_source_dielectric_materials(dielectric_materials)
+        evidence['dielectric_values_origin']='explicit_user_override'
     if pth_plating_um is not None:
         if (isinstance(pth_plating_um, bool) or not isinstance(pth_plating_um, (int, float))
                 or not isfinite(pth_plating_um) or pth_plating_um <= 0):

@@ -2575,3 +2575,15 @@ sweep/typ polecenia; bez natywnego FDTD.
 i POUR na warstwie 16. Jest to odrębny wymóg modelu
 wielowarstwowego. Bez odgórnego usuwania warstw i bez
 fikcyjnej gotowości do pełnego EM.
+
+### 2026-10-23 — adapter wielowarstwowego EasyEDA i warstwy EM GUI
+
+Realny stripline1.epro ujawnił ograniczenie adaptera D4 do top /
+jednego dielektryka / bottom pomimo istniejącego modelu PCB/openEMS
+obsługującego wiele warstw. Adapter mapuje fizyczny porządek LAYER_PHYS,
+powierzchnie miedzi, dielektryki, ślady i przelotki oraz położenia Z.
+Przy εr=0 import diagnostyczny działa, ale solver wymaga jawnego
+parametru materiału z GUI albo CLI. Warstwy silk, mask, paste i stencil
+są pomijane w modelu EM; soldermaska jako εr_eff będzie osobnym
+przybliżeniem później. Fizyka backendu, solver, mesh, FAST i PSU bez
+zmian. Testy offline dodano; natywna weryfikacja Windows nadal otwarta.

@@ -93,6 +93,19 @@ class GuiCommandTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'większy'):
             suggest_excitation('900', '100')
 
+    def test_materials_pass_through_to_fullwave_without_user_json(self):
+        argv=self.cmd('prepare', dielectric_materials='361:4.2:0.02;362:4.4:0.01')
+        self.assertEqual(argv.count('--dielectric-material'),2)
+        self.assertIn('361:4.2:0.02',argv)
+        self.assertIn('362:4.4:0.01',argv)
+        self.assertNotIn('--source-config',argv)
+        with self.assertRaisesRegex(ValueError,'duplicate'):
+            self.cmd('run',dielectric_materials='361:4.2:0;361:4.3:0')
+        with self.assertRaisesRegex(ValueError,'epsilon_r'):
+            self.cmd('run',dielectric_materials='361:0:0')
+        with self.assertRaisesRegex(ValueError,'source-config'):
+            self.cmd('run',dielectric_materials='361:4.2:0',source_config='cfg.json')
+
     def test_report_offline_crop_animation_with_open(self):
         args = self.cmd('report')
         self.assertEqual(args[2:5],['-m','antenna_lab','report'])
