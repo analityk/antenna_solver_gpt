@@ -34,6 +34,8 @@ class ProjectGuiParametersTests(unittest.TestCase):
             values = dict(DEFAULTS, quality='verify', center_mhz='650',
                           fields_mhz='200 500 800',
                           overrides='air_padding_wavelengths=0.12',
+                          source_config=r'C:\\CAD\\only-project1.json',
+                          run_dir=r'C:\\outcomes\\project1_run',
                           csxcad_path='should-not-be-project-local')
             sidecar = write_project_settings(first, project1.parent, values, DEFAULTS)
             self.assertEqual(sidecar, first / SETTINGS_FILE)
@@ -43,6 +45,8 @@ class ProjectGuiParametersTests(unittest.TestCase):
             self.assertEqual(restored['overrides'], 'air_padding_wavelengths=0.12')
             self.assertNotIn('csxcad_path', restored)
             self.assertNotIn('project', restored)
+            self.assertNotIn('source_config', restored)
+            self.assertNotIn('run_dir', restored)
 
     def test_distinct_gerbs_folders_are_isolated_including_nested(self):
         with TemporaryDirectory() as temp:
