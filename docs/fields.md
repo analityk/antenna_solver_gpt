@@ -90,6 +90,10 @@ Prądy przewodów i animacja pełnego okresu nadal nie są obsługiwane.
 
 - `field_layout.json`: żądane/faktyczne położenia, zakresy, kształty i nazwy HDF5.
 - `openems/fields_<przekrój>_E.h5`, `..._H.h5`: surowe zespolone widma.
+  Po przerwaniu openEMS nagłówek `FieldData/FD` może zawierać częstotliwości,
+  ale żadnego zbioru `f0`, `f1`, ...: to **brak zapisanych widm**, nie błąd
+  konwencji `NXYZ`. Postprocess zgłasza taki brak wprost i nie uzupełnia
+  danych zerami ani wygenerowanymi polami.
 - `fields/metadata.json`: kontrakt pól v1, jednostki, maski i normalizacja.
 - `fields/<przekrój>.npz`: `frequency_hz`, `x_m/y_m/z_m`,
   `E_v_per_m`, `H_a_per_m` o osiach [częstotliwość, składowa xyz, x, y, z];

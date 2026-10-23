@@ -41,7 +41,13 @@ def _read_surface(path, frequency):
             raise RuntimeError(f"Brak jednoznacznych pól dla {frequency:g} Hz: {path}")
         key = f"FieldData/FD/f{match[0]}"
         if key not in data:
-            raise RuntimeError("Diagnostyka wymaga zespolonego formatu NXYZ z openEMS 0.37.0rc3.")
+            group = data['FieldData/FD']
+            if not len(group):
+                raise RuntimeError(f'Brak próbek widmowych w FieldData/FD: {path}. '
+                                   'Plik zawiera nagłówek częstotliwości, ale żadne pola; '
+                                   'przerwany FDTD mógł nie zapisać widm.')
+            raise RuntimeError(f'Brak oczekiwanego zbioru {key} w {path}; '
+                               f'dostępne: {list(group.keys())}. Nieznany lub niepełny układ dumpu.')
         dataset = data[key]
         if not np.isclose(float(dataset.attrs["frequency"]), frequency, rtol=1e-12, atol=0):
             raise RuntimeError(f"Częstotliwość próbek nie zgadza się z nagłówkiem w {path}.")

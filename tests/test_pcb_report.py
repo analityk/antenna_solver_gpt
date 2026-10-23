@@ -64,6 +64,48 @@ class PcbReportTests(unittest.TestCase):
         after={str(p.relative_to(self.out)):sha256(p.read_bytes()).hexdigest() for p in self.out.rglob('*') if p.is_file()}
         self.assertEqual(before,after);self.assertIn('Raport PCB',report.read_text())
 
+    def test_profile_is_condensed_and_full_metadata_is_accessible_on_demand(self):
+        from antenna_lab.visualization.report import _pcb_metadata
+        data = load_report_data(self.out)
+        data['summary']['openems_profile'] = {
+            'name': 'design <untrusted>',
+            'resolved_settings': {'max_cells': 20000000, 'end_criteria': 0.0001},
+            'config_path': 'C:\\config\\profile.toml',
+        }
+        html = _pcb_metadata(data)
+        self.assertIn('<details class="profile-details"><summary>', html)
+        self.assertNotIn('<details class="profile-details" open', html)
+        self.assertIn('design &lt;untrusted&gt; · max_cells: 20000000', html)
+        self.assertIn('<pre class="profile-json">', html)
+        self.assertIn('&quot;end_criteria&quot;: 0.0001', html)
+        self.assertNotIn('design <untrusted>', html)
+
+    def test_stackup_schematic_does_not_invent_vertical_drill_positions(self):
+        from antenna_lab.visualization.pcb_stackup import stackup_section
+        stack = {
+            'total_dielectric_thickness_m': 0.0002,
+            'layers': [
+                {'type':'copper','role':'top','z_m':0.0,'thickness_m':35e-6,
+                 'model':'pec','conductivity_s_m':58e6},
+                {'type':'dielectric','name':'D','z_min_m':-0.0002,
+                 'z_max_m':0.0,'thickness_m':0.0002,
+                 'epsilon_r':4.0,'loss_tangent':0.0001},
+                {'type':'copper','role':'bottom','z_m':-0.0002,'thickness_m':35e-6,
+                 'model':'pec','conductivity_s_m':58e6},
+            ]
+        }
+        captured = {}
+        def inspect_figure(fig, description, path):
+            captured['lines'] = [line.get_color() for line in fig.axes[0].lines]
+            return '<img alt="stackup">'
+        html = stackup_section(
+            {'summary':{'resolved_stackup':stack},
+             'geometry':{'drills':[{'plated':True},{'plated':False}]}},
+            None, inspect_figure, lambda columns, rows: '<table></table>')
+        self.assertEqual(captured['lines'], ['#ad6627','#ad6627'])
+        self.assertIn('Przelotek PTH/NPTH nie rysujemy', html)
+        self.assertIn('Drills / vias', html)
+
     def test_geometry_and_note_are_escaped(self):
         path=self.out/'summary.json';value=json.loads(path.read_text());value['note']='<script>alert(1)</script>'
         value['import']['source_directory']='<script>directory</script>';path.write_text(json.dumps(value))

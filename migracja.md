@@ -133,6 +133,35 @@ utworzeniem. W nagłówku zapisuj SHA ostatniego *już potwierdzonego*
 commita bazowego, a opublikowany SHA nowego commita podawaj po publikacji
 w raporcie końcowym. Nowy czat zawsze sam sprawdza HEAD.
 
+## Aktualny checkpoint — czytelność raportu PCB i recovery przerwanego FDTD (2026-10-23)
+
+Na rzeczywistym przebiegu użytkownika `outcomes/pcb_easyeda/stripline2_006`
+przerwanym po >3 h (brak temporalnej zbieżności) offline
+`antenna_lab.pcb.postprocess --run-dir ...` odzyskał sondy portu i raport,
+ale E/H failed. Obserwacja Windows: HDF5 ma `FieldData/FD` z atrybutem
+częstotliwości `[1.2e9,1.5e9,1.8e9]` i **zero zbiorów `f0...`**; to brak
+zapisanych próbek, nie udowodniona niezgodność `NXYZ`. `openEMS_stats.txt`
+brakuje; `termination_status=unconfirmed`. Próbek `port_ut_1` jest 71 w
+oknie ~3.016 ns (co 43.087 ps, **nie** krok FDTD). Z odzyskanych Z/S11 nie
+wolno wnioskować o rzeczywistym rezonansie bez dalszej walidacji.
+
+Użytkownik zgłosił zrzut nieczytelnej ściany JSON `Rozwiązany profil openEMS`
+i mylące fioletowe pionowe kreski na schemacie stackupu. Dostosowano
+renderer: rozwijany pełny profil z krótką etykietą `design/max_cells`,
+rysunek warstw bez umownych rozmieszczeń PTH/NPTH, diagnostyka pustego
+HDF5 bez fałszywego błędu formatu. Nie zmieniono danych, geometrii,
+mesh, portu, materiałów, silnika ani FDTD. Testy regresyjne dodane;
+testy Windows/browser i natywne FDTD nadal nie zostały wykonane przez agenta.
+
+**Pierwszy krok po `git pull --ff-only`:** bez solve ponowić
+`.\\.venv\\Scripts\\python.exe -u -m antenna_lab.pcb.postprocess --run-dir "outcomes\\pcb_easyeda\\stripline2_006"`;
+nowy HTML w `postprocessed/postprocess_NNN/report.html` powinien mieć
+zwinięty profil i stackup bez pseudo-via; fields pozostaje failed,
+ponieważ brak próbek. Dokumenty `docs/reports.md`, `docs/fields.md`,
+`todo.md`, `history.md`. Najbliższy cel: osobny eksperyment ograniczonego
+czasu/modelu, który zapisze użyteczne widma E/H i wyjaśni plateau energii;
+nie utożsamiać wyniku częściowego z walidacją SI.
+
 ## Checkpoint — multilayer EasyEDA EM stackup (2026-10-23)
 
 Po potwierdzeniu `LAYER_PHYS 15 inner stackup unsupported` rozszerzono

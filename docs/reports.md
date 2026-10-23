@@ -151,6 +151,15 @@ kontroli fizycznej na podstawie progu procentowego. Opisy powstają z jawnych
 reguł i liczb, nie z usługi AI. Stan implementacji pól pozostaje w `goal.md`.
 
 
+W raportach PCB **rozwiązany profil openEMS** jest domyślnie zwinięty:
+wiersz pokazuje nazwę profilu i `max_cells`, a kliknięcie rozwija pełny,
+oryginalny JSON (również ścieżkę konfiguracji i jej SHA). Widok pozostaje
+samodzielnym HTML i nie zmienia zapisanych ustawień. Schemat **Stackup**
+pokazuje wyłącznie warstwy dielektryczne i symboliczne powierzchnie miedzi;
+nie rysuje przelotek jako fioletowych pionowych linii o wymyślonym X.
+Wiercenia PTH/NPTH pozostają w sekcji `Drills / vias` i w zapisanej
+geometrii. Schemat stosu nie jest rzeczywistym przekrojem XZ/YZ płytki.
+
 Raporty PCB mają odtwarzacz fazowy oraz wspólny ROI dla E/H i wszystkich
 faz danej planszy/częstotliwości. Domyślnie `--field-view active+geometry`,
 `--field-crop-threshold-db -40`, `--field-crop-margin-mm 1`.

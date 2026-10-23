@@ -1,5 +1,17 @@
 # TODO — PCB: aktualny stan i następne kroki
 
+**2026-10-23 — raport PCB / przerwany FDTD stripline2_006.**
+Użytkownik potwierdził, że po przerwaniu 3+ godz. FDTD zachowały się
+sondy portu i sześć HDF5, lecz `FieldData/FD` jest puste (częstotliwości
+w atrybucie nie są widmami), brak `openEMS_stats.txt`, status temporalny
+unconfirmed. Odzysk offline: port processed, fields failed, raport HTML
+powstał. Zmieniono sam raport: profil openEMS jest zwijany,
+stackup nie pokazuje fikcyjnych pionowych via, a czytnik mówi
+jawnie o braku próbek FD. **OPEN:** test odtworzenia nowego raportu
+na Windows `stripline2_006`, bez nowego FDTD; przebieg nie jest
+zweryfikowaną odpowiedzią EM ani potwierdzonym rezonansem.
+
+
 **2026-10-23: wielowarstwowy EasyEDA source → istniejący PCB openEMS.**
 Rozszerzono tylko adapter źródłowy: kolejność aktywnego stackupu z
 LAYER_PHYS, z=0 dla TOP, rzeczywiste role inner1/inner2..., osobne

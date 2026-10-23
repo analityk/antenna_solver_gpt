@@ -22,6 +22,7 @@ img{max-width:100%;height:auto}figure{margin:18px 0}figcaption{font-size:13px;ma
 table{border-collapse:collapse;width:100%;font-size:14px;margin:10px 0}th,td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:right;vertical-align:top}
 th{background:#f3f7fb}th:first-child,td:first-child{text-align:left}.table-wrap{overflow-x:auto}code{font-size:13px;overflow-wrap:anywhere}
 ul{padding-left:23px}li{margin:7px 0}details{margin:14px 0}summary{cursor:pointer;font-weight:600}
+.profile-json{white-space:pre-wrap;overflow-wrap:anywhere;overflow-x:auto;max-height:65vh;overflow-y:auto;font-size:12px}
 .interactive{display:none}body.ready .interactive{display:block}body.ready .fallback{display:none}
 .fixed{border-left:4px solid var(--blue);padding-left:14px}.meta{display:grid;grid-template-columns:1fr 1fr;gap:5px 25px}
 .meta div{overflow-wrap:anywhere}.footer{font-size:12px;overflow-wrap:anywhere;color:var(--muted)}

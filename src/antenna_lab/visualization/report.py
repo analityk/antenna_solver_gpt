@@ -313,7 +313,13 @@ def _pcb_metadata(data):
           ('Parametry fizyczne',imported.get('physical_config',imported.get('resolved_config','not recorded')))]
     body=table(['Przebieg PCB','Wartość'],rows)
     if s.get('openems_profile'):
-        body += '<h3>Rozwiązany profil openEMS</h3><pre>'+escape(json.dumps(s['openems_profile'], ensure_ascii=False, indent=2))+'</pre>'
+        profile = s['openems_profile']
+        profile_name = escape(str(profile.get('name', 'nieznany')))
+        cell_limit = escape(str(profile.get('resolved_settings', {}).get('max_cells', 'nieznany')))
+        body += ('<details class="profile-details"><summary>Rozwiązany profil openEMS: '
+                 + profile_name + ' · max_cells: ' + cell_limit
+                 + ' — pełna konfiguracja</summary><pre class="profile-json">'
+                 + escape(json.dumps(profile, ensure_ascii=False, indent=2)) + '</pre></details>')
     resolution = s.get('geometry_resolution', imported.get('geometry_resolution'))
     if resolution:
         from antenna_lab.pcb.grid import PcbGrid
