@@ -100,6 +100,78 @@ class EasyEdaTests(unittest.TestCase):
         src=parse_easyeda_source(encoded(records()+[['FILL','unsupported',0,'A',1]]))
         with self.assertRaisesRegex(ConfigurationError,'FILL unsupported'):build_source_layout(src)
 
+    def test_complex_poured_hole_follows_nonzero_winding(self):
+        from shapely.geometry import Point
+        from antenna_lab.pcb.easyeda_model import complex_copper_shape
+        items=records()
+        # Outer perimeter clockwise; inner ring counterclockwise is a hole.
+        outer=items[-1][5][0]
+        inner=[-10,-10,'L',10,-10,10,10,-10,10,-10,-10]
+        items[-1][5]=[outer,inner]
+        src=parse_easyeda_source(encoded(items))
+        self.assertEqual(len(src.semantics['poured'][0]['rings_xy_m']),2)
+        layout=build_source_layout(src)
+        copper=[p for p in layout['copper'] if p['layer_role']=='bottom']
+        self.assertTrue(copper)
+        from shapely.geometry import Polygon
+        geometries=[Polygon(p['vertices_xy_m'],p['holes_xy_m']) for p in copper]
+        self.assertFalse(any(p.covers(Point(0,0)) for p in geometries))
+        self.assertTrue(any(p.covers(Point(-.009,0)) for p in geometries))
+        # Opposite orientation must not be replaced by a union that fills the hole.
+
+    def test_complex_poured_multiple_islands_have_distinct_owners(self):
+        items=records()
+        items[-1][5]=[
+            [-45,40,'L',-15,40,-15,-40,-45,-40,-45,40],
+            [15,40,'L',45,40,45,-40,15,-40,15,40],
+        ]
+        src=parse_easyeda_source(encoded(items))
+        layout=build_source_layout(src)
+        self.assertEqual(len([x for x in layout['feature_owners']
+                              if x.startswith('filled:island_')]),2)
+        self.assertEqual(len([p for p in layout['copper'] if p['layer_role']=='bottom']),2)
+        self.assertEqual(layout['source_semantics']['poured'][0]['id'],'filled')
+
+    def test_nonzero_nested_same_winding_keeps_copper(self):
+        from shapely.geometry import Point
+        from antenna_lab.pcb.easyeda_model import complex_copper_shape
+        src=parse_easyeda_source(encoded(records()))
+        outer=src.semantics['poured'][0]['ring_xy_m']
+        # clockwise inner contour, matching the outer ring orientation
+        inner=[(-.00254,.00254),(.00254,.00254),(.00254,-.00254),(-.00254,-.00254)]
+        geometry=complex_copper_shape([outer,inner],'test')
+        self.assertTrue(geometry.covers(Point(0,0)))
+
+    def test_complex_pour_boundary_hole_excludes_poured_copper(self):
+        items=records()
+        items[-2][8] = [
+            ['R',-500,500,1000,1000,0,0],
+            [-200,-200,'L',200,-200,200,200,-200,200,-200,-200],
+        ]
+        src=parse_easyeda_source(encoded(items))
+        with self.assertRaisesRegex(ConfigurationError, 'leaves its source POUR boundary'):
+            build_source_layout(src)
+
+    def test_easyeda_rectangle_winding_flag_determines_aperture(self):
+        from antenna_lab.pcb.easyeda import polygon_ring
+        from antenna_lab.pcb.easyeda_model import complex_copper_shape
+        from shapely.geometry import Point
+        outer=polygon_ring(['R',-50,50,100,100,0,0],'outer',poured=True)
+        inner_ccw=polygon_ring(['R',-10,10,20,20,0,1],'hole',poured=True)
+        inner_cw=polygon_ring(['R',-10,10,20,20,0,0],'island',poured=True)
+        self.assertFalse(complex_copper_shape([outer,inner_ccw],'aperture').covers(Point(0,0)))
+        self.assertTrue(complex_copper_shape([outer,inner_cw],'nested').covers(Point(0,0)))
+        with self.assertRaisesRegex(ConfigurationError,'rounded corner'):
+            polygon_ring(['R',0,0,10,10,0,0,1],'round',poured=True)
+
+    def test_thermal_strokes_and_curved_poured_contours_fail_closed(self):
+        items=records();items[-1][3]=0.5
+        with self.assertRaisesRegex(ConfigurationError,'only filled, unstroked'):
+            parse_easyeda_source(encoded(items))
+        items=records();items[-1][5].append(['CIRCLE',0,0,5,1])
+        with self.assertRaisesRegex(ConfigurationError,'polygon subtype'):
+            parse_easyeda_source(encoded(items))
+
     def test_pour_boundary_is_not_filled_without_poured(self):
         src=parse_easyeda_source(encoded(records()[:-1]))
         with self.assertRaisesRegex(ConfigurationError,'materialized POURED geometry unavailable'):

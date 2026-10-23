@@ -133,6 +133,23 @@ utworzeniem. W nagłówku zapisuj SHA ostatniego *już potwierdzonego*
 commita bazowego, a opublikowany SHA nowego commita podawaj po publikacji
 w raporcie końcowym. Nowy czat zawsze sam sprawdza HEAD.
 
+## Checkpoint importera: complex EasyEDA POURED (2026-10-23)
+
+Użytkownik testował `gerbs/stripline1/stripline1.epro` w Windows GUI.
+`--inspect-source` zwrócił `POURED e102 (record 230): complex POURED
+fill rule unsupported`. Wspólny parser EasyEDA przed zmianą odrzucał
+każdy `POURED` z więcej niż jednym konturem. Dodano w `easyeda.py`
+wiele poprawnych L/R rings dla SOLID POUR / filled unstroked POURED,
+a `easyeda_model.py` materializuje nonzero winding z otworami i
+osobnymi wyspami bez dopowiadania miedzi. Nieznane kontury zakrzywione
+i thermal strokes są nadal blokowane. Dodano 5 małych testów
+regresyjnych, izolowany algorytm Shapely sprawdzony na dziurach/wyspach.
+Nie przetestowano prawdziwego `stripline1.epro`, którego brak po
+stronie asystenta; nie uruchamiano FDTD/PSU/FAST.
+Najbliższy krok: `git pull --ff-only` i ponowna inspekcja w GUI,
+w razie kolejnego UNSUPPORTED zachować dokładny log. Dokumenty:
+`docs/pcb-easyeda.md`, `todo.md`, `history.md`.
+
 ## Checkpoint GUI: parametry automatycznie przypisane do folderu CAD (2026-10-23)
 
 GUI wcześniej przechowywało formularz w globalnym pliku użytkownika,

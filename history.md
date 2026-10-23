@@ -2535,3 +2535,24 @@ i FDTD. Zmiana dotyczy wyłącznie UI oraz lokalnego przechowywania
 parametrów. Dodano małe testy mapowania folderów i trwałości danych.
 Natywne uruchomienie GUI na Windows i FDTD wymagają odbioru użytkownika;
 nie wykonano PSU ani FAST.
+
+### 2026-10-23 — materializowane wielokonturowe EasyEDA POUR/POURED
+
+**Powód:** lokalna inspekcja `stripline1.epro` zgłosiła
+`POURED e102`, `complex POURED fill rule unsupported`. Program
+obsługiwał jedynie jeden kontur i nie mógł odtworzyć standardowych
+wypełnień z dziurami lub niezależnymi wyspami miedzi.
+
+**Rozwiązanie wielokrotnego użytku:** parser zachowuje wszystkie kontury
+prostych L/R w `POUR` i materializowanym `POURED`; geometria fizyczna
+stosuje udokumentowaną regułę `nonzero` z windingiem zamiast zwykłego
+union albo odejmowania wszystkich zagnieżdżeń. Oddzielne wyspy dostają
+niezależną własność przewodnika, zaś oryginalne rekordy/IDs/provenance
+są zachowane. Granica POUR służy weryfikacji, a nie dorabianiu miedzi.
+
+**Ograniczenia:** stroke/thermal/grid, CARC/ARC/CIRCLE/Bezier, niepoprawne
+lub brakujące wypełnienia, nieznane fizyczne prymitywy nadal fail-closed.
+Bez zmian siatki, XML openEMS, fizyki, PSU i FAST/coupling. Testy offline
+dodano; geometria reguły nonzero sprawdzona izolowanie na Shapely.
+Rzeczywisty lokalny `stripline1.epro` i native FDTD niedostępne tutaj,
+dlatego jego import i wynik EM nie są oznaczone PASS.

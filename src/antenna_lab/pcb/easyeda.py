@@ -55,12 +55,17 @@ def polygon_ring(path,label,*,poured=False):
     if not isinstance(path,list) or not path:raise ConfigurationError(f'EasyEDA {label}: missing polygon path.')
     m=lambda v:metres(v,label,poured=poured)
     if path[0]=='R':
-        if not 6<=len(path)<=8 or any(v!=0 for v in path[6:]):
-            raise ConfigurationError(f'EasyEDA {label}: unsupported R corner/winding variant.')
+        if (not 6<=len(path)<=8 or
+                (len(path)>6 and path[6] not in (0,1,False,True)) or
+                (len(path)>7 and path[7]!=0)):
+            raise ConfigurationError(f'EasyEDA {label}: unsupported R winding/rounded corner variant.')
         x,y,w,h=map(m,path[1:5]);a=radians(number(path[5],label))
         if w<=0 or h<=0:raise ConfigurationError(f'EasyEDA {label}: collapsed rectangle.')
         # Top-left anchor in source +Y-up coordinates: height extends downward.
         points=[(x+u*cos(a)-v*sin(a),y+u*sin(a)+v*cos(a)) for u,v in ((0,0),(w,0),(w,-h),(0,-h))]
+        # EasyEDA R isCCW flag: preserve winding for nonzero fill-rule holes.
+        if len(path)>6 and bool(path[6]):
+            points.reverse()
     else:
         if len(path)<7 or path[2]!='L' or len(path[3:])%2:
             raise ConfigurationError(f'EasyEDA {label}: unsupported polygon subtype (only R or straight L contour).')
@@ -72,6 +77,18 @@ def polygon_ring(path,label,*,poured=False):
     if len(set(points))<3 or not shape.is_valid or shape.area<=0:
         raise ConfigurationError(f'EasyEDA {label}: invalid polygon; no topology repair.')
     return tuple(points)
+
+
+
+def complex_polygon_rings(paths, label, *, poured=False):
+    """Parse all contours. EasyEDA nonzero fill rule is resolved by the model.
+
+    These are materialized copper boundaries, not a POUR outline to guess a
+    fill from. Curved contour types remain explicit unsupported geometry.
+    """
+    if not isinstance(paths, list) or not paths:
+        raise ConfigurationError(f'EasyEDA {label}: missing complex polygon paths.')
+    return tuple(polygon_ring(path, label, poured=poured) for path in paths)
 
 
 def load_easyeda_source(path):
@@ -146,13 +163,17 @@ def parse_easyeda_source(raw,*,source_file='<memory>'):
                     polygons.append(dict(id=r[1],net=r[3],layer_id=r[4],width_m=positive(r[5],label),
                         ring_xy_m=polygon_ring(r[6],label),record_index=index))
                 elif kind=='POUR':
-                    if len(r)!=12 or r[9][0]!='SOLID':raise ValueError('only SOLID POUR supported')
-                    if len(r[8])!=1:raise ValueError('complex POUR boundaries unsupported')
-                    pours.append(dict(id=r[1],net=r[3],layer_id=r[4],ring_xy_m=polygon_ring(r[8][0],label),record_index=index))
+                    if len(r)!=12 or not isinstance(r[9],list) or not r[9] or r[9][0]!='SOLID':
+                        raise ValueError('only SOLID POUR supported')
+                    rings=complex_polygon_rings(r[8],label)
+                    pours.append(dict(id=r[1],net=r[3],layer_id=r[4],
+                        rings_xy_m=rings,ring_xy_m=rings[0],record_index=index))
                 elif kind=='POURED':
-                    if len(r)!=6 or r[3]!=0 or r[4] not in (True,1):raise ValueError('only filled, unstroked POURED supported')
-                    if len(r[5])!=1:raise ValueError('complex POURED fill rule unsupported')
-                    poured.append(dict(id=r[1],parent_id=r[2],ring_xy_m=polygon_ring(r[5][0],label,poured=True),record_index=index))
+                    if len(r)!=6 or r[3]!=0 or r[4] not in (True,1):
+                        raise ValueError('only filled, unstroked POURED supported')
+                    rings=complex_polygon_rings(r[5],label,poured=True)
+                    poured.append(dict(id=r[1],parent_id=r[2],
+                        rings_xy_m=rings,ring_xy_m=rings[0],record_index=index))
                 elif kind=='PAD':
                     if len(r)<11 or (r[9] is not None and r[9]!=['ROUND',0,0]):
                         raise ValueError('only no-hole absolute RECT PAD supported')
