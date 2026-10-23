@@ -21,7 +21,11 @@ from test_openems_pcb import CSX
 class PcbReportTests(unittest.TestCase):
     def setUp(self):
         self.temp=TemporaryDirectory();self.addCleanup(self.temp.cleanup);self.root=Path(self.temp.name)
-        self.bundle=bundle_fixture(self.root/'gerbers',vertical=True,loop=True)
+        # A report test needs a physically representable saved PCB, not the
+        # optional narrow remote copper bridge used by mesh/topology tests.
+        # That bridge can fail the strict inner-cell-envelope audit before
+        # reporting is exercised; keep its separate topology tests intact.
+        self.bundle=bundle_fixture(self.root/'gerbers')
         self.out=self.root/'run';engine=RunEngine()
         with patch('antenna_lab.solvers.openems.native_modules',return_value=(
                 SimpleNamespace(openEMS=lambda **kw:engine),SimpleNamespace(ContinuousStructure=CSX))),contextlib.redirect_stdout(io.StringIO()) as console:
