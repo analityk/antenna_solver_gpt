@@ -136,6 +136,23 @@ Maskuj metal, obwiednię interpolacji i idealny port. Zachowaj surowe HDF5,
 zespolone pola i wspólną skalę między fazami. Nie koryguj bilansu normalizacją.
 Pasywne sondy portu i powierzchnie diagnostyczne same nie zaliczają M3.
 
+## Polityka modelowania warstw EasyEDA w EM
+
+Do modelu pełnofalowego trafiają wyłącznie fizyczne warstwy miedzi
+(TOP, SIGNAL/PLANE, BOTTOM) oraz SUBSTRATE z LAYER_PHYS. Wszelkie
+silk, courtyard, mask, paste, stencil i warstwy pomocnicze pozostają
+danymi CAD/provenance, a nie materiałem EM. Soldermaskę dopiero w
+przyszłości można dodać jako jawny, przybliżony model εr_eff; aktualnie
+żadna ukryta korekta przenikalności nie jest dopuszczalna.
+Nieznane typy warstw fizycznych blokować.
+
+Brakujące/niepoprawne εr (w tym εr=0) wolno raportować w inspekcji,
+ale nie można uruchamiać FDTD przez domyślną wartość FR-4 lub zgadywanie
+z nazwy warstwy. Użytkownik świadomie podaje dane fizyczne, a solver
+zapisuje rozwiązaną konfigurację i provenance. Nie wolno pomijać
+pustych fizycznych pozycji miedzi, bo wyznaczają geometrię Z całego
+stackupu.
+
 ## Zasady architektury
 
 - `core` nie zna Quadosa, API openEMS ani interfejsu graficznego.
