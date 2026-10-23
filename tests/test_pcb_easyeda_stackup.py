@@ -90,6 +90,35 @@ class EasyEdaStackupTests(unittest.TestCase):
         with self.assertRaisesRegex(ConfigurationError,'unknown/non-dielectric'):
             describe_source_stackup(sample(),'sha',{'99':dict(epsilon_r=4.3)})
 
+    def test_canonical_four_copper_layers_without_fake_inner_copper(self):
+        from test_pcb_easyeda import records,encoded,config
+        from antenna_lab.pcb.easyeda_model import build_source_layout,source_layout_geometry
+        rows=records()
+        # Extend the known two-layer fixture with two physical inner copper
+        # interfaces and two more dielectric layers; no fabricated inner fill.
+        layer_end=next(i for i,r in enumerate(rows) if r[0]=='LAYER_PHYS')
+        rows[layer_end:layer_end]=[
+            ['LAYER',15,'SIGNAL','Inner1',3],
+            ['LAYER',16,'SIGNAL','Inner2',3],
+            ['LAYER',362,'SUBSTRATE','Core2',0],
+            ['LAYER',363,'SUBSTRATE','Core3',0]]
+        for i,r in enumerate(rows):
+            if r[0]=='LAYER_PHYS' and r[1]==2:
+                rows[i:i]=[['LAYER_PHYS',15,'',1.378,0,0,1],
+                            ['LAYER_PHYS',362,'air',40,1,0,1],
+                            ['LAYER_PHYS',16,'',1.378,0,0,1],
+                            ['LAYER_PHYS',363,'air',40,1,0,1]]
+                break
+        source=parse_easyeda_source(encoded(rows))
+        layout=build_source_layout(source)
+        self.assertEqual([v['role'] for v in layout['copper_layers']],
+                         ['top','inner1','inner2','bottom'])
+        result=source_layout_geometry(layout,config())
+        self.assertEqual(len(result.dielectric_layers),3)
+        self.assertEqual(len(result.copper_layers),4)
+        self.assertFalse(any(p.layer_role in ('inner1','inner2') for p in result.copper))
+        self.assertEqual(result.copper_layers[-1].z_m,result.dielectric_layers[-1].z_min_m)
+
     def test_real_stripline_stack_and_missing_material_provenance(self):
         import zipfile
         from antenna_lab.pcb.easyeda_project import load_easyeda_project,materialize_project_source
