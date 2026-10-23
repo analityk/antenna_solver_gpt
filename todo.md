@@ -7,9 +7,16 @@ w atrybucie nie są widmami), brak `openEMS_stats.txt`, status temporalny
 unconfirmed. Odzysk offline: port processed, fields failed, raport HTML
 powstał. Zmieniono sam raport: profil openEMS jest zwijany,
 stackup nie pokazuje fikcyjnych pionowych via, a czytnik mówi
-jawnie o braku próbek FD. **OPEN:** test odtworzenia nowego raportu
-na Windows `stripline2_006`, bez nowego FDTD; przebieg nie jest
-zweryfikowaną odpowiedzią EM ani potwierdzonym rezonansem.
+jawnie o braku próbek FD. **Windows odbiór:** offline `postprocess_002` wygenerował raport,
+port=processed, pola=failed z poprawną diagnozą pustego `FieldData/FD`,
+temporal_completion=unconfirmed. `test_fields.py`: 7/7 PASS. Wszystkie
+5 testów `test_pcb_report.py` zatrzymały się w wspólnym `setUp`
+na `PCB copper fidelity` wariantu fixture `vertical=True, loop=True`
+(inner=(2,0), modeled=(1,0)). Test raportu korzysta teraz z bazowego
+fixture bez wąskiego mostka, jak oddzielny działający test importu;
+audit miedzi pozostaje bez zmian, zaś złożony loop nadal sprawdzają
+testy importu/topologii. **OPEN:** powtórzyć `test_pcb_report.py` na
+Windows; nieweryfikowane widmo przerwanego FDTD nie dowodzi rezonansu.
 
 
 **2026-10-23: wielowarstwowy EasyEDA source → istniejący PCB openEMS.**
