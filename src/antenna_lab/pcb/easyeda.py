@@ -91,6 +91,10 @@ def curved_polygon_ring(path, label, *, poured=False):
         raise ConfigurationError(f'EasyEDA {label}: missing polygon path.')
     if path[0]=='R':
         return polygon_ring(path,label,poured=poured)
+    if isinstance(path[0],str):
+        raise ConfigurationError(
+            f'EasyEDA {label}: unsupported polygon subtype {path[0]!r}; '
+            'only unrounded R or L/ARC/CARC contours supported.')
     if len(path)<6:
         raise ConfigurationError(f'EasyEDA {label}: incomplete mixed polygon path.')
     from math import acos, atan2, ceil, hypot, pi
