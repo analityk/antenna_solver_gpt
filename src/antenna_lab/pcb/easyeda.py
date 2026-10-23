@@ -55,12 +55,17 @@ def polygon_ring(path,label,*,poured=False):
     if not isinstance(path,list) or not path:raise ConfigurationError(f'EasyEDA {label}: missing polygon path.')
     m=lambda v:metres(v,label,poured=poured)
     if path[0]=='R':
-        if not 6<=len(path)<=8 or any(v!=0 for v in path[6:]):
-            raise ConfigurationError(f'EasyEDA {label}: unsupported R corner/winding variant.')
+        if (not 6<=len(path)<=8 or
+                (len(path)>6 and path[6] not in (0,1,False,True)) or
+                (len(path)>7 and path[7]!=0)):
+            raise ConfigurationError(f'EasyEDA {label}: unsupported R winding/rounded corner variant.')
         x,y,w,h=map(m,path[1:5]);a=radians(number(path[5],label))
         if w<=0 or h<=0:raise ConfigurationError(f'EasyEDA {label}: collapsed rectangle.')
         # Top-left anchor in source +Y-up coordinates: height extends downward.
         points=[(x+u*cos(a)-v*sin(a),y+u*sin(a)+v*cos(a)) for u,v in ((0,0),(w,0),(w,-h),(0,-h))]
+        # EasyEDA R isCCW flag: preserve winding for nonzero fill-rule holes.
+        if len(path)>6 and bool(path[6]):
+            points.reverse()
     else:
         if len(path)<7 or path[2]!='L' or len(path[3:])%2:
             raise ConfigurationError(f'EasyEDA {label}: unsupported polygon subtype (only R or straight L contour).')
