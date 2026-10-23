@@ -84,3 +84,86 @@ def normalize_stackup(value):
                  'PTH plating 25 um, solid_pec_equivalent: project assumptions, not EasyEDA values.',
                  'Soldermask, paste and silkscreen omitted.']
     return result,dict(format=fmt,thickness_unit='mm',mapped_layers=mapped,omitted_layers=omitted,assumptions=assumptions)
+
+# Source EPRO path below does not reuse manufacturing approximation defaults.
+SOURCE_COPPER_TYPES = frozenset(('TOP','BOTTOM','SIGNAL','PLANE'))
+
+
+def source_physical_stackup(data):
+    """Ordered source LAYER_PHYS; editor/mask/paste/silk are not EM."""
+    layers={v['id']:v for v in data['layers']}
+    selected=[]; omitted=[]; seen=set()
+    for entry in data['layer_physics']:
+        lid=entry['layer_id']
+        if lid in seen or lid not in layers:
+            raise ConfigurationError(f'EasyEDA LAYER_PHYS {lid}: duplicate or undefined layer.')
+        seen.add(lid)
+        kind=layers[lid]['type']
+        if kind in SOURCE_COPPER_TYPES or kind=='SUBSTRATE':
+            if not isfinite(entry['thickness_m']) or entry['thickness_m']<=0:
+                raise ConfigurationError(f'EasyEDA LAYER_PHYS {lid}: positive thickness required.')
+            selected.append(dict(entry,kind=kind,name=layers[lid]['name']))
+        else:
+            omitted.append(dict(layer_id=lid,kind=kind,name=layers[lid]['name'],
+                                record_index=entry['record_index'],disposition='non_EM_layer'))
+    kinds=[x['kind'] for x in selected]
+    if (len(kinds)<3 or kinds[0]!='TOP' or kinds[-1]!='BOTTOM' or
+            any((a in SOURCE_COPPER_TYPES)==(b in SOURCE_COPPER_TYPES)
+                for a,b in zip(kinds,kinds[1:]))):
+        raise ConfigurationError('EasyEDA physical stackup must alternate TOP / SUBSTRATE / '
+                                 'inner SIGNAL/PLANE / SUBSTRATE / BOTTOM.')
+    conductors=[x for x in selected if x['kind'] in SOURCE_COPPER_TYPES]
+    roles={x['layer_id']:('top' if i==0 else 'bottom' if i==len(conductors)-1
+                          else f'inner{i}') for i,x in enumerate(conductors)}
+    return dict(records=selected,role_by_layer_id=roles,ignored_layers=omitted)
+
+
+def describe_source_stackup(data, source_sha256, overrides=None, *, require_materials=False):
+    """Physical Z/provenance; do not guess an absent dielectric epsilon.
+
+    Overrides use string layer IDs mapping to {epsilon_r, loss_tangent}.
+    Inspection can report epsilon 0; FDTD must reject it.
+    """
+    src=source_physical_stackup(data)
+    overrides=overrides or {}
+    if not isinstance(overrides,dict):
+        raise ConfigurationError('EasyEDA dielectrics overrides: require layer ID mapping.')
+    allowed={str(x['layer_id']) for x in src['records'] if x['kind']=='SUBSTRATE'}
+    if any(str(k) not in allowed for k in overrides):
+        raise ConfigurationError('EasyEDA dielectric override: unknown/non-dielectric layer ID.')
+    z=0.0; copper=[]; dielectric=[]; missing=[]
+    for item in src['records']:
+        lid=item['layer_id']
+        if item['kind'] in SOURCE_COPPER_TYPES:
+            copper.append(dict(layer_id=lid,name=item['name'],role=src['role_by_layer_id'][lid],
+                z_m=z,model='pec',thickness_m=item['thickness_m'],conductivity_s_m=58e6,
+                source_sha256=source_sha256))
+        else:
+            manual=overrides.get(str(lid),overrides.get(lid,{}))
+            if not isinstance(manual,dict) or set(manual)-{'epsilon_r','loss_tangent'}:
+                raise ConfigurationError(f'EasyEDA dielectric {lid}: override accepts epsilon_r/loss_tangent only.')
+            eps=manual.get('epsilon_r',item['epsilon_r'])
+            loss=manual.get('loss_tangent',item['loss_tangent'])
+            if (any(isinstance(v,bool) or not isinstance(v,(int,float)) or not isfinite(v)
+                    for v in (eps,loss)) or loss<0):
+                raise ConfigurationError(f'EasyEDA dielectric {lid}: invalid material parameter.')
+            if eps<1:
+                missing.append(dict(layer_id=lid,name=item['name'],reason='epsilon_r missing/less than one'))
+            bottom=z-item['thickness_m']
+            if not bottom<z:
+                raise ConfigurationError(f'EasyEDA dielectric {lid}: Z step collapsed.')
+            dielectric.append(dict(layer_id=lid,material_label=item['material'],
+                name=f"{item['name']}_{lid}",z_min_m=bottom,z_max_m=z,
+                epsilon_r=eps,loss_tangent=loss,
+                epsilon_origin='explicit_user_override' if 'epsilon_r' in manual else 'CAD_LayerPhys',
+                loss_origin='explicit_user_override' if 'loss_tangent' in manual else 'CAD_LayerPhys'))
+            z=bottom
+    if require_materials and missing:
+        ids=', '.join(str(v['layer_id']) for v in missing)
+        raise ConfigurationError('EasyEDA dielectrics: epsilon_r not defined in CAD for layer IDs '
+                                 f'{ids}. Supply explicit epsilon_r (no automatic FR4 assumption).')
+    return dict(copper_layers=copper,dielectric_layers=dielectric,
+                role_by_layer_id=src['role_by_layer_id'],
+                ignored_layers=src['ignored_layers'],missing_materials=missing,
+                soldermask_model='omitted; effective permittivity model deferred',
+                copper_geometry_model='PEC surfaces; foil thickness is material metadata only')
