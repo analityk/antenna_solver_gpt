@@ -103,9 +103,14 @@ def source_physical_stackup(data):
             if not isfinite(entry['thickness_m']) or entry['thickness_m']<=0:
                 raise ConfigurationError(f'EasyEDA LAYER_PHYS {lid}: positive thickness required.')
             selected.append(dict(entry,kind=kind,name=layers[lid]['name']))
-        else:
+        elif (kind in OMITTED_TYPES or kind in
+              {'TOP_PASTE','BOTTOM_PASTE','TOP_MASK','BOTTOM_MASK',
+               'TOP_SILKSCREEN','BOTTOM_SILKSCREEN','COURTYARD','STENCIL'}):
             omitted.append(dict(layer_id=lid,kind=kind,name=layers[lid]['name'],
                                 record_index=entry['record_index'],disposition='non_EM_layer'))
+        else:
+            raise ConfigurationError(f'EasyEDA LAYER_PHYS {lid}: unknown physical layer kind {kind}; '
+                                     'no silent omission of material.')
     kinds=[x['kind'] for x in selected]
     if (len(kinds)<3 or kinds[0]!='TOP' or kinds[-1]!='BOTTOM' or
             any((a in SOURCE_COPPER_TYPES)==(b in SOURCE_COPPER_TYPES)
