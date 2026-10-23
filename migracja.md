@@ -133,6 +133,29 @@ utworzeniem. W nagłówku zapisuj SHA ostatniego *już potwierdzonego*
 commita bazowego, a opublikowany SHA nowego commita podawaj po publikacji
 w raporcie końcowym. Nowy czat zawsze sam sprawdza HEAD.
 
+## Checkpoint — multilayer EasyEDA EM stackup (2026-10-23)
+
+Po potwierdzeniu `LAYER_PHYS 15 inner stackup unsupported` rozszerzono
+adapter EasyEDA na źródłowe stosy wielowarstwowe. Nie zmieniano
+silnika openEMS ani FAST. `source_physical_stackup` filtruje wyłącznie
+fizyczne TOP/INNER(SIGNAL/PLANE)/BOTTOM oraz SUBSTRATE w kolejności
+LAYER_PHYS. Pozostałe znane warstwy (silk/mask/paste/stencil) wykluczono
+z modelu EM i zachowano w metadanych. Soldermask — osobny przyszły
+model εr_eff, dziś bez ukrytych korekt. Realny stripline1 ma cztery
+warstwy miedzi i trzy SUBSTRATE; wartości εr są 0 i **nie są** domyślnie
+zastępowane FR4. SOURCE INSPECT może pokazać brak materiału, ale
+PREPARE/FDTD wymaga jawnych εr poprzez tabelę Warstwy EM w Windows GUI
+lub `--dielectric-material LAYER_ID:ER:TAN`. Ręczny JSON nie jest
+obowiązkowy. Użyta grubość PTH również wymaga jawnego wyboru.
+
+Testy `tests/test_pcb_easyeda_stackup.py` i
+`tests/test_pcb_gui_commands.py`: dodane, bez pełnej suite.
+Nie stwierdzono natywnej zgodności siatki/XML i wyników EM na Windows;
+następne działanie użytkownika: `git pull --ff-only`, uruchomić GUI,
+wybrać stripline1, wykonać INSPECT, sprawdzić mapowanie i źródłowe
+braki εr; następnie wprowadzić fizyczne materiały i PREPARE-ONLY,
+nie uruchamiać FDTD bez oceny wyniku przygotowania.
+
 ## Kolejny checkpoint — realne łuki POURED stripline1 (2026-10-23)
 
 Po scaleniu poprzedniej obsługi wielu konturów użytkownik nadal
