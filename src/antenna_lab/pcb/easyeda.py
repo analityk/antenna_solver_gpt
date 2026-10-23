@@ -80,15 +80,83 @@ def polygon_ring(path,label,*,poured=False):
 
 
 
-def complex_polygon_rings(paths, label, *, poured=False):
-    """Parse all contours. EasyEDA nonzero fill rule is resolved by the model.
+def curved_polygon_ring(path, label, *, poured=False):
+    """EasyEDA V2 single polygon with straight L and signed ARC/CARC segments.
 
-    These are materialized copper boundaries, not a POUR outline to guess a
-    fill from. Curved contour types remain explicit unsupported geometry.
+    Convert every sampled point to source SI coordinates (POURED=10 mil). Use
+    the same geometric curve-error budget as the existing Gerber/route import,
+    not the FDTD mesh resolution. No automatic shape/topology repair.
+    """
+    if not isinstance(path, list) or not path:
+        raise ConfigurationError(f'EasyEDA {label}: missing polygon path.')
+    if path[0]=='R':
+        return polygon_ring(path,label,poured=poured)
+    if len(path)<6:
+        raise ConfigurationError(f'EasyEDA {label}: incomplete mixed polygon path.')
+    from math import acos, atan2, ceil, hypot, pi
+    from .gerber import CURVE_ERROR_M
+    m=lambda value:metres(value,label,poured=poured)
+    points=[(m(path[0]),m(path[1]))]
+    i=2
+    while i<len(path):
+        op=path[i]
+        if op=='L':
+            i+=1
+            beginning=i
+            while i<len(path) and not isinstance(path[i],str):
+                if i+1>=len(path) or isinstance(path[i+1],str):
+                    raise ConfigurationError(f'EasyEDA {label}: incomplete L coordinates.')
+                points.append((m(path[i]),m(path[i+1])))
+                i+=2
+            if i==beginning:
+                raise ConfigurationError(f'EasyEDA {label}: empty L segment.')
+        elif op in ('ARC','CARC'):
+            if i+3>=len(path) or isinstance(path[i+1],str):
+                raise ConfigurationError(f'EasyEDA {label}: incomplete ARC parameters.')
+            angle=number(path[i+1],label)
+            finish=(m(path[i+2]),m(path[i+3]))
+            begin=points[-1]
+            center=arc_center(begin,finish,angle,label)
+            radius=hypot(begin[0]-center[0],begin[1]-center[1])
+            if radius<=0:
+                raise ConfigurationError(f'EasyEDA {label}: collapsed ARC radius.')
+            # Chord sagitta is bounded by CURVE_ERROR_M; the end vertex is
+            # always the exact source endpoint rather than a derived float.
+            limit=2*acos(max(-1.,min(1.,1-CURVE_ERROR_M/radius)))
+            steps=max(2,ceil(abs(radians(angle))/limit)) if limit>0 else 100001
+            if steps>100000:
+                raise ConfigurationError(f'EasyEDA {label}: ARC exceeds curve vertex budget.')
+            first=atan2(begin[1]-center[1],begin[0]-center[0])
+            sweep=radians(angle)
+            for j in range(1,steps):
+                theta=first+sweep*j/steps
+                points.append((center[0]+radius*cos(theta),center[1]+radius*sin(theta)))
+            points.append(finish)
+            i+=4
+        else:
+            raise ConfigurationError(
+                f'EasyEDA {label}: unsupported polygon segment {op!r} '
+                '(supported L, ARC, CARC, unrounded R).')
+        if len(points)>100000:
+            raise ConfigurationError(f'EasyEDA {label}: polygon exceeds vertex budget.')
+    if points[-1]==points[0]:
+        points.pop()
+    from shapely.geometry import Polygon
+    shape=Polygon(points)
+    if len(set(points))<3 or not shape.is_valid or shape.area<=0:
+        raise ConfigurationError(f'EasyEDA {label}: invalid curved polygon; no topology repair.')
+    return tuple(points)
+
+
+def complex_polygon_rings(paths, label, *, poured=False):
+    """Parse all contour types supported by exact source geometry.
+
+    The nonzero fill rule is resolved by the model; we must not flatten arc
+    apertures, lose rings or fabricate solid fill from the parent boundary.
     """
     if not isinstance(paths, list) or not paths:
         raise ConfigurationError(f'EasyEDA {label}: missing complex polygon paths.')
-    return tuple(polygon_ring(path, label, poured=poured) for path in paths)
+    return tuple(curved_polygon_ring(path, label, poured=poured) for path in paths)
 
 
 def load_easyeda_source(path):
