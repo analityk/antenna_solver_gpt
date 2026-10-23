@@ -1,5 +1,22 @@
 # TODO — PCB: aktualny stan i następne kroki
 
+**2026-10-23: rzeczywista przyczyna `stripline1.epro` — łuki
+w POURED.** Repozytoryjny `gerbs/stripline1/stripline1.epro` (13 264 B)
+zawiera w PCB rekord 230 `POURED e102`: 1 kontur prostokątny
++ 5 otworów na dwóch `ARC 180`, oraz rekord 234 `POURED e103`:
+1 prostokąt + 5 otworów `ARC 90` przeplatane `L`.
+Poprzednia poprawka dodała `len(paths)>1`, ale pozostawiła parser
+`polygon_ring` ograniczony do samych L/R, stąd nowy błąd.
+Dodano bez zgadywania kształtu osobny parser konturów
+L/ARC/CARC/R z signed sweep i budżetem krzywej 0.1 µm,
+zachowując otwory w `nonzero`. Test regresyjny czyta *realny*
+archiwum z repozytorium, nie tylko sztuczny fixture. Pozostałe
+krzywe i błędna topologia fail-closed. UWAGA: projekt ma
+13 `LAYER_PHYS` i miedź na warstwie 16; obecny canonical
+top/substrate/bottom nie jest solverem wielowarstwowym.
+Bez native FDTD, PSU/FAST. Następny krok: ponowny `--inspect-source`
+i rozpoznanie osobnego ograniczenia stackupu.
+
 **2026-10-23: wielokonturowe wypełnienia EasyEDA Pro.**
 Lokalny `gerbs/stripline1/stripline1.epro` zatrzymał inspekcję na
 `POURED e102 (record 230): complex POURED fill rule unsupported`.
