@@ -136,7 +136,13 @@ def build_source_layout(source):
             parent.get('rings_xy_m',(parent['ring_xy_m'],)),f"POUR {parent['id']}")
         if not boundary.buffer(TOLERANCE_M).covers(shape):
             raise ConfigurationError(f"EasyEDA POURED {p['id']}: filled image leaves its source POUR boundary.")
-        add(p['id'],parent['net'],parent['layer_id'],shape,'pour')
+        # Distinct islands may belong to distinct canonical conductors.
+        # Preserve the source POURED record as one record in source_semantics,
+        # but give each physical island its own feature identity/ownership.
+        islands = [shape] if shape.geom_type=='Polygon' else list(shape.geoms)
+        for i,island in enumerate(sorted(islands, key=lambda geom: (geom.bounds, geom.area))):
+            name=p['id'] if len(islands)==1 else f"{p['id']}:island_{i:03d}"
+            add(name,parent['net'],parent['layer_id'],island,'pour')
     for p in data['pours']:
         if not any(s['parent_id']==p['id'] for s in data['poured']):
             raise ConfigurationError(f"EasyEDA POUR {p['id']}: materialized POURED geometry unavailable; boundary is not filled copper.")
