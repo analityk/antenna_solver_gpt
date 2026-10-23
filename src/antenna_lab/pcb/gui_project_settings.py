@@ -15,6 +15,8 @@ import tempfile
 
 SCHEMA_VERSION = 1
 SETTINGS_FILE = 'gui-settings.json'
+# These are document/run-specific, not safely shareable between sibling EPROs.
+TRANSIENT_KEYS = frozenset(('project', 'csxcad_path', 'source_config', 'pcb_id', 'run_dir'))
 
 
 def project_parameters_dir(project_path, repository_root):
@@ -54,7 +56,7 @@ def read_project_settings(directory, project_folder, defaults):
         raise ValueError(f'{path}: niezgodny format lub inny folder źródłowy.')
     result = {}
     for key, default in defaults.items():
-        if key in ('project', 'csxcad_path'):
+        if key in TRANSIENT_KEYS:
             continue
         value = data['settings'].get(key)
         if type(value) is type(default):
@@ -68,7 +70,7 @@ def write_project_settings(directory, project_folder, values, defaults):
     directory.mkdir(parents=True, exist_ok=True)
     settings = {
         key: values[key] for key, default in defaults.items()
-        if key not in ('project', 'csxcad_path')
+        if key not in TRANSIENT_KEYS
         and key in values and type(values[key]) is type(default)
     }
     record = dict(schema_version=SCHEMA_VERSION,
