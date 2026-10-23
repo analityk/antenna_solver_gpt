@@ -36,6 +36,14 @@ def sample():
 
 
 class EasyEdaStackupTests(unittest.TestCase):
+    def assert_z_positions(self, observed, expected):
+        """SI coordinates may differ by floating-point accumulation noise."""
+        self.assertEqual(len(observed), len(expected))
+        for index, (actual, target) in enumerate(zip(observed, expected)):
+            with self.subTest(layer_index=index):
+                # One femtometre: rejects any geometrically meaningful shift.
+                self.assertAlmostEqual(actual, target, delta=1e-15)
+
     def test_filters_editor_layers_and_preserves_physical_order(self):
         s=source_physical_stackup(sample())
         self.assertEqual(list(s['role_by_layer_id'].values()),
@@ -48,8 +56,8 @@ class EasyEdaStackupTests(unittest.TestCase):
         info=describe_source_stackup(sample(),'sha')
         self.assertEqual([p['role'] for p in info['copper_layers']],
                          ['top','inner1','inner2','bottom'])
-        self.assertEqual([p['z_m'] for p in info['copper_layers']],
-                         [0,-.0002,-.0004,-.0006])
+        self.assert_z_positions([p['z_m'] for p in info['copper_layers']],
+                                [0,-.0002,-.0004,-.0006])
         self.assertEqual(len(info['missing_materials']),3)
         self.assertIn('omitted',info['soldermask_model'])
         with self.assertRaisesRegex(ConfigurationError,'361, 362, 363'):
@@ -64,8 +72,8 @@ class EasyEdaStackupTests(unittest.TestCase):
                          [4.25,4.12,4.25])
         self.assertEqual(stack['dielectric_layers'][0]['epsilon_origin'],
                          'explicit_user_override')
-        self.assertEqual([d['z_min_m'] for d in stack['dielectric_layers']],
-                         [-.0002,-.0004,-.0006])
+        self.assert_z_positions([d['z_min_m'] for d in stack['dielectric_layers']],
+                                [-.0002,-.0004,-.0006])
         self.assertNotIn('drills',stack)
 
     def test_bad_physical_order_and_unknown_non_em_kind_fail(self):
