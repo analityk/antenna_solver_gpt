@@ -184,7 +184,7 @@ def validate_pcb_geometry(geometry: PcbGeometry):
             _require(all(_finite(v) and v > 0 for v in (sheet.thickness_m,sheet.conductivity_s_m)),
                      'stackup: positive finite copper inputs required.')
         _require(len({c.id for c in geometry.copper}) == len(geometry.copper), 'stackup: duplicate copper polygon ids.')
-        _require({c.layer_role for c in geometry.copper} == {c.role for c in sheets}, 'stackup: missing/extra polygon layer.')
+        _require({c.layer_role for c in geometry.copper} <= {c.role for c in sheets}, 'stackup: polygon on undeclared physical copper layer.')
 
     _require(bool(geometry.copper), "copper: wymagana co najmniej jedna wyspa miedzi.")
     polygons = []
