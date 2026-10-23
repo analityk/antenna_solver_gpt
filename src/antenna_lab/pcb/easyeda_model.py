@@ -10,6 +10,7 @@ import json
 
 from shapely import union_all, normalize
 from shapely.geometry import Polygon, Point, LineString
+from shapely.ops import polygonize, unary_union
 
 from antenna_lab.core.config import ConfigurationError
 from .model import (BoardOutline,CopperPolygon,CopperLayer,DielectricLayer,Substrate,
@@ -38,6 +39,47 @@ def _polygon(id,shape,z,role):
     shape=normalize(shape.simplify(BOOLEAN_CLEANUP_M,preserve_topology=True))
     return CopperPolygon(id,tuple(shape.exterior.coords)[:-1],z,role,
                          tuple(tuple(h.coords)[:-1] for h in shape.interiors))
+
+
+
+def _signed_ring_area(ring):
+    return sum(a[0]*b[1] - b[0]*a[1]
+               for a,b in zip(ring, (*ring[1:],ring[0]))) / 2.
+
+
+def complex_copper_shape(rings, label):
+    """Apply EasyEDA Pro V2's *nonzero* polygon winding rule.
+
+    Union of independent rings would incorrectly fill holes. Subtracting all
+    nested rings would incorrectly erase same-winding islands. Polygonize
+    the exact planar boundaries, then include each face only when its total
+    signed winding number is nonzero. No topological repair or guessed pour.
+    """
+    if not rings:
+        raise ConfigurationError(f'EasyEDA {label}: no fill contours.')
+    contours=[]
+    for ring in rings:
+        poly=Polygon(ring)
+        area=_signed_ring_area(ring)
+        if (len(ring)<3 or area==0 or not poly.is_valid or
+                poly.is_empty or poly.area<=0):
+            raise ConfigurationError(f'EasyEDA {label}: invalid fill contour.')
+        contours.append((poly,1 if area>0 else -1))
+    boundaries=unary_union([LineString([*poly.exterior.coords]) for poly,_ in contours])
+    faces=list(polygonize(boundaries))
+    filled=[]
+    for face in faces:
+        probe=face.representative_point()
+        winding=sum(sign for poly,sign in contours if poly.covers(probe))
+        if winding:
+            filled.append(face)
+    if not filled:
+        raise ConfigurationError(f'EasyEDA {label}: empty nonzero fill.')
+    shape=union_all(filled)
+    if (shape.is_empty or not shape.is_valid or
+            shape.geom_type not in ('Polygon','MultiPolygon')):
+        raise ConfigurationError(f'EasyEDA {label}: invalid nonzero fill geometry.')
+    return shape
 
 
 def build_source_layout(source):
@@ -88,8 +130,11 @@ def build_source_layout(source):
     for p in data['poured']:
         if p['parent_id'] not in parents:raise ConfigurationError(f"EasyEDA POURED {p['id']}: missing parent POUR.")
         parent=parents[p['parent_id']]
-        shape=Polygon(p['ring_xy_m'])
-        if not Polygon(parent['ring_xy_m']).buffer(TOLERANCE_M).covers(shape):
+        shape=complex_copper_shape(
+            p.get('rings_xy_m',(p['ring_xy_m'],)),f"POURED {p['id']}")
+        boundary=complex_copper_shape(
+            parent.get('rings_xy_m',(parent['ring_xy_m'],)),f"POUR {parent['id']}")
+        if not boundary.buffer(TOLERANCE_M).covers(shape):
             raise ConfigurationError(f"EasyEDA POURED {p['id']}: filled image leaves its source POUR boundary.")
         add(p['id'],parent['net'],parent['layer_id'],shape,'pour')
     for p in data['pours']:
