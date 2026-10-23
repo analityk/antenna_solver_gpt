@@ -72,8 +72,8 @@ Dla `.epro` bezpośrednio pod `gerbs/` używa się nazwy pliku bez rozszerzenia;
 dla plików spoza `gerbs/` stosuje się nazwę folderu i stabilny skrót
 jego pełnej ścieżki, aby różne zewnętrzne projekty się nie mieszały.
 
-GUI zapisuje własny plik `gui-settings.json` atomowo przy zmianie projektu,
-uruchomieniu etapu i zamknięciu aplikacji. Zawiera wyłącznie edytowalne
+GUI zapisuje własny plik `gui-settings.json` atomowo już po wyborze projektu,
+a następnie przy zmianie projektu, uruchomieniu etapu i zamknięciu aplikacji. Zawiera wyłącznie edytowalne
 ustawienia eksperymentu, profilu i pól, jawne nadpisania openEMS oraz
 opcjonalną metalizację PTH. **Nie przenosi między dokumentami `.epro`**
 ręcznego JSON-a source-config, identyfikatora PCB ani katalogu wyników.
