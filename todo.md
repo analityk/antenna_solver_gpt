@@ -1,5 +1,19 @@
 # TODO — PCB: aktualny stan i następne kroki
 
+**2026-10-23: wielokonturowe wypełnienia EasyEDA Pro.**
+Lokalny `gerbs/stripline1/stripline1.epro` zatrzymał inspekcję na
+`POURED e102 (record 230): complex POURED fill rule unsupported`.
+Parser miał sztuczne ograniczenie `len(paths)==1`. Wprowadzono obsługę
+wielu konturów prostych L/R dla SOLID POUR oraz filled, unstroked POURED.
+Fizyczna miedź korzysta z reguły `nonzero`: osobne wyspy / dziury,
+bez ignorowania lub uzupełniania otworów. Fizyczne wyspy rozdzielają
+własność przewodnika. Łuki, Bezier, CIRCLE, strokes/thermals nadal jawnie
+unsupported. Dodano małe testy parsera, dziur, wysp i negatywne.
+Izolowany algorytm Shapely: PASS dla dziury, dwóch wysp i zgodnej orientacji;
+pełne testy i lokalny stripline1.epro nieuruchomione. Następny krok użytkownika:
+po `git pull` uruchomić GUI inspekcja stripline1; jeśli nie przejdzie,
+przekazać nowy komunikat parsera. Bez FDTD, PSU i FAST.
+
 **2026-10-23: projektowe katalogi ustawień w Windows GUI.**
 Potwierdzony poprzedni stan: wszystkie pola formularza (w tym solver)
 były w jednym `~/.antenna_lab_pcb_gui.json`, bez zmiany przy wyborze
