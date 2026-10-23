@@ -146,7 +146,7 @@ class EasyEdaTests(unittest.TestCase):
         items=records()
         items[-2][8] = [
             ['R',-500,500,1000,1000,0,0],
-            [-200,-200,'L',-200,200,200,200,200,-200,-200,-200],
+            [-200,-200,'L',200,-200,200,200,-200,200,-200,-200],
         ]
         src=parse_easyeda_source(encoded(items))
         with self.assertRaisesRegex(ConfigurationError, 'leaves its source POUR boundary'):
