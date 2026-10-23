@@ -18,3 +18,5 @@ outcomes/cache/*
 .DS_Store
 Thumbs.db
 
+# Local GUI settings saved per EasyEDA project folder; never commit user experiments.
+/parameters/**/gui-settings.json
