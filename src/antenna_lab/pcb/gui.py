@@ -322,6 +322,8 @@ class PcbDesktop(tk.Tk):
             # Save old values only after validating the destination.
             self._save_current_project()
         except (OSError, ValueError) as exc:
+            # Leave the active CAD/settings pair consistent on failure.
+            self.var['project'].set(self._active_project or '')
             if show_error:
                 messagebox.showerror('Katalog parametrów', str(exc), parent=self)
             self.status.set('Nie udało się przełączyć parametrów: '+str(exc))
