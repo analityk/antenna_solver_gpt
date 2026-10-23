@@ -193,10 +193,9 @@ class EasyEdaTests(unittest.TestCase):
         from antenna_lab.pcb.easyeda_model import complex_copper_shape
         items=records()
         outer=items[-1][5][0]
-        # Rounded rectangular aperture, two semicircular ends and two lines.
-        hole=[-5,5,'ARC',90,0,10,'L',5,10,'ARC',90,10,5,
-              'L',10,-5,'ARC',90,5,-10,'L',-5,-10,
-              'ARC',90,-10,-5,'L',-10,0,'ARC',90,-5,5]
+        # Rounded slot: signed ARC and straight L segments alternate.
+        hole=[-5,5,'ARC',180,-5,-5,'L',5,-5,
+              'ARC',180,5,5,'L',-5,5]
         items[-1][5]=[outer,hole]
         rings=parse_easyeda_source(encoded(items)).semantics['poured'][0]['rings_xy_m']
         self.assertGreater(len(rings[1]),20)
