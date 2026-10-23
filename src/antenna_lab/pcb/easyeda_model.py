@@ -233,7 +233,7 @@ def _contact_audit(shapes, owners, data, source):
         pads.append(dict(pad_id=id,net=net,layer_role=role,conductor_id=owners[id],
                          physical_contacts=sorted(contacts),ownership_status='passed'))
     return dict(status='passed',meaning='physical ownership/short audit, not electromagnetic validation',
-                pads=pads,via_pad_owners={v.id:{r:owners[v.id+':'+r] for r in ('top','bottom')} for v in source.vias})
+                pads=pads,via_pad_owners={v.id:{r:owners[v.id+':'+r] for r in sorted({role for id,net,role,shape,kind in shapes if id.startswith(v.id+':')})} for v in source.vias})
 
 
 def source_layout_geometry(layout,override):
