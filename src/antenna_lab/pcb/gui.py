@@ -309,9 +309,16 @@ class PcbDesktop(tk.Tk):
         try:
             directory = project_parameters_dir(path, ROOT)
             directory.mkdir(parents=True, exist_ok=True)
-            stored = read_project_settings(directory, path.parent, DEFAULTS)
-            # Save old values only after validating the new directory. This
-            # also saves edits when switching between sibling EPRO documents.
+            if directory == self._parameters_dir:
+                # Sibling EPRO: carry unsaved GUI edits as well. Reading the
+                # sidecar first would accidentally revert those edits.
+                current = self._values()
+                stored = {key: value for key, value in current.items()
+                          if key not in ('project', 'csxcad_path', 'source_config',
+                                         'pcb_id', 'run_dir')}
+            else:
+                stored = read_project_settings(directory, path.parent, DEFAULTS)
+            # Save old values only after validating the destination.
             self._save_current_project()
         except (OSError, ValueError) as exc:
             if show_error:
