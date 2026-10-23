@@ -2595,6 +2595,20 @@ raport nie dowodzi zbieżności ani fizycznego rezonansu. Dodano testy
 regresyjne profilu/stackupu i pustego FD. Brak nowych obliczeń FDTD,
 bez zmian siatki, pól, danych surowych, geometrii i modelu EM.
 
+**Odbiór Windows i korekta test fixture (kolejny checkpoint):**
+`postprocess_002` wygenerował raport, port=processed, fields=failed
+z właściwym komunikatem, temporal_completion=unconfirmed.
+`test_fields.py`: 7/7 PASS. `test_pcb_report.py`: 5/5 ERROR
+zanim uruchomiono jakąkolwiek asercję HTML — wspólny fixture
+`vertical=True,loop=True` miał mostek miedziany, którego
+siatka nie zachowywała (`inner=(2,0)`, `modeled=(1,0)`).
+Zmodyfikowano jedynie fixture **testu raportu** do bazowego
+fizycznie prostszego Gerbera, używanego też przez niezależny test
+pełnego importu. Wariant loop zachowano w dedykowanych testach
+fizycznego portu i geometrii. `audit_copper_mesh` nie był
+zmieniany ani pomijany. Testy po tej korekcie jeszcze nie zostały
+uruchomione przez agenta; docelowa weryfikacja Windows otwarta.
+
 ### 2026-10-23 — adapter wielowarstwowego EasyEDA i warstwy EM GUI
 
 Realny stripline1.epro ujawnił ograniczenie adaptera D4 do top /

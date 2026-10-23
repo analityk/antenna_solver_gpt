@@ -150,8 +150,17 @@ i mylące fioletowe pionowe kreski na schemacie stackupu. Dostosowano
 renderer: rozwijany pełny profil z krótką etykietą `design/max_cells`,
 rysunek warstw bez umownych rozmieszczeń PTH/NPTH, diagnostyka pustego
 HDF5 bez fałszywego błędu formatu. Nie zmieniono danych, geometrii,
-mesh, portu, materiałów, silnika ani FDTD. Testy regresyjne dodane;
-testy Windows/browser i natywne FDTD nadal nie zostały wykonane przez agenta.
+mesh, portu, materiałów, silnika ani FDTD. Testy regresyjne dodane. Użytkownik potwierdził na Windows:
+`postprocess_002` wygenerował nowy raport, port `processed`, pola
+`failed` z prawidłowym komunikatem pustego FD, temporalne zakończenie
+`unconfirmed`; 7/7 testów `test_fields.py` PASS. Wszystkie 5 testów
+`test_pcb_report.py` zatrzymały się w identycznym `setUp` — fixture
+`vertical=True,loop=True` powodował `PCB copper fidelity` (inner=(2,0),
+modeled=(1,0)), przed wykonaniem testów HTML. W osobnym checkpointcie
+zmieniono **tylko fixture raportów** na bazowy bez mostka; nie rozluźniono
+fizycznego audytu, a wariant loop pozostaje w osobnych testach topologii.
+Zmiana fixture nie została jeszcze wykonana na Windows. Natywnego FDTD
+nie uruchamiano przez agenta.
 
 **Pierwszy krok po `git pull --ff-only`:** bez solve ponowić
 `.\\.venv\\Scripts\\python.exe -u -m antenna_lab.pcb.postprocess --run-dir "outcomes\\pcb_easyeda\\stripline2_006"`;
