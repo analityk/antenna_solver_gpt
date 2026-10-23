@@ -2517,3 +2517,21 @@ przed uruchomieniem CLI oraz dodano przycisk świadomego dopasowania
 center/cutoff do żądanego sweep. Przycisk nie zmienia fizyki w tle;
 nie zmieniano solvera ani interpretacji widma. Dodano test offline.
 Bez FDTD, PSU, FAST i pełnej suite.
+
+### 2026-10-23 — katalog ustawień GUI zależny od folderu projektu
+
+**Przyczyna:** po zmianie projektu EasyEDA pole ustawień solvera w GUI
+pozostawało poprzednie, ponieważ cały formularz był przechowywany w
+globalnym `~/.antenna_lab_pcb_gui.json`. Dodano automatyczne
+`parameters/<folder_projektu>/gui-settings.json`, które GUI tworzy,
+wyświetla i wczytuje przy zmianie pliku .epro. Kilka dokumentów .epro w
+jednym folderze CAD współdzieli jedno ustawienie profilu, częstotliwości
+i nadpisań; katalog wyniku i manualny source-config nie są przenoszone.
+CSXCAD i bazowy TOML pozostają globalne. Atomowy zapis nie narusza
+pozostałych plików projektu. Sidecar jest ignorowany przez Git.
+
+**Fizyka/solver:** zero zmian solvera, siatki, materiałów, portów
+i FDTD. Zmiana dotyczy wyłącznie UI oraz lokalnego przechowywania
+parametrów. Dodano małe testy mapowania folderów i trwałości danych.
+Natywne uruchomienie GUI na Windows i FDTD wymagają odbioru użytkownika;
+nie wykonano PSU ani FAST.
