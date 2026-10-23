@@ -97,7 +97,7 @@ def curved_polygon_ring(path, label, *, poured=False):
             'only unrounded R or L/ARC/CARC contours supported.')
     if len(path)<6:
         raise ConfigurationError(f'EasyEDA {label}: incomplete mixed polygon path.')
-    from math import acos, atan2, ceil, hypot, pi
+    from math import acos, atan2, ceil, hypot
     from .gerber import CURVE_ERROR_M
     m=lambda value:metres(value,label,poured=poured)
     points=[(m(path[0]),m(path[1]))]
