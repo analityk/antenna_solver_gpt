@@ -24,9 +24,12 @@ w lokalnym `.venv`. Dla natywnego solvera sprawdź pole
 
 ## Obsługa
 
-1. **Wybierz projekt**: dowolne dostępne lokalnie `.epro`. Wybór innego
-   projektu zeruje ręczny `--source-config` i ręczną grubość PTH,
-   żeby nie przenosić założeń produkcyjnych do obcej płytki.
+1. **Wybierz projekt**: dowolne dostępne lokalnie `.epro`. GUI sam
+   wyznacza i tworzy folder ustawień `parameters/<folder_projektu>/` i
+   wyświetla jego pełną ścieżkę pod polem pliku (przycisk **Otwórz parametry**).
+   Po zmianie folderu automatycznie wczytuje właściwy `gui-settings.json`.
+   Kilka plików `.epro` w jednym folderze współdzieli ustawienia solvera
+   i eksperymentu; ręczny `source-config` i ostatni przebieg są osobne.
 2. **Sprawdź projekt**: używa istniejącego
    `antenna_lab.pcb.reduced_control --inspect-source`, bez FAST solve,
    mesh/FDTD i bez plików Gerber. Nieznane typy rekordów CAD pozostają błędem.
@@ -57,10 +60,37 @@ z `.epro` i zapisuje kontrakt w plikach wyniku. **Nie zgadujemy**
 niezapisanej w CAD grubości PTH: opcjonalne pole `PTH metalizacja`
 to jawnie podana przez użytkownika wartość w µm.
 
-Ustawienia GUI (bez sekretów i danych wynikowych) są zachowywane lokalnie w
-`~/.antenna_lab_pcb_gui.json`. Nie są dodawane do projektu .epro ani
-do historii Git. Polecenia i rzeczywista konfiguracja FDTD pozostają
-w istniejących artefaktach solvera.
+## Katalog parametrów przypisany automatycznie do projektu
+
+Dla typowej ścieżki `gerbs/dif4002/dif4002.epro` GUI tworzy lub otwiera
+`parameters/dif4002/`. Jeżeli w `gerbs/projekt/` są
+`projekt1.epro` i `projekt2.epro`, **oba korzystają z
+`parameters/projekt/`**. Identyfikatorem katalogu jest zatem ścieżka
+*folderu projektu pod gerbs*, nie nazwa każdego osobnego dokumentu `.epro`.
+Ta stabilna reguła działa także po dodaniu kolejnych plików w folderze.
+Dla `.epro` bezpośrednio pod `gerbs/` używa się nazwy pliku bez rozszerzenia;
+dla plików spoza `gerbs/` stosuje się nazwę folderu i stabilny skrót
+jego pełnej ścieżki, aby różne zewnętrzne projekty się nie mieszały.
+
+GUI zapisuje własny plik `gui-settings.json` atomowo przy zmianie projektu,
+uruchomieniu etapu i zamknięciu aplikacji. Zawiera wyłącznie edytowalne
+ustawienia eksperymentu, profilu i pól, jawne nadpisania openEMS oraz
+opcjonalną metalizację PTH. **Nie przenosi między dokumentami `.epro`**
+ręcznego JSON-a source-config, identyfikatora PCB ani katalogu wyników.
+Brak katalogu powoduje jego utworzenie. Inne pliki w `parameters/`
+nie są usuwane ani nadpisywane.
+
+Ścieżka instalacji biblioteki `CSXCAD_INSTALL_PATH` pozostaje
+**ustawieniem środowiska komputera**, dlatego nie przełącza się razem z
+projektem. Plik profili `parameters/openems_profiles.toml` nadal jest
+wspólną konfiguracją bazową solvera; wybór profilu i edytowane override
+są zapisane oddzielnie dla folderu projektu.
+
+Globalny plik `~/.antenna_lab_pcb_gui.json` pamięta jedynie ostatnio
+otwarty projekt i ścieżkę CSXCAD. Nowe lokalne
+`parameters/**/gui-settings.json` są wykluczone z Git. Polecenia CLI,
+surowa geometria i pełna konfiguracja rzeczywistego przebiegu pozostają
+utrwalone w istniejących artefaktach FDTD.
 
 ## Bezpieczeństwo i ograniczenia
 
