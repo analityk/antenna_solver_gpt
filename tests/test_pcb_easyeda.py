@@ -219,7 +219,8 @@ class EasyEdaTests(unittest.TestCase):
         for id in ('e102','e103'):
             shape=complex_copper_shape(pours[id]['rings_xy_m'],id)
             self.assertTrue(shape.is_valid)
-            self.assertGreaterEqual(len(shape.interiors),5)
+            parts=list(shape.geoms) if shape.geom_type=='MultiPolygon' else [shape]
+            self.assertGreaterEqual(sum(len(part.interiors) for part in parts),5)
             self.assertFalse(shape.covers(Point(20.966e-2*0.0254,58.5e-2*0.0254)))
         self.assertEqual(pours['e102']['record_index'],230)
 
