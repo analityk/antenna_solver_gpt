@@ -129,8 +129,9 @@ class PcbDesktop(tk.Tk):
         params_row = ttk.Frame(outer)
         params_row.pack(fill='x', pady=(0, 10))
         ttk.Label(params_row, text='Katalog parametrów projektu:').pack(side='left', padx=(0, 8))
-        ttk.Label(params_row, textvariable=self.parameters_path).pack(side='left', fill='x', expand=True)
-        ttk.Button(params_row, text='Otwórz parametry', command=self._open_parameter_dir).pack(side='right')
+        ttk.Entry(params_row, textvariable=self.parameters_path, state='readonly').pack(
+            side='left', fill='x', expand=True)
+        ttk.Button(params_row, text='Otwórz parametry', command=self._open_parameter_dir).pack(side='right', padx=(8, 0))
 
         notebook = ttk.Notebook(outer)
         notebook.pack(fill='x', pady=(0, 9))
@@ -342,6 +343,13 @@ class PcbDesktop(tk.Tk):
         self._command_prepared = None
         self.status.set('Projekt: '+path.name+' | parametry: '+str(directory))
         self._log('Parametry projektu: '+str(directory)+'\n', 'info')
+        # A newly created parameters directory is immediately useful: it
+        # contains a real settings file even before inspection/FDTD.
+        try:
+            self._save_current_project()
+        except (OSError, ValueError) as exc:
+            self._log('Nie zapisano ustawień projektu: '+str(exc)+'\n', 'error')
+            self.status.set('Projekt otwarty, ale zapis parametrów nie powiódł się: '+str(exc))
         self._refresh_preview()
         return True
 
