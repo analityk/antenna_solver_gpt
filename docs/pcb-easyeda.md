@@ -288,11 +288,13 @@ potwierdza rozdzielone skale. Nie jest to EasyEDA Standard ani format Pro V3.
 
 DOCTYPE, HEAD, CANVAS, LAYER, LAYER_PHYS, NET, LINE, ARC, VIA, PAD_NET,
 COMPONENT i ATTR. POLY: niezaokrąglone R (dowolny obrót) i proste
-kontury L. POUR / POURED: **wiele konturów L/R (także jawne R isCCW) z regułą nonzero**
+kontury L. POUR / POURED: **wiele konturów L/R/ARC/CARC**
+(także jawne R isCCW, signed arcs oraz przejścia ARC ↔ L) z regułą
+nonzero, z aproksymacją krzywizny do 0,1 µm przed siatkowaniem
 (oddzielne wyspy, dziury według orientacji/winding); tylko prawdziwe
 materializowane wypełnienie POURED jest fizyczną miedzią, a POUR wyznacza
 granicę. POURED nadal wymaga fill=true i stroke=0; termiczne spoke,
-grid/LINE fill, łuki/Bezier/CIRCLE oraz niepoprawne kontury pozostają
+grid fill, cubic Bezier/CIRCLE oraz niepoprawne kontury pozostają
 jawnym UNSUPPORTED. Dla wielu wysp osobne fizyczne identyfikatory przewodnika
 nie zmieniają pierwotnych ID/rekordów źródłowych.
 Raw pola, wartości i źródłowe SHA pozostają niezmienione. Unknown records
@@ -300,9 +302,17 @@ są zachowane i blokują canonical solve, chyba że są rozpoznanym metadata
 edytora lub mają prefiks META_. Nie ma topologicznego repair ani domyślnej
 zamiany nieznanego wypełnienia na pełną miedź.
 
-Ta poprawka dotyczy **klasy wielu konturów POURED/POUR**, nie konkretnego
-pliku `stripline1.epro` czy ID `e102`. Rzeczywisty projekt lokalny może
-zawierać inne warianty konturów nadal nieobsługiwane. Dokumentacja formatu:
+Przypadek regresyjny z repozytorium `gerbs/stripline1/stripline1.epro`
+(dodany 2026-10-23): `POURED e102` (PCB record 230) zawiera duży
+prostokąt i pięć otworów z dwóch `ARC 180`; `POURED e103`
+(PCB record 234) zawiera prostokąt i pięć zaokrąglonych otworów
+z naprzemiennymi `ARC 90` i `L`. Samo odblokowanie `len(paths)>1`
+nie wystarcza: kontury należy fizycznie odtworzyć. Test źródłowego
+archiwum jest w `tests/test_pcb_easyeda.py`. Ten projekt zawiera
+13 `LAYER_PHYS` i wewnętrzne pola miedzi na warstwie 16: poprawny
+import konturów **nie oznacza** jeszcze obsługi jego stackupu ani
+gotowości do FDTD. Obecny model canonical dopuszcza tylko top / jeden
+substrate / bottom; nie wolno pomijać dodatkowych warstw przy solve. Dokumentacja formatu:
 [Complex Polygon](https://github.com/easyeda/easyeda-file-format-v2/blob/main/docs/en/pcb/polygon-system/complex-polygon.md),
 [POURED](https://github.com/easyeda/easyeda-file-format-v2/blob/main/docs/en/pcb/polygon-system/poured.md).
 

@@ -133,6 +133,27 @@ utworzeniem. W nagłówku zapisuj SHA ostatniego *już potwierdzonego*
 commita bazowego, a opublikowany SHA nowego commita podawaj po publikacji
 w raporcie końcowym. Nowy czat zawsze sam sprawdza HEAD.
 
+## Kolejny checkpoint — realne łuki POURED stripline1 (2026-10-23)
+
+Po scaleniu poprzedniej obsługi wielu konturów użytkownik nadal
+otrzymał `POURED e102 ... unsupported polygon subtype (only R or straight
+L contour)`. Projekt `gerbs/stripline1/stripline1.epro` dodany na `main`
+został odczytany wprost: PCB record 230 (`e102`) to pięć otworów
+okrągłych z dwóch `ARC 180`, record 234 (`e103`) to pięć otworów
+z `ARC 90` i `L`. Nowy `curved_polygon_ring` obsługuje signed
+ARC/CARC i L oraz R w fizycznej geometrii konturów POUR/POURED,
+korzystając z budżetu 1e-7 m jak istniejący gerber parser. Testy
+używają repozytoryjnego archiwum + offline synthetic fixtures.
+Nie pomijano otworów ani warstw.
+
+Osobny przyszły blocker: **13 rekordów LAYER_PHYS, POURED na layer16**,
+podczas gdy `build_source_layout` wymaga stosu top / jeden substrate /
+bottom i odrzuca wewnętrzne fizyczne warstwy. Nie deklarować
+`stripline1` jako FDTD-ready po samym odblokowaniu ARC. Jeżeli
+pojawi się błąd stackupu, nie usuwać warstw z CAD i nie
+aproksymować wielowarstwowego PCB jako dwuwarstwowego. Nie
+uruchamiano FDTD/PSU/FAST.
+
 ## Checkpoint importera: complex EasyEDA POURED (2026-10-23)
 
 Użytkownik testował `gerbs/stripline1/stripline1.epro` w Windows GUI.
