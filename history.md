@@ -2556,3 +2556,22 @@ Bez zmian siatki, XML openEMS, fizyki, PSU i FAST/coupling. Testy offline
 dodano; geometria reguły nonzero sprawdzona izolowanie na Shapely.
 Rzeczywisty lokalny `stripline1.epro` i native FDTD niedostępne tutaj,
 dlatego jego import i wynik EM nie są oznaczone PASS.
+
+### 2026-10-23 — kompleksowe wypełnienia POURED: łuki ARC/CARC z rzeczywistego .epro
+
+Po imporcie `stripline1.epro` na `main` zweryfikowano ZIP i wewnętrzny
+PCB. Rekord `POURED e102` (230) ma 6 konturów, w tym 5 zaokrąglonych
+wycięć z `ARC 180`; `e103` (234) ma podobne wycięcia z
+mieszanych `ARC 90` oraz `L`. Poprzedni parser z błędnym
+założeniem "only straight L" odrzucał te poprawne rekordy.
+Nowe próbkowanie krzywizny w jednostkach rekordu POURED (10 mil)
+z użyciem signed sweep, SI, limitem maksymalnego błędu 1e-7 m
+i bez snap/repair. Dalej używany jest istniejący model nonzero
+winding i walidacja miedzi. Testy obejmują realne źródłowe
+`.epro`, łuki półokrągłe i mieszane z L, nieprawidłowy
+sweep/typ polecenia; bez natywnego FDTD.
+
+**Nie naprawiono stackupu:** stripline1 ma 13 `LAYER_PHYS`
+i POUR na warstwie 16. Jest to odrębny wymóg modelu
+wielowarstwowego. Bez odgórnego usuwania warstw i bez
+fikcyjnej gotowości do pełnego EM.
