@@ -189,9 +189,10 @@ def install_pcb_lumped_port(engine, csx, geometry: PcbGeometry,
     return port, spec, metadata
 
 
-def prepare_pcb_native_model(geometry: PcbGeometry, settings: PcbSimulationSettings, *, port_edge_mode='aligned', gerber_quality=None, copper_config=None):
+def prepare_pcb_native_model(geometry: PcbGeometry, settings: PcbSimulationSettings, *, port_edge_mode='aligned', gerber_quality=None, copper_config=None, surface_probe_offset_m=0.):
     """Return engine, CSX, port, mesh, spec, metadata; no waveform, BC, XML or run."""
-    domain_mesh = make_pcb_domain_mesh(geometry, settings, port_edge_mode=port_edge_mode, **({'gerber_quality': gerber_quality} if gerber_quality is not None else {}))
+    domain_mesh = make_pcb_domain_mesh(geometry, settings, port_edge_mode=port_edge_mode,
+        surface_probe_offset_m=surface_probe_offset_m, **({'gerber_quality': gerber_quality} if gerber_quality is not None else {}))
     from .runtime import native_engine_settings
     engine_options = native_engine_settings(settings, domain_mesh)
     from .openems import native_modules
@@ -253,13 +254,15 @@ def write_pcb_xml(engine, csx, domain_mesh: PcbDomainMesh, xml_path) -> dict:
     return {'path': str(xml_path), 'size_bytes': size, 'parse_status': 'passed'}
 
 
-def prepare_pcb_xml_model(geometry: PcbGeometry, settings: PcbSimulationSettings, xml_path, *, port_edge_mode='aligned', gerber_quality=None, field_frequency_hz=(), copper_config=None):
+def prepare_pcb_xml_model(geometry: PcbGeometry, settings: PcbSimulationSettings, xml_path, *, port_edge_mode='aligned', gerber_quality=None, field_frequency_hz=(), copper_config=None, field_mode='far', surface_probe_offset_m=0.):
     """Prepare reusable XML; no Run, result processing or additional files."""
-    engine, csx, port, mesh, spec, metadata = prepare_pcb_native_model(geometry, settings, copper_config=copper_config, port_edge_mode=port_edge_mode, **({'gerber_quality': gerber_quality} if gerber_quality is not None else {}))
+    engine, csx, port, mesh, spec, metadata = prepare_pcb_native_model(geometry, settings, copper_config=copper_config, port_edge_mode=port_edge_mode,
+        surface_probe_offset_m=surface_probe_offset_m, **({'gerber_quality': gerber_quality} if gerber_quality is not None else {}))
     metadata = {**metadata, **configure_pcb_fdtd(engine, csx, mesh, settings)}
     if field_frequency_hz:
         from .pcb_fields import install_pcb_fields
-        metadata['fields'] = install_pcb_fields(csx, geometry, mesh, settings, field_frequency_hz)
+        metadata['fields'] = install_pcb_fields(csx, geometry, mesh, settings, field_frequency_hz,
+            mode=field_mode, surface_probe_offset_m=surface_probe_offset_m)
     metadata['xml'] = write_pcb_xml(engine, csx, mesh, xml_path)
     return engine, csx, port, mesh, spec, metadata
 

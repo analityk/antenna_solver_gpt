@@ -1,5 +1,20 @@
 # Cel projektu
 
+## Bieżący cel eksperymentalny PCB (2026-10-24)
+
+Użytkownik wybiera między istniejącą diagnostyką E/H w otoczeniu PCB
+a nowym trybem map powierzchni miedzi. Celem nowego trybu jest zobaczenie
+osobno obu stron każdej warstwy TOP/INNER/BOTTOM jako kolorowych map
+|E|, |H| i K_face (przybliżenie z n×H przy powierzchni) z wektorami.
+Dedykowany raport ma pokazywać WYŁĄCZNIE mapy pól/prądów, bez S11,
+SWR, impedancji i odległych przekrojów powietrza. Do pomiaru potrzebne
+są jawne sondy 10 µm od miedzi i PREPARE-ONLY oceniający wzrost kosztu
+CFL/cells; nie są to bezkosztowe pasywne próbki starej siatki.
+Nie uznawać n×H z odległości 10 µm na modelu PEC za zweryfikowane
+skin/proximity ani straty rzeczywistej miedzi. Stan i plan akceptacji:
+[docs/pcb-copper-surfaces.md](docs/pcb-copper-surfaces.md).
+
+
 Wersja wymagań: 0.13. Data: 2026-09-29, Europe/Warsaw.
 
 ## Bieżący stan

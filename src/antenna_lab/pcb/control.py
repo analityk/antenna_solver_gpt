@@ -77,7 +77,8 @@ def run_synthetic_control(output_dir, *,
 
 
 def run_control_model(geometry: PcbGeometry, settings: PcbSimulationSettings, output_dir, *,
-                      port_edge_mode='aligned', exact_endcriteria=False, dump_statistics=False, gerber_quality=None, field_frequency_hz=(), copper_config=None, expected_domain_mesh=None, run_context=None) -> dict:
+                      port_edge_mode='aligned', exact_endcriteria=False, dump_statistics=False, gerber_quality=None, field_frequency_hz=(), copper_config=None, expected_domain_mesh=None, run_context=None,
+                      field_mode='far', surface_probe_offset_m=0.) -> dict:
     """Run a supplied control geometry/settings pair in an isolated directory."""
     validate_pcb_simulation_settings(settings)
     output = Path(output_dir).resolve()
@@ -93,6 +94,8 @@ def run_control_model(geometry: PcbGeometry, settings: PcbSimulationSettings, ou
         mode_options['gerber_quality'] = gerber_quality
     if field_frequency_hz:
         mode_options['field_frequency_hz'] = field_frequency_hz
+        mode_options['field_mode'] = field_mode
+        mode_options['surface_probe_offset_m'] = surface_probe_offset_m
     engine, csx, port, mesh, spec, metadata = prepare_pcb_xml_model(geometry, settings, native/'model.xml', **mode_options)
     if expected_domain_mesh is not None and mesh != expected_domain_mesh:
         raise ConfigurationError("Native PCB mesh differs from geometry-resolution preflight mesh; FDTD was not started.")

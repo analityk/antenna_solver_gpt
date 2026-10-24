@@ -93,6 +93,18 @@ def load_report_data(run_path, *, start_mhz=None, stop_mhz=None, step_mhz=None,
     summary = read_json(root / "summary.json")
     if not summary:
         raise ValueError(f"Brak summary.json w {root}. Wskaż katalog wyników symulacji.")
+    if summary.get('field_mode') == 'copper_surfaces':
+        # The surface-only report is not a disguised impedance report:
+        # load independently of S11, passive R, sweep CSV or its diagnostics.
+        # The port remains an internal phasor-normalization prerequisite in
+        # native postprocessing, never a graph/report requirement.
+        geometry = read_json(root / 'geometry.json')
+        if not all(key in geometry for key in ('copper','copper_layers','outline')):
+            raise ValueError('Copper surface reporting requires explicit saved multilayer PCB geometry.')
+        return dict(root=root,summary=summary,geometry=geometry,is_pcb=True,
+                    run_id=root.name,variant_name=root.name,
+                    execution_status=summary.get('status','not recorded'),
+                    warnings=summary.get('warnings',[]))
     config = read_json(root / "parameters.resolved.json")
     manifest = read_json(root / "manifest.json")
     mesh = read_json(root / "mesh.json")

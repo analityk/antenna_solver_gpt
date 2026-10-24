@@ -28,6 +28,7 @@ DEFAULTS = {
     'quality': 'design', 'geometry_um': '10', 'center_mhz': '1500',
     'cutoff_mhz': '1400', 'start_mhz': '1000', 'stop_mhz': '2000',
     'step_mhz': '100', 'fields_enabled': True, 'fields_mhz': '1000 2000',
+    'field_mode':'far',
     'csxcad_path': r'C:\dev\openems\openEMS', 'overrides': '',
     'run_dir': '', 'field_view': 'active+geometry', 'threshold_db': '-40',
     'margin_mm': '1', 'phase_step': '15', 'open_after_run': True,
@@ -213,8 +214,17 @@ class PcbDesktop(tk.Tk):
         ttk.Checkbutton(frame, text='Zapisz pola E i H', variable=self.var['fields_enabled']).grid(
             row=3, column=0, columnspan=2, sticky='w', pady=5)
         self._field(frame, 'Pola przy', 'fields_mhz', 3, 1, width=20, help_text='MHz, np. 1000 2000')
+        ttk.Label(frame,text='Tryb pomiaru pól:').grid(row=4,column=0,sticky='w',pady=(6,0))
+        ttk.Radiobutton(frame,text='Przekroje E/H wokół płytki (dotychczasowy)',
+                        variable=self.var['field_mode'],value='far').grid(
+                            row=4,column=1,columnspan=3,sticky='w',pady=(6,0))
+        ttk.Radiobutton(frame,text='Powierzchnie miedzi: góra i dół każdej warstwy',
+                        variable=self.var['field_mode'],value='copper_surfaces').grid(
+                            row=5,column=0,columnspan=4,sticky='w')
+        ttk.Label(frame,text='Powierzchnie Cu: mapy E/H/K proxy, sondy 10 µm; zmienia siatkę Z i koszt FDTD. Najpierw PREPARE.',
+                  foreground='#666').grid(row=6,column=0,columnspan=6,sticky='w')
         ttk.Label(frame, text='Zakres i częstotliwości dobierasz do projektu. Użyteczny zakres pobudzenia to środek ± 0,8 × odcięcie.',
-                  foreground='#666').grid(row=4, column=0, columnspan=6, sticky='w', pady=(4, 0))
+                  foreground='#666').grid(row=7, column=0, columnspan=6, sticky='w', pady=(4, 0))
 
     def _match_excitation(self):
         if self._busy:

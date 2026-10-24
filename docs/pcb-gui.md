@@ -148,3 +148,15 @@ center=500 MHz, cutoff=500 MHz; trzy pola E/H przy 200/500/800 MHz
 pozostają poprawne. Do oceny dokładności częstotliwości brzegowych
 stosuj niezależne sprawdzenia zbieżności; spełnienie guardu nie jest
 walidacją fizyki.
+
+## Tryb map powierzchni miedzi (2026-10-24)
+
+W zakładce Eksperyment pojawił się wybór `far` (stare przekroje E/H)
+lub `copper_surfaces` (każda fizyczna warstwa Cu od góry i od dołu).
+Wybór jest zapisywany osobno dla folderu projektu EasyEDA razem z
+pozostałymi ustawieniami. CLI wykorzystuje `--field-mode copper_surfaces`
+i nadal wymaga zaznaczonego zapisu pól oraz 1–3 częstotliwości.
+To **zmienia siatkę Z** przez wstawienie sond 10 µm od powierzchni;
+przed FDTD wykonaj PREPARE-ONLY i zweryfikuj CFL oraz liczbę komórek.
+Tryb przygotowuje dedykowany raport powierzchniowy bez S11/SWR/impedancji.
+Kontrakt i warunki walidacji: [pcb-copper-surfaces.md](pcb-copper-surfaces.md).

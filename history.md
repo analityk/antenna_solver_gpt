@@ -2609,6 +2609,24 @@ fizycznego portu i geometrii. `audit_copper_mesh` nie był
 zmieniany ani pomijany. Testy po tej korekcie jeszcze nie zostały
 uruchomione przez agenta; docelowa weryfikacja Windows otwarta.
 
+
+### 2026-10-24 — eksperymentalne mapy pól obu stron warstw Cu
+
+Nowy cel użytkownika: nie analizować S11/SWR ani powietrza 1 mm od PCB,
+lecz na każdej fizycznej warstwie miedzi pokazać E/H oraz lokalne
+skupiska prądu od góry i od dołu; wzorzec mapy prądów z wektorami.
+Dopisano w GUI i CLI tryb `copper_surfaces` obok historycznego `far`.
+W nowym trybie wstawiamy jawne z-mesh planes ±10 µm, bo stare
+z=0.2 mm nie dawały pól przy miedzi; zmianę siatki ocenia preflight.
+Dane: zespolone E/H na każdej stronie, maska footprintu miedzi,
+K_face_proxy=n×H jako przybliżenie z pomiaru z dystansu 10 µm.
+Raport nowego trybu pokazuje tylko te mapy, oddzielne warstwy/strony,
+wysoką rozdzielczość i zoom; nie pokazuje widma impedancji.
+Stary profil i raport pozostają niezmienione. Nie dodano solvera
+skin/proximity ani strat przewodzenia; brak walidacji fizycznego K.
+Testy syntetyczne dodane; natywne Windows, CFL i ilościowa zbieżność
+pozostają OPEN. Szczegóły w docs/pcb-copper-surfaces.md.
+
 ### 2026-10-24 — ręczne raporty HTML: stała nazwa zamiast timestampu
 
 Po `antenna_lab report .../stripline3_004` użytkownik otrzymał plik

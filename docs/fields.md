@@ -152,3 +152,17 @@ w rzeczywistej regresji raportowej.
 ```cmd
 .\.venv\Scripts\python.exe -m antenna_lab report "<katalog_wynikow>" --field-view active+geometry --field-crop-threshold-db -40 --field-crop-margin-mm 1 --open
 ```
+
+## PCB: dwa tryby pomiaru pola (2026-10-24)
+
+Dotychczasowy tryb `far` zachowuje przekroje `xy_air`, `xz_feed` i
+`yz_feed`, jego maskę halo i raport przekrojów. Nowy, jawny tryb
+`copper_surfaces` zbiera pary sond XY w Z±10 µm każdej miedzianej
+warstwy PCB; poprawny zakres Z jest wymaganiem PREPARE-ONLY, a nie
+interpolowanym wynikiem postprocessingu. Dodatkowe węzły Z zmieniają
+siatkę i CFL. Maska usuwa tylko obszar poza rzeczywistą miedzią,
+nie zasłania jej otoczenia halo. Pliki NPZ zawierają zespolone E, H
+i `K_proxy_a_per_m` dla każdej strony. Powierzchniowe K to przybliżenie
+`n × H` w odległości 10 µm, a nie dokładny prąd na miedzi, ani model
+strat/skin/proximity. Kontrakt fizyczny i odbiór:
+[pcb-copper-surfaces.md](pcb-copper-surfaces.md).

@@ -17,7 +17,8 @@ from antenna_lab.solvers.pcb_mesh import (make_gerber_mesh_anchor_plan, make_pcb
                                          derive_pcb_physical_mesh_policy)
 from antenna_lab.solvers.pcb_features import audit_copper_mesh
 from antenna_lab.solvers.pcb_components import resolve_component_boxes
-from antenna_lab.solvers.pcb_fields import validate_field_frequencies, pcb_field_layout
+from antenna_lab.solvers.pcb_fields import (validate_field_frequencies, pcb_field_layout,
+    COPPER_PROBE_OFFSET_M, FIELD_MODES)
 from antenna_lab.solvers.profiles import DEFAULT_CONFIG, resolve_profile, parse_override
 from .control import run_control_model
 from .easyeda_project import (load_easyeda_project, resolve_project_components,
@@ -44,7 +45,7 @@ def _write_json(path, value):
 
 def run_easyeda_control(project_path, output_dir, *, source_config=None, source_pcb_id=None,
                        pth_plating_um=None, dielectric_materials=None, prepare_only=False, quality=None, geometry_resolution_um=10,
-                       resolved_profile=None, sweep_request=None, **frequency_settings):
+                       resolved_profile=None, sweep_request=None, field_mode='far', **frequency_settings):
     """Use D4 unchanged; all electrical overrides are explicit source-config data."""
     if isinstance(geometry_resolution_um, bool) or geometry_resolution_um not in (100,10,1,.1):
         raise ConfigurationError('Geometry resolution requires 100, 10, 1 or 0.1 um.')
@@ -53,7 +54,13 @@ def run_easyeda_control(project_path, output_dir, *, source_config=None, source_
     settings=profile.settings
     validate_pcb_simulation_settings(settings)
     fields=validate_field_frequencies(profile.field_frequency_hz,settings)
-    field_options={'field_frequency_hz':fields} if fields else {}
+    if field_mode not in FIELD_MODES:
+        raise ConfigurationError(f'Unknown PCB field mode: {field_mode}.')
+    if field_mode=='copper_surfaces' and not fields:
+        raise ConfigurationError('Copper surface mode requires --fields-mhz: choose 1–3 frequencies.')
+    surface_offset=COPPER_PROBE_OFFSET_M if field_mode=='copper_surfaces' else 0.
+    field_options=(dict(field_frequency_hz=fields,field_mode=field_mode,
+                        surface_probe_offset_m=surface_offset) if fields else {})
     frequencies=settings.result_frequency_hz
     sweep=dict(mode='explicit',start_hz=frequencies[0],stop_hz=frequencies[-1],point_count=len(frequencies))
     if sweep_request is not None:
@@ -73,7 +80,8 @@ def run_easyeda_control(project_path, output_dir, *, source_config=None, source_
         validation_status='unverified',quality_profile=profile.name,openems_profile=profile.metadata,
         geometry_resolution_um=geometry_resolution_um,simulation_settings=asdict(settings),
         sweep=sweep,actual_iterations=None,termination_status='not_started',
-        report_phase_step_deg=settings.runtime.report_phase_step_deg)
+        report_phase_step_deg=settings.runtime.report_phase_step_deg,field_mode=field_mode,
+        copper_surface_probe_offset_m=surface_offset)
     stage='source_import'
     result={}
     try:
@@ -137,7 +145,8 @@ def run_easyeda_control(project_path, output_dir, *, source_config=None, source_
         _,anchors=make_gerber_mesh_anchor_plan(geometry,settings,profile.name)
         diagnostics['suppressed_noncritical_anchors']=anchors.pop('suppressed_noncritical_anchors')
         diagnostics['mesh_anchor_policy']=anchors
-        mesh=make_pcb_domain_mesh(geometry,settings,gerber_quality=profile.name)
+        mesh=make_pcb_domain_mesh(geometry,settings,gerber_quality=profile.name,
+                                  surface_probe_offset_m=surface_offset)
         diagnostics['mesh']={k:v for k,v in asdict(mesh).items() if k not in ('x_lines_m','y_lines_m','z_lines_m')}
         policy=derive_pcb_physical_mesh_policy(geometry,settings)
         diagnostics['mesh_physical_policy']=asdict(policy)
@@ -159,11 +168,13 @@ def run_easyeda_control(project_path, output_dir, *, source_config=None, source_
         require_excitation_fits(cost,settings)
         if fields:
             from math import prod
-            planes=pcb_field_layout(geometry,mesh,settings,fields)
+            planes=pcb_field_layout(geometry,mesh,settings,fields,
+                mode=field_mode,surface_probe_offset_m=surface_offset)
             print('Field frequencies: '+', '.join(f'{f/1e6:g} MHz' for f in fields)+
-                  '\nField planes: xy_air, xz_feed, yz_feed'+
+                  ('\nField planes: '+', '.join(p['name'] for p in planes)) +
                   f"\nField DFT samples: {6*len(fields)*sum(prod(p['shape_xyz']) for p in planes)} complex components"+
-                  '\nMesh changed by fields: no\nAdditional FDTD runs: 0',flush=True)
+                  f'\nMesh changed by fields: {"yes (explicit Z nodes)" if surface_offset else "no"}' +
+                  '\nAdditional FDTD runs: 0',flush=True)
         stage='native_preparation' if prepare_only else 'native_run'
         if prepare_only:
             native=output/'native';native.mkdir()
@@ -194,7 +205,8 @@ def run_easyeda_control(project_path, output_dir, *, source_config=None, source_
                 result.update(sampled_diagnostics(result))
         result.update(diagnostics)
         result['import']=provenance
-        if not prepare_only and 'frequency_hz' in result:print_sweep_summary(result)
+        if not prepare_only and field_mode=='far' and 'frequency_hz' in result:
+            print_sweep_summary(result)
     except (Exception,KeyboardInterrupt) as exc:
         if isinstance(exc,QuantizationError):
             diagnostics['geometry_resolution']=dict(exc.audit,requested_um=geometry_resolution_um,quantum_nm=grid.quantum_nm)
@@ -235,6 +247,8 @@ def main(argv=None):
     parser.add_argument('--yes',action='store_true')
     parser.add_argument('--no-fields',action='store_true')
     parser.add_argument('--fields-mhz',type=float,nargs='+')
+    parser.add_argument('--field-mode',choices=FIELD_MODES,default='far',
+        help='far: legacy E/H cuts; copper_surfaces: upper/lower XY E/H on each copper layer')
     parser.add_argument('--prepare-only',action='store_true')
     add_frequency_arguments(parser);parser.set_defaults(frequencies_mhz=None)
     for name in ('start','stop','step'):parser.add_argument(f'--sweep-{name}-mhz',type=float)
@@ -260,9 +274,11 @@ def main(argv=None):
             source_pcb_id=args.source_pcb_id,pth_plating_um=args.pth_plating_um,
             dielectric_materials=dielectric_materials,prepare_only=args.prepare_only,
             geometry_resolution_um=args.geometry_resolution_um,resolved_profile=profile,
-            sweep_request=request if sweep and tuple(profile.settings.result_frequency_hz)==tuple(band['result_frequency_hz']) else None)
+            sweep_request=request if sweep and tuple(profile.settings.result_frequency_hz)==tuple(band['result_frequency_hz']) else None,
+            field_mode=args.field_mode)
         print(f"Status: {result['status']}; validation_status: unverified\n{output.resolve()/'summary.json'}")
-        if not args.prepare_only:print(output.resolve()/'impedance.csv')
+        if not args.prepare_only and args.field_mode=='far':
+            print(output.resolve()/'impedance.csv')
         return int(result['status'] in ('postprocess_failed','postprocess_partial') or
                    result.get('termination_status') in ('max_timesteps_reached','max_time_reached'))
     except (ConfigurationError,OSError,RuntimeError,ValueError,KeyboardInterrupt) as exc:
