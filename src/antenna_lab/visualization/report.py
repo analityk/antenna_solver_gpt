@@ -460,10 +460,20 @@ def generate_report(run_path, output=None, *, automatic=False, start_mhz=None, s
         raise ValueError("Składowe pola muszą wskazywać osie x/y/z.")
     root = Path(run_path).resolve()
     if output is None:
-        label = f"{variant_name}__{root.name}" if variant_name else root.name
-        safe_id = re.sub(r"[^a-zA-Z0-9_.-]+", "_", label)[:100]
-        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S_%fZ")
-        output = root / "report.html" if automatic else ROOT / "outcomes" / "reports" / f"{safe_id}_{stamp}.html"
+        if automatic:
+            output = root / "report.html"
+        else:
+            label = f"{variant_name}__{root.name}" if variant_name else root.name
+            safe_id = re.sub(r"[^a-zA-Z0-9_.-]+", "_", label)[:100] or "report"
+            reports_dir = ROOT / "outcomes" / "reports"
+            output = reports_dir / f"{safe_id}.html"
+            # Keep source runs and earlier reports immutable. The run ID
+            # already distinguishes runs; only a repeated report needs a
+            # deterministic numeric suffix, never a wall-clock timestamp.
+            version = 2
+            while output.exists():
+                output = reports_dir / f"{safe_id}__{version:03d}.html"
+                version += 1
     output = Path(output).resolve()
     if output.suffix.lower() != ".html":
         raise ValueError("Plik raportu musi mieć rozszerzenie .html.")

@@ -2609,6 +2609,22 @@ fizycznego portu i geometrii. `audit_copper_mesh` nie był
 zmieniany ani pomijany. Testy po tej korekcie jeszcze nie zostały
 uruchomione przez agenta; docelowa weryfikacja Windows otwarta.
 
+### 2026-10-24 — ręczne raporty HTML: stała nazwa zamiast timestampu
+
+Po `antenna_lab report .../stripline3_004` użytkownik otrzymał plik
+`stripline3_004_20261024T004959_587285Z.html`, niezgodny z wymaganiem
+czytelnych nazw. Bezwarunkowy stempel UTC był w `generate_report`.
+Manualny raport dostaje teraz nazwę `stripline3_004.html`, kolejne
+raporty o tej bazie `stripline3_004__002.html`, `__003` itd.
+Jawny `--output` nie jest modyfikowany; kolizja jawna nadal jest błędem,
+kolizja domyślna wybiera najbliższy wolny numer bez nadpisywania.
+Dla wariantów antenowych zachowano etykietę wariantu wraz z ID run,
+a dla automatycznego raportu w katalogu run zachowano `report.html`.
+Test regresyjny sprawdza tworzenie trzech plików i brak nadpisywania.
+Zmiana wyłącznie nazwy wyjściowego ręcznego HTML, bez zmian FDTD,
+geometrii, portów, pól, raportowanych danych i archiwalnych wyników.
+Testy Windows po tej poprawce pozostają otwarte.
+
 ### 2026-10-23 — adapter wielowarstwowego EasyEDA i warstwy EM GUI
 
 Realny stripline1.epro ujawnił ograniczenie adaptera D4 do top /

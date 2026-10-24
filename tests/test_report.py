@@ -58,6 +58,30 @@ class ReportTests(unittest.TestCase):
         self.assertIn('Brak far_field.npz', html)
         self.assertIn('Brak niezależnego bilansu', html)
 
+    def test_default_manual_report_uses_stable_name_and_numeric_revisions(self):
+        run = fixture(self.root / "stripline3_004")
+        reports_dir = self.root / "outcomes" / "reports"
+        with (patch("antenna_lab.visualization.report.ROOT", self.root),
+              patch("subprocess.Popen", side_effect=AssertionError("no solver"))):
+            first = generate_report(run)
+            self.assertEqual(first, reports_dir / "stripline3_004.html")
+            first_bytes = first.read_bytes()
+            second = generate_report(run)
+            third = generate_report(run)
+            self.assertEqual(second, reports_dir / "stripline3_004__002.html")
+            self.assertEqual(third, reports_dir / "stripline3_004__003.html")
+            self.assertEqual(first.read_bytes(), first_bytes)
+            self.assertTrue(second.is_file())
+            self.assertTrue(third.is_file())
+            variant = generate_report(run, variant_name="board variant")
+            self.assertEqual(variant, reports_dir / "board_variant__stripline3_004.html")
+            explicit = reports_dir / "chosen.html"
+            self.assertEqual(generate_report(run, explicit), explicit)
+            with self.assertRaisesRegex(ValueError, "już istnieje"):
+                generate_report(run, explicit)
+            with self.assertRaisesRegex(ValueError, "niezmienny"):
+                generate_report(run, run / "do-not-overwrite.html")
+
     def test_completed_run_and_existing_output_are_protected(self):
         with self.assertRaisesRegex(ValueError, "niezmienny"):
             generate_report(self.run, self.run / "new.html")

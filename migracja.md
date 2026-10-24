@@ -133,6 +133,29 @@ utworzeniem. W nagłówku zapisuj SHA ostatniego *już potwierdzonego*
 commita bazowego, a opublikowany SHA nowego commita podawaj po publikacji
 w raporcie końcowym. Nowy czat zawsze sam sprawdza HEAD.
 
+## Aktualny checkpoint — stabilne nazwy raportów (2026-10-24)
+
+Użytkownik uruchomił na Windows `antenna_lab report .../stripline3_004`
+i dostał niechciany timestamp w nazwie HTML:
+`outcomes/reports/stripline3_004_20261024T004959_587285Z.html`.
+Przyczyną było bezwarunkowe `datetime.now(timezone.utc).strftime(...)`
+w `visualization/report.py` w domyślnej ścieżce manualnego raportu.
+Zmieniono **tylko nazewnictwo wyjściowego HTML**: `stripline3_004.html`,
+a gdy istnieje `stripline3_004__002.html`, `__003` itd. Re-generacja
+nie nadpisuje starych raportów ani danych źródłowych; `--output` oraz
+automatyczny `run/report.html` zachowują swoje kontrakty. Dla wariantu
+antenowego wybranego przez JSON zachowano `wariant__run.html`.
+Dodano test powtarzalności, kolizji, jawnego output i niezmienności run.
+Bez nowych FDTD, pól, korekt wyniku i parametrów solvera.
+
+**Następny krok Windows:** `git pull --ff-only`;
+`.\\.venv\\Scripts\\python.exe -m unittest discover -s tests -p test_report.py -v`
+oraz `python -m antenna_lab report .../stripline3_004 --open`.
+Sprawdzić raport HTML bez daty w `outcomes/reports/`; dotychczasowego
+pliku z timestampem nie kasować. Status testów po tej zmianie:
+nieuruchomione przez agenta. Dokumenty: `docs/reports.md`, `todo.md`,
+`history.md`. Poprzednia diagnostyka przerwanego FDTD poniżej.
+
 ## Aktualny checkpoint — czytelność raportu PCB i recovery przerwanego FDTD (2026-10-23)
 
 Na rzeczywistym przebiegu użytkownika `outcomes/pcb_easyeda/stripline2_006`
