@@ -1,5 +1,16 @@
 # TODO — PCB: aktualny stan i następne kroki
 
+**2026-10-24 — nazwy raportów ręcznych bez timestampu.**
+Zgłoszenie Windows: `report .../stripline3_004` generował
+`outcomes/reports/stripline3_004_20261024T004959_587285Z.html`.
+Wspólny generator stosował datę UTC mimo jednoznacznego ID run.
+Zmieniono politykę domyślną: pierwszy plik `stripline3_004.html`,
+kolizje `stripline3_004__002.html`, `__003` itd., bez nadpisywania,
+bez zmian dla jawnego `--output` i automatycznego `run/report.html`.
+Dodano regresję bez FDTD; **OPEN:** sprawdzić testy `test_report.py`
+na Windows oraz ponownie wygenerować raport `stripline3_004`.
+
+
 **2026-10-23 — raport PCB / przerwany FDTD stripline2_006.**
 Użytkownik potwierdził, że po przerwaniu 3+ godz. FDTD zachowały się
 sondy portu i sześć HDF5, lecz `FieldData/FD` jest puste (częstotliwości
