@@ -437,12 +437,13 @@ def make_pcb_domain_mesh(
         for a, b in zip(required, required[1:]):
             maximum = policy.max_substrate_z_step_m if axis == 2 else policy.max_substrate_xy_step_m
             if axis == 2 and geometry.dielectric_layers:
-                layer = next(d for d in geometry.dielectrics if d.z_min_m <= a and b <= d.z_max_m)
-                # Wavelength follows the actual material. The existing minimum
-                # substrate count applies to total dielectric depth, NOT N cells
-                # per layer: interfaces alone may already exceed that minimum.
-                maximum = min(policy.air_wavelength_m / sqrt(layer.epsilon_r) / settings.cells_per_wavelength,
-                              plan.substrate_thickness_m / settings.min_substrate_cells_z)
+                layer = next((d for d in geometry.dielectrics if
+                              d.z_min_m <= a and b <= d.z_max_m), None)
+                if layer is not None:
+                    # Z probes may lie outside the board in air. Only internal
+                    # intervals inherit the dielectric wavelength bound.
+                    maximum = min(policy.air_wavelength_m / sqrt(layer.epsilon_r) / settings.cells_per_wavelength,
+                                  plan.substrate_thickness_m / settings.min_substrate_cells_z)
             if axis < 2 and local_ranges[axis][0] <= a and b <= local_ranges[axis][1]:
                 maximum = min(maximum, local_steps[axis])
             if axis<2 and feature_plan is not None:
