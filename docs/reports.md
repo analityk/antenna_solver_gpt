@@ -174,3 +174,16 @@ faz danej planszy/częstotliwości. Domyślnie `--field-view active+geometry`,
 `--field-view domain` przywraca cały zapisany przekrój diagnostyczny.
 Kontrakt progów, fallbacków i pozostałych trybów: [fields.md](fields.md#roi-raportów-pcb--bez-nowych-obliczeń).
 Opcje zmieniają wyłącznie raport; zapisane NPZ/HDF5 pozostają nietknięte.
+
+## Raport PCB: tryb pól na powierzchniach miedzi
+
+Gdy zapisany przebieg deklaruje `field_mode=copper_surfaces`, wspólny
+generator HTML wybiera **raport powierzchniowy**, a nie raport
+impedancji: widoki XY TOP/INNER/BOTTOM, każda strona osobno,
+mapy |E|, |H| i |K_face_proxy|, kierunki wektorów przy fazie 0°,
+przewijanie i zoom. **Brak S11, SWR, impedancji i dalekich pól**
+w tym raporcie; port pozostaje wewnętrznym źródłem i normalizacją.
+Brak NPZ jest oznaczony jako brak danych. Wartość K jest przybliżeniem
+pola H 10 µm od miedzi PEC, nie wynikiem strat AC. Raport `far`
+zachowuje dotychczasowe wykresy i pola. Szczegóły:
+[pcb-copper-surfaces.md](pcb-copper-surfaces.md).
