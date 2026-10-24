@@ -205,7 +205,8 @@ def run_easyeda_control(project_path, output_dir, *, source_config=None, source_
                 result.update(sampled_diagnostics(result))
         result.update(diagnostics)
         result['import']=provenance
-        if not prepare_only and 'frequency_hz' in result:print_sweep_summary(result)
+        if not prepare_only and field_mode=='far' and 'frequency_hz' in result:
+            print_sweep_summary(result)
     except (Exception,KeyboardInterrupt) as exc:
         if isinstance(exc,QuantizationError):
             diagnostics['geometry_resolution']=dict(exc.audit,requested_um=geometry_resolution_um,quantum_nm=grid.quantum_nm)
@@ -276,7 +277,8 @@ def main(argv=None):
             sweep_request=request if sweep and tuple(profile.settings.result_frequency_hz)==tuple(band['result_frequency_hz']) else None,
             field_mode=args.field_mode)
         print(f"Status: {result['status']}; validation_status: unverified\n{output.resolve()/'summary.json'}")
-        if not args.prepare_only:print(output.resolve()/'impedance.csv')
+        if not args.prepare_only and args.field_mode=='far':
+            print(output.resolve()/'impedance.csv')
         return int(result['status'] in ('postprocess_failed','postprocess_partial') or
                    result.get('termination_status') in ('max_timesteps_reached','max_time_reached'))
     except (ConfigurationError,OSError,RuntimeError,ValueError,KeyboardInterrupt) as exc:
