@@ -385,6 +385,9 @@ def _pcb_metadata(data):
 
 
 def render_html(data, *, plots_path=None, phase_step=None, field_components=None, field_crop=None):
+    if data.get('is_pcb') and data['summary'].get('field_mode')=='copper_surfaces':
+        from .copper_surface_report import render_copper_surface_report
+        return render_copper_surface_report(data)
     from .fields import field_section
     spectrum, reference = data["spectrum"], data["reference"]
     pcb = data.get("is_pcb", False)
