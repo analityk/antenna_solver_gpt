@@ -11,6 +11,12 @@
 **Potwierdzony opublikowany checkpoint przed aktualizacją:** `8bef03fc42ac774e6051a5325ccb3ce7832cf83d`
 **Uwaga:** ten SHA jest punktem historycznym, nie obietnicą, że nadal jest HEAD. Każde wznowienie rozpoczyna się sprawdzeniem Git.
 
+## 2026-10-24 — nadrzędna aktualizacja celu PCB (przed starszymi checkpointami)
+
+**Obowiązkowe wymaganie:** dla każdej fizycznej warstwy miedzi sheet mierzyć jednostronne E/H z +z i -z oraz wiarygodną **wypadkową gęstość prądu powierzchniowego K_net [A/m] i gęstość ładunku powierzchniowego sigma_s_net [C/m²]**. To cel analiz planar transformer, current crowding, proximity effect i field fringing. Miedź o zerowej grubości geometrycznej może mieć różne pola po dwóch stronach wskutek sprzężenia między warstwami. Skok H daje K_net, skok D daje sigma_s_net (z właściwą przenikalnością ε danego ośrodka); to nie są osobne wielkości obu fizycznych stron folii. 
+
+**Stan:** wymaganie udokumentowane, jeszcze niezaimplementowane ani niezweryfikowane FDTD. Najpierw zweryfikować jednostronne próbki pól D/H przy PEC i conducting sheet oraz błędy interpolacji Yee; następnie wspólny model danych, postprocess, GUI z wyborem starego `spatial-eh` i nowego `copper-faces`, raport E/H/K/ładunek bez S11, impedancji i SWR. Dawne oznaczenia „K opcjonalne” oraz starszy „aktualny krok” w dalszej części pliku nie obowiązują. Podstawy: [docs/pcb-current-charge-goal.md](docs/pcb-current-charge-goal.md), [docs/pcb-copper-surfaces.md](docs/pcb-copper-surfaces.md), [todo.md](todo.md). Ostatni potwierdzony opublikowany HEAD przed tym wpisem: `704765fefd2abc314796341a8ae2c86b904fc514`; zawsze sprawdzać ponownie. Zachowano całą historię pliku.
+
 ## 1. Instrukcja dla nowego czatu — wykonaj po wskazaniu tego pliku
 
 Jesteś kolejnym wykonawcą prac nad tym samym repozytorium. **Nie polegaj na

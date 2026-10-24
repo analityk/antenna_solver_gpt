@@ -215,3 +215,8 @@ wynik niezweryfikowany; nie wolno luzować progów tylko dla uzyskania zaliczeni
 Benchmarki, prace nad GPU, optymalizacja szybkości przed działającym modelem,
 hosting obliczeniowy, automatyczny dobór najlepszej anteny, macierze wielu
 anten, układ odbiorczy i model nieba. Można rozwijać je później po nowej decyzji.
+
+
+## PCB: wymagany pomiar przywarstwowy 2026-10-24
+
+Przykładowy cel inżynierski: planarny transformator, sprzężenie między uzwojeniami, current crowding, proximity effect i field fringing. W jednym GUI zachować istniejący `spatial-eh` oraz dodać `copper-faces`: jednostronne E/H przy +z/-z każdej warstwy miedzi i **obowiązkowe** rozkłady wypadkowej powierzchniowej gęstości prądu K_net [A/m] i ładunku sigma_s_net [C/m²]. Skoki graniczne H i D umożliwiają ich określenie po zweryfikowaniu próbkowania Yee, ε, maski i zbieżności. Zerogrubościowy sheet może mieć różne pola po obu stronach wskutek sprzężenia z innymi warstwami; K_net i sigma_s_net nie są niezależnymi gęstościami dwóch fizycznych stron folii. HTML tego trybu bez S11, SWR, impedancji ani odległych przekrojów; stary typ raportu bez regresji. **Stan: wymaganie, niezaimplementowane.** [Uzasadnienie](docs/pcb-current-charge-goal.md), [kontrakt](docs/pcb-copper-surfaces.md).
