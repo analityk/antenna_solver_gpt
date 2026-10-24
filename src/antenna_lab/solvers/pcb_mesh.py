@@ -371,8 +371,34 @@ def _add_domain_pml(lines, count):
     return result
 
 
+def copper_surface_z_anchors(geometry, interfaces, offset_m):
+    """Explicit near-face sampling nodes; no approximation from remote slices.
+
+    Every face (including external air faces) has its own Z mesh line. This
+    intentionally modifies the FDTD grid and must pass the usual cost/CFL guard.
+    """
+    if not 0 < offset_m <= 20e-6:
+        raise ConfigurationError('Copper surface probes require an explicit offset in (0,20] um.')
+    levels = sorted({c.z_m for c in geometry.copper_layers} if geometry.copper_layers
+                    else {c.z_m for c in geometry.copper})
+    if not levels:
+        raise ConfigurationError('No physical copper layers for surface-field measurements.')
+    for lo, hi in zip(levels, levels[1:]):
+        if hi - lo <= 4 * offset_m:
+            raise ConfigurationError('Copper layers too close for independent upper/lower surface probes.')
+    for d in geometry.dielectrics:
+        if d.z_max_m-d.z_min_m <= 4 * offset_m:
+            raise ConfigurationError('Dielectric too thin for distinct copper-face sampling nodes.')
+    extra = [z + sign * offset_m for z in levels for sign in (-1, 1)]
+    all_lines = sorted({*interfaces, *extra})
+    if any(b-a <= ANCHOR_MERGE_TOLERANCE_M for a,b in zip(all_lines,all_lines[1:])):
+        raise ConfigurationError('Copper surface probe overlaps a physical Z interface.')
+    return tuple(all_lines)
+
+
 def make_pcb_domain_mesh(
     geometry: PcbGeometry, settings: PcbSimulationSettings, *, port_edge_mode='aligned', gerber_quality=None,
+    surface_probe_offset_m=0.,
 ) -> PcbDomainMesh:
     """Refine local PCB/air intervals, audit, then attach uniform PML cells.
 
@@ -386,6 +412,10 @@ def make_pcb_domain_mesh(
         plan,feature_plan=make_gerber_mesh_anchor_plan(geometry,settings,gerber_quality)
     else:
         plan=make_pcb_solver_anchor_plan(geometry,settings,port_edge_mode)
+    if surface_probe_offset_m:
+        from dataclasses import replace
+        plan = replace(plan, z_required_m=copper_surface_z_anchors(
+            geometry, plan.z_required_m, surface_probe_offset_m))
     policy = derive_pcb_physical_mesh_policy(geometry, settings)
     pml = policy.pml_cells
     if isinstance(pml, bool) or not isinstance(pml, int) or not 6 <= pml <= 20:
