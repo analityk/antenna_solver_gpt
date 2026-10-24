@@ -253,7 +253,20 @@ def recover_run(run_dir, *, render=True, reuse=True, report_options=None):
             complete_fields = {p['name'] for p in metadata['planes']} == expected_names
             try:
                 for plane in metadata['planes']:
-                    load_plane(root/'fields'/(plane['name']+'.npz'), plane, requested)
+                    artifact=root/'fields'/(plane['name']+'.npz')
+                    if metadata.get('mode')=='copper_surfaces':
+                        # This layout is XY on both faces; the legacy loader
+                        # intentionally recognizes only far-field cut names.
+                        import numpy as np
+                        with np.load(artifact,allow_pickle=False) as probe:
+                            if (plane.get('measurement')!='copper_surface' or
+                                not all(k in probe for k in ('E_v_per_m','H_a_per_m',
+                                                              'K_proxy_a_per_m','mask','frequency_hz')) or
+                                not np.array_equal(probe['frequency_hz'],requested) or
+                                probe['mask'].shape!=tuple(plane['shape_xyz'])):
+                                raise ValueError('Incomplete copper-surface NPZ.')
+                    else:
+                        load_plane(artifact, plane, requested)
             except (OSError, ValueError, KeyError):
                 complete_fields = False
         if summary.get('frequency_hz') and complete_fields:
