@@ -1,5 +1,24 @@
 # TODO — PCB: aktualny stan i następne kroki
 
+## NOWY PRIORYTET 2026-10-24 — mapy pól bezpośrednio przy miedzi
+
+**Żądanie:** w istniejącym Windows GUI wybierać `far` albo
+`copper_surfaces`; drugi tryb ma dawać mapy od góry i dołu KAŻDEJ
+fizycznej warstwy Cu: |E|, |H| i |K_face_proxy| ze strzałkami,
+bez S11/SWR/impedancji i dalekiego powietrza. Wzorzec to kolorowa
+mapa prądu na przewodniku. Specyfikacja i warunki odbioru:
+[docs/pcb-copper-surfaces.md](docs/pcb-copper-surfaces.md).
+
+Na gałęzi funkcji dodano przełącznik GUI/CLI, jawne węzły Z ±10 µm,
+przechwycenie E/H, osobną maskę copper polygon, zespolony proxy K,
+osobny field-only HTML i syntetyczne testy jednostkowe. **OPEN:**
+Windows testy test_pcb_surface_fields.py i test_pcb_gui_commands.py,
+PREPARE-ONLY rzeczywistego 4-layer `.epro` i porównanie native E/H/K
+z prostą referencją. Bez takiej walidacji nie uruchamiać
+wielogodzinnego FDTD jako potwierdzonego pomiaru prądu.
+
+
+
 **2026-10-24 — nazwy raportów ręcznych bez timestampu.**
 Zgłoszenie Windows: `report .../stripline3_004` generował
 `outcomes/reports/stripline3_004_20261024T004959_587285Z.html`.
