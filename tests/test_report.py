@@ -61,8 +61,8 @@ class ReportTests(unittest.TestCase):
     def test_default_manual_report_uses_stable_name_and_numeric_revisions(self):
         run = fixture(self.root / "stripline3_004")
         reports_dir = self.root / "outcomes" / "reports"
-        with patch("antenna_lab.visualization.report.ROOT", self.root), \\
-             patch("subprocess.Popen", side_effect=AssertionError("no solver")):
+        with (patch("antenna_lab.visualization.report.ROOT", self.root),
+              patch("subprocess.Popen", side_effect=AssertionError("no solver"))):
             first = generate_report(run)
             self.assertEqual(first, reports_dir / "stripline3_004.html")
             first_bytes = first.read_bytes()
