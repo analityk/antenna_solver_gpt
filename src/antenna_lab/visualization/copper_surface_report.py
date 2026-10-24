@@ -18,7 +18,7 @@ def _magnitude(phasor):
     return np.sqrt(np.sum(np.abs(phasor) ** 2, axis=0))
 
 
-def _figure(record, plane, index, frequency_hz):
+def _figure(record, plane, index, frequency_hz, global_scales):
     x = record['x_m'] * 1e3
     y = record['y_m'] * 1e3
     labels = (('|E|', 'V/m / 1 V port', 'E_v_per_m'),
@@ -29,8 +29,13 @@ def _figure(record, plane, index, frequency_hz):
     for ax, (label, units, name) in zip(axes, labels):
         field = record[name][index]
         values = _magnitude(field)[:,:,0]
+        # Same 0...max color range for this quantity/frequency across
+        # every copper face. Do not normalize each face independently:
+        # that would hide physically important differences in magnitude.
+        maximum=global_scales.get((index,name),0.)
         colors = ax.pcolormesh(x, y, np.ma.masked_invalid(values).T,
-                               shading='auto', cmap='inferno')
+                               shading='auto', cmap='inferno', vmin=0,
+                               vmax=maximum if maximum>0 else 1.)
         fig.colorbar(colors, ax=ax, label=units)
         if name == 'K_proxy_a_per_m':
             kx, ky = np.real(field[0,:,:,0]), np.real(field[1,:,:,0])
@@ -66,6 +71,19 @@ def render_copper_surface_report(data):
     metadata = read_json(field_file) if field_file.is_file() else {}
     if metadata and metadata.get('mode') != 'copper_surfaces':
         raise ValueError('Saved fields do not match copper-surface report mode.')
+    global_scales={}
+    if metadata:
+        for plane in metadata.get('planes',()):
+            with np.load(root/'fields'/(plane['name']+'.npz'),allow_pickle=False) as record:
+                for name in ('E_v_per_m','H_a_per_m','K_proxy_a_per_m'):
+                    if name not in record:
+                        raise ValueError(f'Missing {name} in {plane["name"]}.')
+                    for i in range(len(record['frequency_hz'])):
+                        values=_magnitude(record[name][i])
+                        finite=values[np.isfinite(values)]
+                        maximum=float(np.max(finite)) if len(finite) else 0.
+                        key=(i,name)
+                        global_scales[key]=max(global_scales.get(key,0.),maximum)
     panels=[]
     if not metadata:
         panels.append('<section class="panel"><p>Nie zapisano przetworzonych map '
@@ -81,7 +99,7 @@ def render_copper_surface_report(data):
                     raise ValueError(f'Missing copper field arrays for {name}.')
                 frames=[]
                 for i,f in enumerate(record['frequency_hz']):
-                    png=_figure(record,plane,i,float(f))
+                    png=_figure(record,plane,i,float(f),global_scales)
                     encoded=base64.b64encode(png).decode('ascii')
                     frames.append(
                         f'<details><summary>{f/1e6:g} MHz · E / H / K_face</summary>'
@@ -115,7 +133,7 @@ def render_copper_surface_report(data):
 <p>Każda fizyczna warstwa Cu osobno: widok od góry i od dołu. Bez przekrojów pola daleko od PCB.</p></header>
 <div class="status">Wynik niezweryfikowany · {note}</div>
 <section class="panel"><h2>Co oznaczają mapy</h2>
-<p>Kolory E/H pokazują moduł zespolonych pól (norma amplitud trzech składowych).
+<p>Kolory E/H pokazują moduł zespolonych pól (norma amplitud trzech składowych). Skale dla danej wielkości i częstotliwości są wspólne na wszystkich warstwach i stronach.
 Kolor K_face oznacza |n × H| przy zapisanej odległości od powierzchni miedzi.
 Strzałki to kierunek chwilowej części rzeczywistej K_face przy fazie 0°.
 Pola i prądy są normalizowane do 1 V napięcia portu.</p>
