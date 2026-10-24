@@ -133,6 +133,36 @@ utworzeniem. W nagłówku zapisuj SHA ostatniego *już potwierdzonego*
 commita bazowego, a opublikowany SHA nowego commita podawaj po publikacji
 w raporcie końcowym. Nowy czat zawsze sam sprawdza HEAD.
 
+
+## Aktywny checkpoint 2026-10-24 — Copper Surface Field Explorer
+
+Nowe polecenie użytkownika ma pierwszeństwo nad wcześniejszymi zadaniami
+raportowania impedancji. Cel: istniejąca aplikacja GUI oferuje dwa
+tryby pól: `far` (historyczne przekroje E/H) i `copper_surfaces` —
+mapy E/H i przybliżone K oddzielnie dla obu stron każdej fizycznej
+warstwy miedzi, tak jak na kolorowych mapach prądu z wektorami.
+Dedykowany HTML NIE pokazuje S11/SWR/impedancji ani dalekich pól.
+Źródło prawdy: [docs/pcb-copper-surfaces.md](docs/pcb-copper-surfaces.md).
+
+Implementacja na gałęzi `feature/copper-surface-field-maps`: UI/CLI
+zapisują `field_mode`; preflight i XML dodają dokładne węzły Z = Zcu
+±10 µm (jawnie zmieniają CFL, cell_count); 8 sond dla 4 użytych
+warstw Cu z E/H i maską tylko poza polygonem miedzi; zespolone
+K_face_proxy = n × H na próbce 10 µm (NIE dokładny prąd PEC ani
+skin/proximity), osobny HTML z mapami trzech amplitud i zoomem.
+Nowy tryb nie maskuje automatycznie H przy metalu szerokim halo.
+Stary tryb i stare raporty pozostają bez zmian.
+
+Ważne ograniczenia: w poprzednich wynikach brakuje powierzchniowych
+sond; ich danych nie da się odtworzyć przez ponowny raport.
+Konieczna walidacja zbieżności pól względem odległości sond/siatki;
+same mapy nie dowodzą zweryfikowanych fizycznych prądów w miedzi.
+Brak natywnych testów Windows w środowisku agenta. Testy syntetyczne
+nowo dodane, wyniku jeszcze nie potwierdzono. Następny krok po pull:
+1) test_pcb_surface_fields.py i test_pcb_gui_commands.py;
+2) PREPARE-ONLY małego `.epro` z `copper_surfaces` i audyt Z/komórek/CFL;
+3) mały test natywny przed kosztownym FDTD.
+
 ## Aktualny checkpoint — stabilne nazwy raportów (2026-10-24)
 
 Użytkownik uruchomił na Windows `antenna_lab report .../stripline3_004`
