@@ -146,6 +146,11 @@ def command_for(action, values, *, interpreter=None):
             cmd.extend(['--pth-plating-um', str(_positive(plating, 'Metalizacja PTH µm'))])
         for spec in dielectric_specs:
             cmd.extend(['--dielectric-material',spec])
+    mode=values.get('field_mode','far')
+    if mode not in ('far','copper_surfaces'):
+        raise ValueError('Tryb pól: wybierz przekroje E/H albo powierzchnie miedzi.')
+    if mode=='copper_surfaces' and not values.get('fields_enabled',True):
+        raise ValueError('Powierzchnie miedzi wymagają włączonego zapisu pól E/H.')
     if values.get('fields_enabled', True):
         fields = _fields(str(values.get('fields_mhz', '')))
         if not fields:
@@ -155,6 +160,8 @@ def command_for(action, values, *, interpreter=None):
         if len(set(fields)) != len(fields):
             raise ValueError('Powtórzone częstotliwości pól.')
         cmd += ['--fields-mhz', *(str(f) for f in fields)]
+        if mode=='copper_surfaces':
+            cmd += ['--field-mode','copper_surfaces']
     else:
         cmd.append('--no-fields')
     overrides = []
