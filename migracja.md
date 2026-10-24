@@ -144,7 +144,7 @@ warstwy miedzi, tak jak na kolorowych mapach prądu z wektorami.
 Dedykowany HTML NIE pokazuje S11/SWR/impedancji ani dalekich pól.
 Źródło prawdy: [docs/pcb-copper-surfaces.md](docs/pcb-copper-surfaces.md).
 
-Implementacja na gałęzi `feature/copper-surface-field-maps`: UI/CLI
+Implementacja na gałęzi `feature/copper-surface-field-maps` (draft PR #12; **niezmergowany main**): UI/CLI
 zapisują `field_mode`; preflight i XML dodają dokładne węzły Z = Zcu
 ±10 µm (jawnie zmieniają CFL, cell_count); 8 sond dla 4 użytych
 warstw Cu z E/H i maską tylko poza polygonem miedzi; zespolone
