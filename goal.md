@@ -1,5 +1,10 @@
 # Cel projektu
 
+## Nadrzędny cel produktu (decyzja 2026-10-25)
+
+**Rzeczywisty projekt PCB w archiwum EasyEDA Pro `.epro` jest źródłem pełnej topologii i identyfikacji elementów, włącznie z MPN.** To już dostarczona podstawa. Brakujące poza PCB bryły (np. rdzeń magnetyczny), charakterystyki materiałów i warunki pracy użytkownik dodaje jawnie. Program ma wykorzystać ten model do niezależnych, kompatybilnych fizycznie analiz anten, pól E/H/D/B, prądu i ładunku powierzchniowego, pojemności, transformatorów planarnych, zewnętrznych obwodów i promieniowania. Nie mylić pełnej topologii CAD z pełnią danych materiałowych. **Nie wolno zdegradować istniejącego solvera antenowego.** Plan etapy i bramki odbioru: [plan.md](plan.md); procedura importu: [AGENTS.md](AGENTS.md) i [docs/pcb-easyeda.md](docs/pcb-easyeda.md). Dotychczasowe wymagania antenowe poniżej pozostają obowiązujące tam, gdzie nie są sprzeczne z tą nadrzędną decyzją.
+
+
 Wersja wymagań: 0.13. Data: 2026-09-29, Europe/Warsaw.
 
 ## Bieżący stan

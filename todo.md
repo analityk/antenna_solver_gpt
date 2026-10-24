@@ -1,5 +1,14 @@
 # TODO — PCB: aktualny stan i następne kroki
 
+## Nowy nadrzędny kierunek — patrz [plan.md](plan.md) (2026-10-25)
+
+**Konstytucja:** rzeczywiste `.epro`/ZIP to dostarczone źródło topologii, obejmujące także MPN komponentów; zewnętrzne bryły rdzeni, fizyka materiałów i warunki pracy są jawnie dodawane. Nie pisać importera ani solvera na nowo. Zajmujemy się platformą analiz rzeczywistych PCB i **utrzymujemy funkcje antenowe**. Poszczególne starsze zadania poniżej zachowują znaczenie historyczne, ale nie wyznaczają już automatycznie priorytetu produktu.
+
+**Następne programowanie po akceptacji planu:** **M0** audyt topologii/atrybutów/MPN w istniejącym importerze i modelu kanonicznym → wynik w GUI czytelny do porównania z EasyEDA. **Bramka użytkownika:** potwierdzenie zgodności wybranego wielowarstwowego `.epro`, bez niewykrytych braków. Następnie M1 materiały/rdzeń/terminalne; M2 zbieżność i brak regresji solvera anten; M3 próbkowanie Yee; M4 K i ρs; M5 C/L, M6 AC, M7 multiport/SPICE, M8 nieliniowy magnetyk, M9 emisja, M10 spójny viewer/raport — szczegóły i warunki zatrzymania w `plan.md`. Nie oznaczać tych etapów jako wykonanych.
+
+**Obecny status:** tylko dokumentacja, bez nowych testów/FDTD i bez zmiany funkcji. W razie braku poprawnych próbek E/H/D lub materiału pokazać przyczynę i poprosić użytkownika o decyzję odnośnie uproszczenia. Nie mieszać unit-test PASS z akceptacją fizycznych wyników.
+
+
 **2026-10-24 — nazwy raportów ręcznych bez timestampu.**
 Zgłoszenie Windows: `report .../stripline3_004` generował
 `outcomes/reports/stripline3_004_20261024T004959_587285Z.html`.

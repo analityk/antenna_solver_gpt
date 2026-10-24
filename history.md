@@ -2636,3 +2636,11 @@ parametru materiału z GUI albo CLI. Warstwy silk, mask, paste i stencil
 są pomijane w modelu EM; soldermaska jako εr_eff będzie osobnym
 przybliżeniem później. Fizyka backendu, solver, mesh, FAST i PSU bez
 zmian. Testy offline dodano; natywna weryfikacja Windows nadal otwarta.
+
+## 2026-10-25 — konstytucja źródłowego PCB .epro i plan platformy analiz (tylko dokumentacja)
+
+**Przyczyna:** użytkownik sprecyzował, że kompletną topologię rzeczywistej płytki, włącznie z MPN elementów, niesie już archiwum EasyEDA Pro `.epro` i importer tego wejścia został dowieziony. Właściwą inwestycją jest zachowanie tej informacji, uzupełnienie jej o świadomie dostarczoną fizykę (np. rdzeń), a nie nowy importer ani zastąpienie solvera anten.
+
+**Zakres:** zapisano konstytucję w `AGENTS.md`/`goal.md` i plan rozwoju w `plan.md`; aktualny kierunek i pierwszy etap w `migracja.md`/`todo.md`. Plan ma bramki odbioru przez użytkownika na **rzeczywistych wynikach** wielowarstwowego PCB, anteny, pól przywarstwowych E/H/D, K i ładunku, C/L, strat AC, obwodów i emisji. Projekty openEMS/Fairbeam/Palace/PyPEEC/GetDP/ngspice/scikit-rf są rozróżnione według zakresu; ich integracja jest warunkowa, nie deklarowana jako wykonana. Dokument zawiera ograniczenia natywnego Windows i pełnego modelu fizycznego.
+
+**Wpływ na fizykę, kod i dane:** brak zmian. Nie uruchamiano solvera, nie zmieniono formatów wyników, nie usunięto żadnych plików ani modeli anten. Planowane założenia wymagają przyszłej walidacji. Testy kodu nie były uruchamiane (praca dokumentacyjna). **Najbliższy krok po akceptacji:** M0 — audyt zachowania atrybutów MPN/netów/warstw przez już istniejący importer, ręczna weryfikacja z realnym `.epro`.

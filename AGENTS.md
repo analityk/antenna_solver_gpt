@@ -31,6 +31,14 @@ przesłanki, rzeczywisty stan, dowody, ograniczenia i następne działania.
 Nie odczytuj bez potrzeby całej wieloletniej historii; używaj najnowszych
 wpisów i sięgaj do wcześniejszych decyzji, gdy są istotne.
 
+## Konstytucja rozwiązania — źródło topologii PCB i cel analiz
+
+**Decyzja użytkownika (2026-10-25):** „Pliki `.epro`, które faktycznie są archiwami ZIP, zawierają wszystko, co istotne z punktu widzenia topologii PCB — włącznie z MPN komponentów. Inne elementy, jak magnetyk, muszę wprowadzić sam”. **Import pełnego `.epro` został dowieziony i jest fundamentem produktu.** Nie planować zastąpienia importera, ponownego odrysowywania PCB ani wyprowadzania topologii z Gerberów. Wymagać zachowania pełnej identyfikowalności sieci, footprintów rzeczywiście umieszczonych na PCB, padów, przelotek, warstw, instancji i atrybutów (w tym MPN, jeżeli obecny w archiwum) przez cały tor obliczeń. Jeśli obecny model wynikowy nie ujawnia jeszcze części źródłowych atrybutów, naprawić to w warstwie źródło → model kanoniczny; nie twierdzić, że cały pipeline jest już kompletny.
+
+**Granica stwierdzenia:** kompletność topologii w CAD nie oznacza automatycznie kompletnych własności EM, charakterystyk B-H, modeli SPICE, temperaturowych ani pełnej zgodności fizycznej. Materiały/rdzeń/bryły 3D, warunki pracy i świadome uproszczenia są osobnymi danymi z jawnym pochodzeniem. Brakujących danych nie zgadywać. Wszystkie wyniki mają ujawniać założenia, niepewność i pominięcia.
+
+**Kierunek:** `.epro` + świadomie uzupełniony model fizyczny + dobierane istniejące silniki → zintegrowana analiza anten PCB, pól E/H/D/B, prądu powierzchniowego i ładunku, pojemności, transformatorów planarnych, obwodów i emisji. **Solver antenowy openEMS i jego raporty pozostają pełnoprawne i nie podlegają zastąpieniu.** Etapy implementacji, rola innych projektów i ręczne bramki odbioru wyników: [plan.md](plan.md).
+
 ## Kontrakt importu PCB EasyEDA Pro i konwencje użytkownika — obowiązkowe
 
 - **Nowym docelowym wejściem geometrii PCB jest pełny projekt `.epro`**
