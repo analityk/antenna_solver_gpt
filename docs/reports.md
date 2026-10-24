@@ -43,8 +43,16 @@ manifeście o etapie `simulation` i stanie `completed`; pomija `prepare`,
 eksporty geometrii, przerwane i trwające obliczenia. Wymaga też `summary.json`.
 Nie wybiera katalogu tylko dlatego, że był ostatnio modyfikowany.
 
-Nowy samodzielny HTML trafia do `outcomes/reports/`. Ścieżka pojawia się
-w terminalu. `--open` otwiera go w domyślnej przeglądarce; można też otworzyć
+Nowy samodzielny HTML trafia do `outcomes/reports/`. Nazwa jest stabilna:
+`stripline3_004` → `stripline3_004.html`; przy ponownym generowaniu bez
+`--output` powstają `stripline3_004__002.html`, `stripline3_004__003.html`
+itd. **Bez timestampu.** Istniejących raportów nie nadpisujemy. Przy
+raportowaniu wariantu anteny wybranego przez `report <wariant.json>` nazwa
+uwzględnia jawny wariant i katalog przebiegu (`wariant__run.html`).
+`--output` zachowuje dokładną nazwę podaną przez użytkownika i kończy się
+błędem, jeśli plik istnieje. Automatyczny `report.html` w nowym katalogu
+`run` pozostaje bez zmian. Ścieżka pojawia się w terminalu.
+`--open` otwiera go w domyślnej przeglądarce; można też otworzyć
 plik dwuklikiem. Po skopiowaniu samego HTML na inny komputer nadal działa.
 JavaScript steruje suwakami i wykresami; bez niego dostępne są statyczne
 wykresy i tabele. Wydruk używa statycznego wykresu z pierwotnym Zref.
