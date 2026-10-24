@@ -52,6 +52,18 @@ class GuiCommandTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'source-config'):
             self.cmd('prepare', pth_plating_um='25', source_config=r'C:\tmp\x.json')
 
+    def test_copper_surface_mode_is_explicit_and_compatible_with_preparation(self):
+        prep=self.cmd('prepare',field_mode='copper_surfaces')
+        run=self.cmd('run',field_mode='copper_surfaces')
+        self.assertEqual(prep[prep.index('--field-mode')+1],'copper_surfaces')
+        self.assertEqual(run[run.index('--field-mode')+1],'copper_surfaces')
+        self.assertTrue(is_matching_preparation(prep,run))
+        self.assertNotIn('--field-mode',self.cmd('prepare'))  # legacy default
+        with self.assertRaisesRegex(ValueError,'wymagają'):
+            self.cmd('prepare',field_mode='copper_surfaces',fields_enabled=False)
+        with self.assertRaisesRegex(ValueError,'Tryb pól'):
+            self.cmd('prepare',field_mode='made_up')
+
     def test_no_fields_and_solver_overrides(self):
         args = self.cmd('prepare', fields_enabled=False, fields_mhz='',
                         overrides='air_padding_wavelengths=0.1\n# comment\nmax_timesteps=50000')
