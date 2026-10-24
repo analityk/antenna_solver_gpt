@@ -99,8 +99,8 @@ def load_report_data(run_path, *, start_mhz=None, stop_mhz=None, step_mhz=None,
         # The port remains an internal phasor-normalization prerequisite in
         # native postprocessing, never a graph/report requirement.
         geometry = read_json(root / 'geometry.json')
-        if geometry.get('model') != 'pcb':
-            raise ValueError('Copper surface reporting requires saved PCB geometry.')
+        if not all(key in geometry for key in ('copper','copper_layers','outline')):
+            raise ValueError('Copper surface reporting requires explicit saved multilayer PCB geometry.')
         return dict(root=root,summary=summary,geometry=geometry,is_pcb=True,
                     run_id=root.name,variant_name=root.name,
                     execution_status=summary.get('status','not recorded'),
