@@ -174,3 +174,9 @@ faz danej planszy/częstotliwości. Domyślnie `--field-view active+geometry`,
 `--field-view domain` przywraca cały zapisany przekrój diagnostyczny.
 Kontrakt progów, fallbacków i pozostałych trybów: [fields.md](fields.md#roi-raportów-pcb--bez-nowych-obliczeń).
 Opcje zmieniają wyłącznie raport; zapisane NPZ/HDF5 pozostają nietknięte.
+
+## PCB: animacja prądu na miedzi w samodzielnym HTML
+
+Na życzenie użytkownika raport PCB używa dla `currents/*.npz` **tylko kontrastowej animacji fazowego modułu |K(t)|**, po 24 klatki PNG na każdy zestaw warstwa/częstotliwość. Przyciski **Play/Pause**, suwak co 15° i czas klatki działają offline. Wszystkie klatki są osadzone wewnątrz HTML (`data:image/png;base64`); nie ma `canvas` ani powtórnego solvera. Wiele warstw oraz częstotliwości tworzy niezależne odtwarzacze; nie ma limitu 4 warstw. Statyczne linear/globalne mapy K są ukryte (niegenerowane) w nowym raporcie, także gdy historyczne PNG leżą na dysku. Pliki NPZ/HDF5 nie są zmieniane. Raport może być duży, bo zawiera komplet PNG; stare widoki antenowe i pola E/H nadal zachowują swoje metody prezentacji.
+
+Zobacz [docs/pcb-current-maps.md](pcb-current-maps.md). Ilościowa wiarygodność K pozostaje niepotwierdzona, dane `tanδ=1.001` dla `stripline4_004` wymagają decyzji materiałowej przed nowym solverem.

@@ -1,5 +1,9 @@
 # TODO — PCB: aktualny stan i następne kroki
 
+## stripline4_004 — animacja PNG co 15° zamiast statycznej mapy (NOWY PRIORYTET)
+
+Zgodnie z decyzją użytkownika raport prądu pokazuje wyłącznie lokalny kontrast `|K(t)|` ze zmianą barw i strzałek w każdej fazie, jako **24 PNG / 360° / warstwa i częstotliwość**, suwak oraz Play/Pause. Dla dotychczasowego przebiegu 4 × 2 = 8 odtwarzaczy = **192 PNG**, bez nowego FDTD. Wbudowany HTML offline; brak globalnych map liniowych. **Kody już opublikowane:** `be3f719`, `da5c3db`; fizyka K wciąż niewalidowana, dane NPZ pozostały niezmienione. Przetestowano lokalnie rzeczywiste NPZ i pojedynczy PNG, a także JS kontrole Play/Pause w Chromium. **Następny odbiór:** Windows unittest i wygenerowanie samego raportu `stripline4_004` z już zachowanych danych, ocena przycisku i 24 faz każdej warstwy. Nie powtarzać FDTD. Uwaga na `tanδ=1.001` i niepotwierdzoną konwergencję raportową bez `openEMS_stats.txt`.
+
 ## stripline4_004: wizualizacja raportu przyjęta (2026-10-25)
 
 Z otrzymanego `stripline4_004__003.html` potwierdzono **16 zapisanych wykresów K_est (4 warstwy × 2 częstotliwości × 2 style)**, brak wyjątku TypeError i czytelne lokalne rozkłady prądu. **VISUAL PASS**, ale `K_est` nadal **UNVERIFIED**; brak dostarczonych NPZ uniemożliwia sprawdzenie prądu z całek i faz. Następna porcja, bez FDTD: odczytać `currents/metadata.json` i `currents/*.npz` z ukończonego `stripline4_004`, sprawdzić amplitudy/wektory oraz metodę względem jednostronnych H; odrębnie wyjaśnić brak `openEMS_stats.txt`. Zwrócić uwagę na **tanδ=1.001** dla trzech dielektryków przed ewentualnym kolejnym solve. Zapisana starsza instrukcja ponawiania raportu niżej jest już wykonana.

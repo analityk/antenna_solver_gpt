@@ -18,7 +18,9 @@ polecenia CMD i log na żywo, a konfiguracja elektryczna jest domyślnie
 wyprowadzana z `.epro`. Bez osobnego solvera i bez powtórnego FDTD
 przy zmianie raportu. Opcjonalny zapis map powierzchniowej gęstości prądu
 na każdej warstwie miedzi (rot(H), diagnostyczny, niezweryfikowany)
-ma osobny checkbox w zakładce eksperymentu. Zobacz
+ma osobny checkbox w zakładce eksperymentu. Raport PCB odtwarza teraz PNG
+co 15° w trybie kontrastu lokalnego dla każdej warstwy i częstotliwości,
+z Play/Pause i suwakiem fazy, bez nowych symulacji. Zobacz
 [instrukcję stripline4 i ograniczenia fizyczne](docs/pcb-current-maps.md).
 Szczegóły: [GUI PCB](docs/pcb-gui.md).
 
