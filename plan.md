@@ -1,6 +1,6 @@
 # Plan rozwoju — analiza fizyczna rzeczywistych projektów PCB
 
-**Status:** plan produktu i bramki odbioru, **nie** deklaracja zaimplementowania etapów. Uzgodniony kierunek na 2026-10-25; każda bramka fizyczna wymaga rzeczywistego wyniku zweryfikowanego przez użytkownika na jego Windows. Dokument jest nadrzędną mapą kierunku; `migracja.md` służy do wznowienia pracy, a `todo.md` do śledzenia aktualnego zadania. Plan nie upoważnia do zmiany fizyki, danych ani konfiguracji bez jawnego wyboru użytkownika.
+**Status:** plan produktu i bramki odbioru. M0 — import i audyt danych źródłowych EasyEDA — był realizowany i testowany w poprzednich etapach; nie jest ponownym zadaniem. Pierwszy nowy etap to M1. Dalsze etapy nie są jeszcze zaimplementowane. Uzgodniony kierunek na 2026-10-25; każda bramka fizyczna wymaga rzeczywistego wyniku zweryfikowanego przez użytkownika na jego Windows. Dokument jest nadrzędną mapą kierunku; `migracja.md` służy do wznowienia pracy, a `todo.md` do śledzenia aktualnego zadania. Plan nie upoważnia do zmiany fizyki, danych ani konfiguracji bez jawnego wyboru użytkownika.
 
 ## 1. Konstytucja produktu — źródło prawdy
 
@@ -82,17 +82,16 @@ W GUI przed solve: orientacyjny rozmiar siatki, przestrzeń dyskowa, wymagane pa
 
 **Zasada bramkowania:** kolejny etap uruchamiamy dopiero, gdy dostarczony wynik z poprzedniego etapu jest użyteczny w jego zamierzonym zakresie; jeśli nie, poprawiamy ogólną warstwę odpowiedzialną za błąd lub wybieramy jawny inny model. Nie kodujemy pod nazwę testowego projektu. Sprawdzenia poniżej są **oceną wyników przez użytkownika**, nie tylko zestawem testów jednostkowych. Tolerancje liczbowe ustalamy z nim dla każdego pomiaru/zakresu zastosowania; nie dopasowujemy progu po zobaczeniu wyników.
 
-### M0. Inwentaryzacja i wzorcowy import `.epro` — pierwszy etap
+### M0. Import i audyt .epro — istniejący fundament, bez ponownego audytu
 
-**Kod:** audyt pokrycia i braków obecnego importera, bez nowego parsera. Udostępnić w GUI/raporcie audytowalną listę każdej sieci, komponentu, MPN/atrybutów, footprintu, pary pad-net, przelotki, konturu miedzi, layer ID, geometrii Z, warningów i brakujących danych fizycznych. Dodać wersjonowany kontrakt modelu kanonicznego, bez duplikowania istniejącej struktury.
+**Wykonano już wcześniej:** audyt dużego archiwum `gerbs/test_psu/test_psu.epro`, kontrolę ZIP/CRC i powiązań bibliotek, 291/291 instancji komponentów oraz 906/906 powiązań PAD_NET, 288 jawnych footprintów PCB i 3 przypisanych przez Device, 257 bibliotek zewnętrznych i 34 osadzonych. Kod importu D4 i testy na rzeczywistych projektach już istnieją. PSU jest większy od planowanych przykładów. Nie pisać importera na nowo ani nie nakazywać powtórzenia tych samych testów. Źródła: `docs/pcb-easyeda.md`, `todo.md`, wcześniejsze wpisy `history.md`.
 
-**Użytkownik sprawdza:** porównuje rzeczywisty wielowarstwowy projekt PCB w EasyEDA z wizualizacją/wykazem: te same obwody, identyfikatory, warstwy, łączność, MPN i obsadzone footprinty; nie gubią się wewnętrzne warstwy, pady, voids i płaszczyzny. Można też wskazać jeden mały projekt z kontrolowaną geometrią oraz jeden wymagający praktyczny.
+**Granica potwierdzenia historycznego:** audyt PSU zakończył się **identity PASS**, natomiast **physical canonical UNSUPPORTED** dla pełnego PSU w ówczesnym zakresie: pusty rekord NET, biblioteki footprintów 1.3/1.7, slots i złożone wypełnienia. Jest to odrębne od 291/906: liczby potwierdzają integralność referencji, nie fizyczną łączność wszystkich sieci PSU ani jego gotowość do FDTD. Projekt `spirala.epro` przeszedł canonical/contact audit w obsługiwanym profilu. Nie przekuwać historycznego ograniczenia pełnego PSU w ogólną blokadę dalszego rozwoju ani nie rozbudowywać parsera dla nieużywanych przypadków.
 
-**Bramka:** brak niewykrytych lub przemilczanych strat topologii; nieobsługiwany rekord jasno blokuje *ten* zakres analizy. Gdy bramka nie przejdzie, nie ma sensu interpretować pól z błędnego PCB.
-
+**Wniosek operacyjny:** M0 nie wymaga nowych prac ani odbioru od użytkownika. Jeśli kiedyś konkretna analiza wykaże brak odczytanego atrybutu (np. MPN) lub nierozpoznany prymityw, naprawić wskazaną odpowiedzialność ogólnego importera tylko wtedy, gdy jest to konieczne. Nie przeprowadzać ponownego całościowego audytu PSU.
 ### M1. Materiały, komponenty, zaciski, bryły zewnętrzne i preflight
 
-**Kod:** dołożyć do wspólnego modelu profile materiałów i parametry elektryczne, mapę MPN → znany atrybut/odsyłacz (bez zgadywania modelu), ręczne parametry brakujące w `.epro`, import bryły rdzenia z kontrolą skali/umiejscowienia/kolizji, named terminal pairs, parametry źródeł i obciążeń. Pierwszy raport „co uwzględniono/co pominięto” i szacowanie kosztu siatki.
+**Kod:** wykorzystać już istniejący import i profile materiałów PCB; dołożyć tylko brakujące fizyczne parametry, zewnętrzną bryłę rdzenia z kontrolą jednostek/położenia, named terminal pairs, odpowiednie źródła i obciążenia. MPN może służyć odsyłaczowi do konkretnego modelu, ale nie należy ponownie audytować wszystkich identyfikatorów ani zgadywać parametrów. Raport „co uwzględniono/co pominięto”, z oceną kosztu siatki.
 
 **Użytkownik sprawdza:** w podglądzie geometrii potrafi wskazać oba uzwojenia i ich końce, rdzeń, szczelinę, materiał, εr/tanδ, grubość miedzi oraz ewentualne idealizacje komponentów; PREPARE-ONLY nie gubi połączeń i nie wybiera portu na podstawie MPN.
 
@@ -170,7 +169,7 @@ W GUI przed solve: orientacyjny rozmiar siatki, przestrzeń dyskowa, wymagane pa
 
 **Bramka:** rozwiązanie jest użyteczne inżyniersko i zachowuje stare anteny/raporty oraz pełną historię wyników. GUI nie dopowiada fizyki, której solver nie policzył.
 
-**Kolejność praktyczna:** po M0/M1 wykonywać M2–M4 jako rdzeń produktu, potem M5 i M6; M7 dopiero po wiarygodnych portach i wieloporcie; M8 warunkowe; M9 może mieć wczesne regresje antenowe wraz z M2, lecz pełna emisja urządzenia po M7. M10 rozwija się inkrementalnie, nie trzeba odkładać całej ergonomii do końca.
+**Kolejność praktyczna:** na bazie zrealizowanego wcześniej M0 zaczynać od M1, następnie M2–M4 jako rdzeń produktu, potem M5 i M6; M7 dopiero po wiarygodnych portach i wieloporcie; M8 warunkowe; M9 może mieć wczesne regresje antenowe wraz z M2, lecz pełna emisja urządzenia po M7. M10 rozwija się inkrementalnie, nie trzeba odkładać całej ergonomii do końca.
 
 ## 7. Ryzyka i alternatywy bez udawania wyniku
 
@@ -194,16 +193,15 @@ W GUI przed solve: orientacyjny rozmiar siatki, przestrzeń dyskowa, wymagane pa
 
 ## 8. Co jest potrzebne od użytkownika, a co nie
 
-Na start potrzebny jest **jeden reprezentatywny `.epro` z rzeczywistą strukturą wielowarstwową** (już w repozytorium są projekty, można z nich skorzystać) i możliwość porównania z EasyEDA. Do M1: wiedza o konkretnym rdzeniu, pozycjonowaniu, brakujących parametrach laminatu oraz terminalach uzwojeń. Do etapów późniejszych: karta materiału magnetycznego/εr w interesującym paśmie, schemat sterowania i obciążenia, opcjonalnie pomiary C/L/Rac, V/I, pola lub emisji. Nie potrzebujemy od razu wszystkich danych do wszystkich modeli.
+Nie jest potrzebny kolejny `.epro` do audytu importu ani ponawianie testów PSU. W repozytorium są już sprawdzone przykłady. Do M1: dla wybranego fizycznego przypadku potrzebna jest wiedza o konkretnym rdzeniu, jego pozycjonowaniu, brakujących parametrach laminatu oraz terminalach uzwojeń. Do etapów późniejszych: karta materiału magnetycznego/εr w interesującym paśmie, schemat sterowania i obciążenia, opcjonalnie pomiary C/L/Rac, V/I, pola lub emisji. Nie potrzebujemy od razu wszystkich danych do wszystkich modeli.
 
 Po każdym kamieniu milowym użytkownik otrzymuje: **konkretne wyniki, instrukcję ich obejrzenia, listę różnic i uproszczeń, status `accepted / needs-model-change / unavailable` oraz pytanie, czy zakres dokładności wystarcza do następnego kroku.** Nie oczekujemy, że „zielone” testy kodu zastąpią jego ocenę konstrukcyjną.
 
-## 9. Pierwsza następna praca, bez przepisywania solvera
+## 9. Pierwsza następna praca — M1, bez ponownego audytu importu
 
-**M0: audyt kompletności modelu kanonicznego z istniejącego importera `.epro`** — szczególnie mapowanie MPN i atrybutów, terminale/nety, wiele warstw oraz jawne braki danych potrzebnych fizyce. Jego rezultatem ma być w pełni inspectowalny projekt, nie kolejny „demo solver”. Równocześnie utrzymać historyczny tor anten i zidentyfikować referencyjny przypadek M2, a dopiero po bramce przejść do przetwarzania pól powierzchniowych M3/M4.
+**M1: modele fizyczne uzupełniające istniejący projekt PCB.** Wykorzystać dotychczasowy `.epro`, istniejące odwzorowanie komponentów, miedzi i stackupu. Dołożyć tylko to, czego konkretna analiza rzeczywiście wymaga: materiały dielektryków i magnetyków, opcjonalną zewnętrzną bryłę rdzenia z pozycjonowaniem, wskazanie elektrycznych terminali uzwojeń oraz pobudzenia i obciążenia. Pierwszy rzeczywisty odbiór użytkownika: PREPARE-ONLY i podgląd zgodności fizycznej konstrukcji, przypisanych materiałów i terminali, wraz z jawnymi uproszczeniami. Nie wykonywać na nowo audytu liczby instancji i PAD_NET dużego PSU.
 
-Nie rozpoczynać od implementowania Palace, GetDP, nowego silnika 3D ani własnego SPICE. Zanim adapter zostanie dodany, wskazać **konkretną wielkość**, której openEMS/aktualny tor nie potrafi wiarygodnie wyznaczyć, i **konkretny wynik** uzasadniający integrację.
-
+**Równoległe zobowiązanie:** zachować istniejący solver antenowy openEMS, przygotować referencję M2 i po fizycznym preflight rozwijać przywarstwowe próbki E/H/D oraz K/ρs w M3/M4. Żadnego nowego solvera wyłącznie dlatego, że istnieje; każdy adapter musi wnosić określoną brakującą wielkość i mieć ocenę wyniku.
 ## 10. Źródła zewnętrzne — punkty startowe, nie obietnice zgodności
 
 - openEMS: [field dumps i problem interpolacji Yee](https://docs.openems.de/en/latest/octave/autogenerated/CSXCAD/AddDump.html), [NF2FF](https://docs.openems.de/en/latest/concepts/nf2ff.html), [openEMS](https://openems.de/).
