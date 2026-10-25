@@ -6,9 +6,6 @@ The plot is quantitative in nominal units, but validation is NOT implied.
 from html import escape
 
 import numpy as np
-from matplotlib.figure import Figure
-from matplotlib import colormaps
-from shapely.geometry import Polygon
 
 
 def load_copper_current(path, plane, frequencies):
@@ -57,82 +54,14 @@ def current_contrast_scale(data, index, percentile=99.5):
                 count=int(magnitude.size))
 
 
-def current_figure(data, geometry, plane, index, shared_limit, *, contrast=False):
-    """Global absolute linear or local logarithmic *presentation* of the same K."""
-
-    from matplotlib.colors import Normalize, LogNorm
-    from matplotlib.cm import ScalarMappable
-
-    x, y = data['x_m'] * 1e3, data['y_m'] * 1e3
-    k = data['k'][index]
-    amplitude = np.ma.array(_magnitude(k).T,
-                            mask=~data['on_copper'].T)
-    fig = Figure(figsize=(11, 4.5), layout='constrained')
-    axes = fig.subplots(1, 2, sharex=True, sharey=True)
-    cmap = colormaps['viridis'].with_extremes(bad='#d2d5db')
-    if contrast:
-        stats = current_contrast_scale(data, index)
-        arrow_limit = stats['scale']
-        if stats['has_signal']:
-            norm = LogNorm(vmin=stats['floor'], vmax=stats['scale'], clip=True)
-            amplitude = np.ma.array(
-                np.maximum(amplitude.filled(0), stats['floor']),
-                mask=~data['on_copper'].T)
-        else:
-            norm = Normalize(vmin=0, vmax=1)
-    else:
-        arrow_limit = shared_limit
-        norm = Normalize(vmin=0.0, vmax=max(shared_limit, 1e-30))
-    gx, gy = np.meshgrid(x, y)
-    # At most 20x20 arrows, display-only thinning; NPZ remains full resolution.
-    ix = np.unique(np.linspace(0, len(x)-1, min(len(x), 20), dtype=int))
-    iy = np.unique(np.linspace(0, len(y)-1, min(len(y), 20), dtype=int))
-    px, py = np.meshgrid(x[ix], y[iy])
-    from shapely.geometry import Point
-    polys = [Polygon(c['vertices_xy_m'], c.get('holes_xy_m', ()))
-             for c in geometry['copper']
-             if c['layer_role'] == plane['layer_role'] and
-             abs(c['z_m'] - plane['z_m']) <= 1e-12]
-    for ax, phase in zip(axes, (0, 90)):
-        ax.pcolormesh(gx, gy, amplitude, norm=norm, cmap=cmap, shading='nearest',
-                      rasterized=True)
-        for poly in polys:
-            if poly.is_empty:
-                continue
-            for ring in (poly.exterior, *poly.interiors):
-                boundary = np.asarray(ring.coords) * 1e3
-                ax.plot(boundary[:, 0], boundary[:, 1],
-                        linewidth=.6, color='#252525')
-        samples = k[:, np.ix_(ix, iy)[0], np.ix_(ix, iy)[1]]
-        # Equivalent to np.real(K*exp(j phase)): no rescaling between snapshots.
-        instant = (samples.real * np.cos(np.deg2rad(phase)) -
-                   samples.imag * np.sin(np.deg2rad(phase)))
-        u = instant[0].T.copy()
-        v = instant[1].T.copy()
-        valid = data['on_copper'][np.ix_(ix, iy)].T
-        u[~valid] = np.nan
-        v[~valid] = np.nan
-        ax.quiver(px, py, u, v, color='#151515', angles='xy', scale_units='width',
-                  scale=max(arrow_limit, 1e-30)*26, width=.003)
-        ax.set(xlabel='X [mm]', ylabel='Y [mm]',
-               title=f'Wektor K — faza {phase}°')
-        ax.set_aspect('equal', adjustable='box')
-    fig.colorbar(ScalarMappable(norm=norm, cmap=cmap), ax=list(axes),
-                 label=('|K|, log p99,5 [A/m / 1 V port]'
-                        if contrast and stats['has_signal'] else
-                        '|K| estymowane [A/m / 1 V port]'))
-    view_label = ('lokalny kontrast (tylko prezentacja) · niewalidowany'
-                  if contrast else 'wspólna skala · niewalidowany')
-    fig.suptitle(f"Warstwa {plane['layer_role']} · "
-                 f"{data['frequency_hz'][index] / 1e6:g} MHz · {view_label}")
-    return fig
-
-
 def pcb_current_section(data, figure_image, plots_path):
-    """Only local-contrast phase playback: one PNG each 15°, per Cu layer/f."""
-    from .pcb_current_frames import (
-        PHASES_DEG, PLAYER_CSS, PLAYER_JS, png_phase_player)
+    """One collapsible GIF per modeled copper layer and frequency.
+
+    The figure_image argument is kept for the existing report hook;
+    GIF encoding is handled by the current-frame module instead.
+    """
     from antenna_lab.pcb.postprocess import read_json
+    from .pcb_current_frames import gif_phase_image, PHASES_DEG
 
     root = data['root']
     metadata = read_json(root / 'currents/metadata.json')
@@ -146,50 +75,47 @@ def pcb_current_section(data, figure_image, plots_path):
         root / 'currents' / (plane['name'] + '.npz'), plane, frequencies))
         for plane in metadata['planes']]
 
-    body = ('<section class="panel"><h2>Gęstość prądu na miedzi — animacja fazowa</h2>'
+    body = ('<section class="panel"><h2>Gęstość prądu na miedzi — animacja GIF</h2>'
             '<p><strong>Wynik niezweryfikowany ilościowo.</strong> '
-            'Estymata K pochodzi z rot(H) na modelowanym sheetcie miedzi '
-            'pomnożonego przez szerokość lokalnej komórki dualnej Yee. '
-            'Nie przedstawia osobnych powierzchni folii, strat AC ani '
-            'gęstości prądu objętościowego.</p>'
-            '<p><strong>Wyłącznie kontrast lokalny.</strong> Kolor PNG '
-            'oznacza chwilowy moduł wektora '
-            '|K(t)| = |Re(K · exp(jφ))|, a strzałki jego kierunek. '
-            'Klatki 0°–345° co 15° są obliczone ze zarchiwizowanych '
-            'zespolonych próbek i odtwarzane przez Play/Pause. '
-            'Skala logarytmiczna jest niezmienna podczas całego cyklu '
-            'danej warstwy i częstotliwości: jej górny próg to p99,5 '
-            'dodatnich wartości modułu fazora (obwiednia zespolona), '
-            'nie percentyl liczony od nowa na każdej klatce. '
-            'Przekroczenia nasycają barwę, a wartości poniżej dolnego '
-            'progu przyjmują najciemniejszy kolor; poza miedzią szaro. '
-            'Skal lokalnych NIE wolno używać do porównywania jasności '
-            'między warstwami ani częstotliwościami. '
+            'Estymata K pochodzi z rot(H) na modelowanej miedzi '
+            'pomnożonego przez szerokość komórki dualnej Yee. '
+            'Nie przedstawia osobno obu stron folii, strat AC ani '
+            'rozkładu objętościowego J.</p>'
+            '<p><strong>Tylko kontrast lokalny.</strong> '
+            'Każdy GIF przedstawia 24 fazy (0°–345° co 15°). '
+            'Kolor to moduł chwilowego wektora '
+            '|K(t)| = |Re(K · exp(jφ))|, a strzałki wskazują kierunek. '
+            'Skala logarytmiczna jest stała przez cały cykl dla danej '
+            'warstwy i częstotliwości, wyznaczona z percentyla p99,5 '
+            'dodatnich wartości obwiedni zespolonej. '
+            'Wartości powyżej limitu są nasycone kolorem. '
+            'Jasności NIE są porównywalne między warstwami '
+            'ani częstotliwościami. '
             'Normalizacja: 1∠0 V na porcie; nie 1 W. '
-            'Dane NPZ/HDF5 pozostają bez zmian.</p>')
+            'Każda animacja jest osadzona w zwijanej sekcji HTML. '
+            'Zachowano surowe NPZ/HDF5, bez powtórnego FDTD.</p>')
     if not records:
         body += '<p>Brak danych dla obsadzonych warstw miedzi.</p>'
     for layer_idx, (plane, record) in enumerate(records):
-        for index, f in enumerate(frequencies):
-            title = f"{plane['layer_role']} · {f/1e6:g} MHz"
+        for index, frequency in enumerate(frequencies):
+            label = f"{plane['layer_role']} · {frequency/1e6:g} MHz"
             stats = current_contrast_scale(record, index)
             body += ('<details' +
                      (' open' if layer_idx == 0 and index == 0 else '') +
-                     '><summary>Kontrast lokalny · ' + escape(title) +
-                     ' (24 PNG / pełny obrót)</summary>'
+                     '><summary>Kontrast lokalny · ' + escape(label) +
+                     ' (GIF, 24 klatki po 15°)</summary>'
                      '<p>Maksimum modułu fazora: ' +
                      f"{stats['actual_peak']:.6g}" +
-                     ' A/m / 1 V; niezmienny próg koloru p99,5: ' +
+                     ' A/m / 1 V; stały próg kontrastu p99,5: ' +
                      f"{stats['scale']:.6g}" +
-                     ' A/m / 1 V. Statystyki dotyczą zespolonej obwiedni, '
+                     ' A/m / 1 V. Statystyka dotyczy obwiedni zespolonej, '
                      'nie chwilowej klatki.</p>')
-            body += png_phase_player(
-                record, data['geometry'], plane, index, stats,
-                figure_image, plots_path)
+            body += gif_phase_image(
+                record, data['geometry'], plane, index, stats, plots_path)
             body += '</details>'
     for missing in metadata.get('empty_layers', ()):
         body += ('<p>Brak modelowanej miedzi na warstwie ' +
                  escape(str(missing['layer_role'])) + '.</p>')
     for name, reason in metadata.get('failed_planes', {}).items():
         body += '<p>Brak danych ' + escape(name) + ': ' + escape(reason) + '</p>'
-    return PLAYER_CSS + body + '</section>' + PLAYER_JS
+    return body + '</section>'
