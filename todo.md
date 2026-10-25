@@ -1,6 +1,10 @@
 # TODO — PCB: aktualny stan i następne kroki
 
-## Bieżący eksperyment — stripline4: prąd powierzchniowy, status PARTIAL
+## Wynik testów przekazany przez użytkownika — 2026-10-25
+
+**PASS 4/4**, `Ran 4 tests in 0.163s; OK` dla `test_pcb_currents.py` na Windows użytkownika. Ostrzeżenie Matplotlib (`set_bad`) nie dotyczyło fizyki i zostało usunięte w kodzie przez `with_extremes` — jeszcze nieprzetestowane lokalnie po poprawce. **Następna porcja: PREPARE-ONLY `gerbs/stripline4/stripline4.epro`** po synchronizacji repozytorium, z materiałami i PTH jawnie wybranymi. Nie uruchamiać FDTD przed oceną przygotowanego modelu. Wyniki fizyczne nadal niezweryfikowane.
+
+
 
 **Kod zapisany:** osobny wielowarstwowy dump `rot(H)`, dane zespolone `K_est` w [A/m / 1V], GUI `--surface-current` i checkbox, opcjonalna sekcja raportu HTML, bez wpływu na wcześniejsze FDTD i anteny. Każda część ma oddzielny checkpoint. **Nie ma jeszcze natywnego wyniku FDTD ani oceny numerycznej**; stąd `K_est` oznaczone `unverified`, bez deklaracji prawdziwych strat AC lub rozdzielenia prądu obu stron folii.
 

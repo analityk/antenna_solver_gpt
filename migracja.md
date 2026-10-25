@@ -11,7 +11,13 @@
 **Potwierdzony opublikowany checkpoint przed aktualizacją:** `8bef03fc42ac774e6051a5325ccb3ce7832cf83d`
 **Uwaga:** ten SHA jest punktem historycznym, nie obietnicą, że nadal jest HEAD. Każde wznowienie rozpoczyna się sprawdzeniem Git.
 
-## 2026-10-25 — stripline4: pierwszy tor map prądu na miedzi (etapy 1–4, NATIVE OPEN)
+## 2026-10-25 — stripline4: odbiór testów offline przez użytkownika (4/4 PASS)
+
+**Rzeczywisty wynik z CMD na Windows użytkownika:** `python.exe -X utf8 -m unittest discover -s tests -p test_pcb_currents.py -v` — 4 testy przeszły (`Ran 4 tests in 0.163s; OK`): pięć warstw i dualny Yee-width, natywny dump `rot(H)`, błąd sheetu poza siatką, konwersja/maska/HTML. Jeden `PendingDeprecationWarning` Matplotlib dotyczył `cmap.set_bad` w `visualization/pcb_currents.py`; zastąpiono wywołaniem `colormaps['viridis'].with_extremes(bad=...)` w osobnym małym commicie, **zamieniony fragment wymaga następnego pobrania kodu**. Zalogowane testy potwierdzają poprzedni kod; nie deklarować, że nowa wersja jest już przetestowana.
+
+**Co dalej:** PREPARE-ONLY rzeczywistego `gerbs/stripline4/stripline4.epro` po `git pull --ff-only`, z jawnymi εr/tanδ i platingiem PTH, jeśli wymagany; sprawdzić status i liczbę płaszczyzn/parametry modelu. Nie uruchomiono jeszcze FDTD; brak realnej mapy prądu i walidacji fizycznej K. Tego nie wolno mylić z PASS syntetycznych testów.
+
+
 
 **Prośba użytkownika:** dla rzeczywistego `gerbs/stripline4/stripline4.epro` uzyskać rozkład gęstości prądu na miedzi. Pracować **porcjami, osobne commity i punkty odbioru**, nie przebudowywać równocześnie GUI/solverów/reportów. Inspekcja rzeczywistych bajtów ZIP wykazała 4 fizyczne warstwy miedzi (TOP / Inner1 / Inner2 / BOTTOM), 3 dielektryki ID 361–363 bez zdefiniowanych poprawnych εr, 5 netów TX/GND/+5V/3V/1V, 8 komponentów, 10 VIA. Nie zgadywać εr/tanδ, ani plating PTH.
 

@@ -50,8 +50,7 @@ def current_figure(data, geometry, plane, index, shared_limit):
                             mask=~data['on_copper'].T)
     fig = Figure(figsize=(11, 4.5), layout='constrained')
     axes = fig.subplots(1, 2, sharex=True, sharey=True)
-    cmap = colormaps['viridis'].copy()
-    cmap.set_bad('#d2d5db')
+    cmap = colormaps['viridis'].with_extremes(bad='#d2d5db')
     norm = Normalize(vmin=0.0, vmax=max(shared_limit, 1e-30))
     gx, gy = np.meshgrid(x, y)
     # At most 20x20 arrows, display-only thinning; NPZ remains full resolution.
