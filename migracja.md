@@ -11,6 +11,14 @@
 **Potwierdzony opublikowany checkpoint przed aktualizacją:** `8bef03fc42ac774e6051a5325ccb3ce7832cf83d`
 **Uwaga:** ten SHA jest punktem historycznym, nie obietnicą, że nadal jest HEAD. Każde wznowienie rozpoczyna się sprawdzeniem Git.
 
+## 2026-10-26 — odbiór GIF stripline4: implementacja w raporcie, następny krok Windows
+
+**Akceptacja formatu od użytkownika:** pokazany prawdziwy `stripline4_1GHz_all_layers.gif` (4 warstwy, 24 fazy po 15°) został odebrany pozytywnie; użytkownik zatwierdził **tylko GIF** w raporcie, zamiast wcześniejszych 192 PNG z suwakiem. Obecny kod w `main` generuje dokładnie **1 osadzony GIF na parę miedź/f**, np. 8 GIF-ów dla `stripline4_004` (4 warstwy × 1/2 GHz). Każdy GIF ma 24 klatki co 15°, jest zapętlony i osadzony jako `data:image/gif;base64` w niezależnym natywnym `<details><summary>` z „dziubkiem” po lewej. Raport prądów pokazuje **wyłącznie kontrast log-p99,5** i wektory chwilowego K, bez PNG-playera, suwaka, JS, Play/Pause lub map liniowych. Skala jest stała w całym cyklu jednej warstwy/f, paleta kolorów też stała; różne warstwy/f mają własne skale. Kod antenty i E/H nienaruszony. Pillow deklarowane jawnie w `pyproject.toml`.
+
+**Wykonane checkpointy Git:** `f62e3a0` (kod GIF i details), `567af0e` (regresja kodowania GIF, 24 klatek, niezmiennej pętli i zależność). Nie nadpisano `currents/*.npz` ani natywnych HDF5; nie wykonano FDTD. Prosty lokalny test Pillow pokazał 24-klatkowy GIF z zapisaną pętlą i 180 ms, ale **pełny `unittest` projektu po zmianie nie jest jeszcze potwierdzony na Windows**. Walidacja fizyczna K pozostaje **UNVERIFIED**; `tanδ=1.001` i brak `openEMS_stats.txt` są odrębne.
+
+**Jedyna najbliższa bramka:** `git pull --ff-only`, `.\\.venv\\Scripts\\python.exe -X utf8 -m unittest discover -s tests -p test_pcb_currents.py -v`, następnie wyłącznie ponowne `antenna_lab report outcomes\\pcb_easyeda\\stripline4_004 --phase-step 15 --open` bez FDTD. Należy potwierdzić końcowy HTML zawiera osiem zwijanych sekcji GIF; jeśli błąd, utrwalić traceback i poprawić bez naruszania solvera. Starą kartę „PNG 15°” poniżej traktować jako **historię, nie aktualne wymaganie**.
+
 ## 2026-10-25 — animacja prądu K na wszystkich warstwach, PNG 15° (punkt wznowienia)
 
 **Aktualna decyzja użytkownika (nadrzędna dla raportu):** kolor animacji pokazuje moduł K, klatki są **PNG**, w raportach prądu pozostaje **wyłącznie lokalny kontrast**, bez globalnego liniowego wykresu. Dla odtworzenia ruchu przyjęto **moduł chwilowy** `|K(t)| = |Re(K·exp(+jφ))|` plus wektory kierunku; nie stałą fazową obwiednię. Każda warstwa i częstotliwość ma 24 klatki `0°…345°` co 15°, suwak, **Play/Pause** i niezależny odtwarzacz. Skala lokalna log-p99,5 jest zamrożona dla danego widoku na cały obrót. Obrazy PNG osadzane są w samodzielnym HTML, nie canvas i bez przeliczania JS; typowo dla `stripline4_004` będzie **192 PNG** (4 warstwy × 2 częstotliwości × 24 fazy). Nie wprowadzono limitu 4 warstw.

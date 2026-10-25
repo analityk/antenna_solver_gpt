@@ -175,8 +175,12 @@ faz danej planszy/częstotliwości. Domyślnie `--field-view active+geometry`,
 Kontrakt progów, fallbacków i pozostałych trybów: [fields.md](fields.md#roi-raportów-pcb--bez-nowych-obliczeń).
 Opcje zmieniają wyłącznie raport; zapisane NPZ/HDF5 pozostają nietknięte.
 
-## PCB: animacja prądu na miedzi w samodzielnym HTML
+## PCB: animowane GIF-y prądu na miedzi w samodzielnym HTML (2026-10-26)
 
-Na życzenie użytkownika raport PCB używa dla `currents/*.npz` **tylko kontrastowej animacji fazowego modułu |K(t)|**, po 24 klatki PNG na każdy zestaw warstwa/częstotliwość. Przyciski **Play/Pause**, suwak co 15° i czas klatki działają offline. Wszystkie klatki są osadzone wewnątrz HTML (`data:image/png;base64`); nie ma `canvas` ani powtórnego solvera. Wiele warstw oraz częstotliwości tworzy niezależne odtwarzacze; nie ma limitu 4 warstw. Statyczne linear/globalne mapy K są ukryte (niegenerowane) w nowym raporcie, także gdy historyczne PNG leżą na dysku. Pliki NPZ/HDF5 nie są zmieniane. Raport może być duży, bo zawiera komplet PNG; stare widoki antenowe i pola E/H nadal zachowują swoje metody prezentacji.
+**Obecna implementacja zgodna z akceptacją użytkownika:** wyłącznie **GIF** z kontrastowym rozkładem `|K(t)|=|Re(K exp(jφ))|`, po jednym na warstwę miedzi i częstotliwość. Każdy GIF ma 24 klatki z odstępem 15°, 180 ms na klatkę, nieskończoną pętlę oraz obrys i kierunki wektora z zapisanej geometrii PCB. Nie ma sterowania suwakami, Play/Pause, indywidualnych PNG ani widoku liniowego. Każdy GIF znajduje się we własnym `<details><summary>...` — standardowy „dziubek” służy do rozwijania i zwijania. Pierwsza sekcja jest domyślnie otwarta.
 
-Zobacz [docs/pcb-current-maps.md](pcb-current-maps.md). Ilościowa wiarygodność K pozostaje niepotwierdzona, dane `tanδ=1.001` dla `stripline4_004` wymagają decyzji materiałowej przed nowym solverem.
+Animacje są osadzane w samodzielnym offline HTML jako `data:image/gif;base64`; przy automatycznym raporcie plik jest również zapisywany do `plots/current_phase_*.gif`. Do kodowania i spójnej palety barw używany jest Pillow. Jedna stała logarytmiczna skala kontrastu dla całego cyklu danej pary warstwa/częstotliwość, z p99,5 obwiedni zespolonej; skal nie porównujemy między różnymi warstwami. Żadnej kolejnej symulacji FDTD ani zmian `currents/*.npz` / natywnych HDF5. Raport standardowego `antenna_lab report` można wyrenderować ponownie z ukończonego przebiegu.
+
+**Ograniczenia:** GIF ma najwyżej 256 kolorów i sam zapętla się bez kontroli pojedynczej fazy. To prezentacja diagnostycznego `K_est` z `rot(H)`, nadal niewalidowanego fizycznie. Dla `stripline4_004` wejściowe `tanδ=1.001` wymaga sprawdzenia przed ewentualnym kolejnym przebiegiem. Antenowy raport oraz osobny odtwarzacz E/H pozostają bez zmian.
+
+Szczegóły: [pcb-current-maps.md](pcb-current-maps.md).

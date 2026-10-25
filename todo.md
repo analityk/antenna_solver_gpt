@@ -1,6 +1,10 @@
 # TODO — PCB: aktualny stan i następne kroki
 
-## stripline4_004 — animacja PNG co 15° zamiast statycznej mapy (NOWY PRIORYTET)
+## stripline4_004: GIF w raporcie PCB (bieżący odbiór 2026-10-26)
+
+Format GIF na realnych próbkach zaakceptowany przez użytkownika. **Nowy raport**: jeden animowany, zapętlony GIF 24×15° na każdą parę miedź/f w zwijanym `<details><summary>`, stały kontrast lokalny, kolor `|Re(K·exp(jφ))|`, kierunek przez strzałki. **Bez** dawnych odtwarzaczy PNG, suwaka, Play/Pause czy liniowych map. `stripline4_004` daje **8 GIF-ów** z niezmienionych NPZ; nie powtarzamy FDTD. Commity `f62e3a0`, `567af0e` już opublikowane; Pillow deklarowane. **Najbliższe:** odbiór Windows unittest i samodzielnego `antenna_lab report` dla `stripline4_004`; potwierdzić osadzenie, pętlę i zwijanie GIF. Nie deklarować PASS lokalnego Windows ani zweryfikowanej fizyki K przed sprawdzeniem. `tanδ=1.001` i brak `openEMS_stats.txt` to osobne ryzyka.
+
+## stripline4_004 — animacja PNG co 15° zamiast statycznej mapy (HISTORYCZNE, ZASTĄPIONE GIF)
 
 Zgodnie z decyzją użytkownika raport prądu pokazuje wyłącznie lokalny kontrast `|K(t)|` ze zmianą barw i strzałek w każdej fazie, jako **24 PNG / 360° / warstwa i częstotliwość**, suwak oraz Play/Pause. Dla dotychczasowego przebiegu 4 × 2 = 8 odtwarzaczy = **192 PNG**, bez nowego FDTD. Wbudowany HTML offline; brak globalnych map liniowych. **Kody już opublikowane:** `be3f719`, `da5c3db`; fizyka K wciąż niewalidowana, dane NPZ pozostały niezmienione. Przetestowano lokalnie cztery rzeczywiste NPZ, pojedynczy PNG i pełny podgląd **8 odtwarzaczy / 192 PNG** w Chromium: Play/Pause, suwak, pojedyncza widoczna klatka i zmieniający się z fazą obraz, PASS. **Następny odbiór:** Windows unittest i wygenerowanie samego raportu `stripline4_004` z już zachowanych danych, ocena przycisku i 24 faz każdej warstwy. Nie powtarzać FDTD. Uwaga na `tanδ=1.001` i niepotwierdzoną konwergencję raportową bez `openEMS_stats.txt`.
 
