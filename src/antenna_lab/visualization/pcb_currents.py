@@ -129,8 +129,11 @@ def current_figure(data, geometry, plane, index, shared_limit, *, contrast=False
 
 
 def pcb_current_section(data, figure_image, plots_path):
-    from pathlib import Path
+    """Only local-contrast phase playback: one PNG each 15°, per Cu layer/f."""
+    from .pcb_current_frames import (
+        PHASES_DEG, PLAYER_CSS, PLAYER_JS, png_phase_player)
     from antenna_lab.pcb.postprocess import read_json
+
     root = data['root']
     metadata = read_json(root / 'currents/metadata.json')
     if (metadata.get('schema_version') != 1 or
@@ -143,68 +146,50 @@ def pcb_current_section(data, figure_image, plots_path):
         root / 'currents' / (plane['name'] + '.npz'), plane, frequencies))
         for plane in metadata['planes']]
 
-    # Common absolute scale across all layers and frequencies.
-    peaks = []
-    for _plane, record in records:
-        for k in record['k']:
-            amplitude = _magnitude(k)
-            valid = amplitude[record['on_copper']]
-            if valid.size:
-                peaks.append(float(valid.max()))
-    limit = max(peaks, default=0.0)
-    body = ('<section class="panel"><h2>Gęstość prądu na miedzi — mapa diagnostyczna</h2>'
+    body = ('<section class="panel"><h2>Gęstość prądu na miedzi — animacja fazowa</h2>'
             '<p><strong>Wynik niezweryfikowany ilościowo.</strong> '
-            'openEMS zapisuje rot(H) [A/m²] na płaszczyźnie miedzi; '
-            'przeliczenie przez lokalną szerokość komórki dualnej daje '
-            'estymatę wypadkowego K [A/m] na sheetcie PEC/conducting sheet. '
-            'Nie jest to pomiar osobnych prądów obu fizycznych stron '
-            'folii, rozkład J przez jej grubość ani obliczenie strat AC. '
-            'Punkty przy portach, krawędziach i przelotkach wymagają '
-            'kontroli zbieżności i warunków brzegowych.</p>'
-            '<p>Kolory pierwszej mapy: moduł wektora K, wspólna liniowa '
-            'skala dla wszystkich warstw i częstotliwości. Dodatkowa mapa '
-            'stosuje skalę logarytmiczną i percentyl 99,5 dodatnich wartości '
-            'na danej warstwie i częstotliwości, z obcięciem ekstremów. '
-            'Jej barwy i długości strzałek NIE służą do porównań '
-            'bezwzględnych między warstwami. Strzałki: '
-            'chwilowy kierunek i wartość w fazach 0°/90°. '
-            'Źródło: 1∠0 V na porcie (nie 1 W). Szare: poza rzeczywistą '
-            'powierzchnią miedzi. Surowe HDF5 i pełne NPZ '
-            'pozostają zachowane.</p>')
+            'Estymata K pochodzi z rot(H) na modelowanym sheetcie miedzi '
+            'pomnożonego przez szerokość lokalnej komórki dualnej Yee. '
+            'Nie przedstawia osobnych powierzchni folii, strat AC ani '
+            'gęstości prądu objętościowego.</p>'
+            '<p><strong>Wyłącznie kontrast lokalny.</strong> Kolor PNG '
+            'oznacza chwilowy moduł wektora '
+            '|K(t)| = |Re(K · exp(jφ))|, a strzałki jego kierunek. '
+            'Klatki 0°–345° co 15° są obliczone ze zarchiwizowanych '
+            'zespolonych próbek i odtwarzane przez Play/Pause. '
+            'Skala logarytmiczna jest niezmienna podczas całego cyklu '
+            'danej warstwy i częstotliwości: jej górny próg to p99,5 '
+            'dodatnich wartości modułu fazora (obwiednia zespolona), '
+            'nie percentyl liczony od nowa na każdej klatce. '
+            'Przekroczenia nasycają barwę, a wartości poniżej dolnego '
+            'progu przyjmują najciemniejszy kolor; poza miedzią szaro. '
+            'Skal lokalnych NIE wolno używać do porównywania jasności '
+            'między warstwami ani częstotliwościami. '
+            'Normalizacja: 1∠0 V na porcie; nie 1 W. '
+            'Dane NPZ/HDF5 pozostają bez zmian.</p>')
     if not records:
-        body += '<p>Nie zapisano prądu dla żadnej obsadzonej warstwy.</p>'
+        body += '<p>Brak danych dla obsadzonych warstw miedzi.</p>'
     for layer_idx, (plane, record) in enumerate(records):
         for index, f in enumerate(frequencies):
             title = f"{plane['layer_role']} · {f/1e6:g} MHz"
-            fig = current_figure(record, data['geometry'], plane, index, limit)
-            path = (Path(plots_path) /
-                    f"current_{plane['name']}_{index}.png") if plots_path else None
-            body += ('<details'+(' open' if layer_idx == 0 and index == 0 else '')+
-                     '><summary>'+escape(title)+'</summary>')
-            body += figure_image(fig, title, path) + '</details>'
-            fig.clear()
             stats = current_contrast_scale(record, index)
-            body += ('<details><summary>Kontrast lokalny · ' + escape(title) +
-                     ' (log, p99,5)</summary>'
-                     '<p>Maksimum bezwzględne: ' +
+            body += ('<details' +
+                     (' open' if layer_idx == 0 and index == 0 else '') +
+                     '><summary>Kontrast lokalny · ' + escape(title) +
+                     ' (24 PNG / pełny obrót)</summary>'
+                     '<p>Maksimum modułu fazora: ' +
                      f"{stats['actual_peak']:.6g}" +
-                     ' A/m / 1 V; granica koloru p99,5: ' +
+                     ' A/m / 1 V; niezmienny próg koloru p99,5: ' +
                      f"{stats['scale']:.6g}" +
-                     ' A/m / 1 V; nasycone: ' +
-                     str(stats['clipped']) + ' / ' +
-                     str(stats['count']) +
-                     ' próbek. Bez przeliczenia pierwotnych fazorów.</p>')
-            fig_contrast = current_figure(record, data['geometry'],
-                                          plane, index, limit, contrast=True)
-            contrast_path = (Path(plots_path) /
-                             f"current_contrast_{plane['name']}_{index}.png"
-                             ) if plots_path else None
-            body += figure_image(fig_contrast, 'Kontrast '+title,
-                                 contrast_path) + '</details>'
-            fig_contrast.clear()
+                     ' A/m / 1 V. Statystyki dotyczą zespolonej obwiedni, '
+                     'nie chwilowej klatki.</p>')
+            body += png_phase_player(
+                record, data['geometry'], plane, index, stats,
+                figure_image, plots_path)
+            body += '</details>'
     for missing in metadata.get('empty_layers', ()):
-        body += ('<p>Brak modelowanej miedzi na warstwie '+
-                 escape(str(missing['layer_role']))+'.</p>')
+        body += ('<p>Brak modelowanej miedzi na warstwie ' +
+                 escape(str(missing['layer_role'])) + '.</p>')
     for name, reason in metadata.get('failed_planes', {}).items():
-        body += '<p>Brak danych '+escape(name)+': '+escape(reason)+'</p>'
-    return body+'</section>'
+        body += '<p>Brak danych ' + escape(name) + ': ' + escape(reason) + '</p>'
+    return PLAYER_CSS + body + '</section>' + PLAYER_JS

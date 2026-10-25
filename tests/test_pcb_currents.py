@@ -3,6 +3,7 @@
 These tests check implementation contracts, not physical openEMS validation.
 """
 from pathlib import Path
+from io import BytesIO
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 import unittest
@@ -16,8 +17,10 @@ from antenna_lab.pcb.model import CopperLayer, CopperPolygon
 from antenna_lab.solvers.pcb_currents import (
     pcb_current_layout, install_pcb_currents, finish_pcb_currents)
 from antenna_lab.visualization.pcb_currents import (
-    load_copper_current, pcb_current_section, current_contrast_scale,
-    current_figure)
+    load_copper_current, pcb_current_section, current_contrast_scale)
+from antenna_lab.visualization.pcb_current_frames import (
+    PHASES_DEG, current_at_phase, frame_figure, png_phase_player,
+    PLAYER_JS)
 
 
 F = 1e9
@@ -121,33 +124,57 @@ class CopperCurrentTests(unittest.TestCase):
                 ((2+3j) * scale * layer['dual_width_m']).real)
             self.assertTrue(
                 np.isnan(record['k'][0, 0, 0, 0].real))
-            body = pcb_current_section(
-                dict(root=path, geometry=dict(copper=[
-                    dict(vertices_xy_m=list(p.vertices_xy_m),
-                         holes_xy_m=(), z_m=p.z_m,
-                         layer_role=p.layer_role)
-                    for p in g.copper])),
-                lambda fig, description, path=None: '<img alt="mapa prądu">',
-                None)
+            with patch('antenna_lab.visualization.pcb_current_frames.frame_figure') as figure:
+                figure.return_value = SimpleNamespace(clear=lambda: None)
+                body = pcb_current_section(
+                    dict(root=path, geometry=dict(copper=[
+                        dict(vertices_xy_m=list(p.vertices_xy_m),
+                             holes_xy_m=(), z_m=p.z_m,
+                             layer_role=p.layer_role)
+                        for p in g.copper])),
+                    lambda fig, description, path=None: '<img alt="mapa prądu">',
+                    None)
+                self.assertEqual(figure.call_count, 24)
             self.assertIn('top', body)
             self.assertIn('Gęstość prądu', body)
             self.assertIn('niezweryfikowany', body)
             self.assertIn('Kontrast lokalny', body)
+            self.assertIn('class="pcb-current-player"', body)
+            self.assertEqual(body.count('class="pcb-current-frame"'), 24)
+            self.assertIn('class="pcb-current-play"', body)
+            self.assertIn('class="pcb-current-slider"', body)
+            self.assertIn('setInterval', body)
+            self.assertNotIn('wspólna skala', body)
             stats = current_contrast_scale(record, 0)
             self.assertTrue(stats['has_signal'])
             self.assertGreater(stats['actual_peak'], 0)
             self.assertLessEqual(stats['scale'], stats['actual_peak'])
-            geometry = dict(copper=[dict(
-                vertices_xy_m=list(p.vertices_xy_m), holes_xy_m=(),
-                z_m=p.z_m, layer_role=p.layer_role) for p in g.copper])
-            fig_linear = current_figure(
-                record, geometry, layer, 0, 1.0, contrast=False)
-            self.assertIn('wspólna skala', fig_linear._suptitle.get_text())
-            fig_linear.clear()
-            fig_local = current_figure(
-                record, geometry, layer, 0, 1.0, contrast=True)
-            self.assertIn('lokalny kontrast', fig_local._suptitle.get_text())
-            fig_local.clear()
+            outlines = []
+            fig0 = frame_figure(record, layer, 0, 0, stats, outlines)
+            fig90 = frame_figure(record, layer, 0, 90, stats, outlines)
+            a0 = np.asarray(fig0.axes[0].collections[0].get_array())
+            a90 = np.asarray(fig90.axes[0].collections[0].get_array())
+            self.assertFalse(np.array_equal(a0, a90))
+            out = BytesIO()
+            fig90.savefig(out, format='png', dpi=80)
+            self.assertTrue(out.getvalue().startswith(bytes((137, 80, 78, 71))))
+            fig0.clear()
+            fig90.clear()
+
+    def test_phase_modulus_and_direction_from_complex_phasor(self):
+        phasor = np.array([[[1.0+0j]], [[0+2.0j]]])
+        a0, m0 = current_at_phase(phasor, 0)
+        a90, m90 = current_at_phase(phasor, 90)
+        a180, m180 = current_at_phase(phasor, 180)
+        self.assertEqual(tuple(PHASES_DEG), tuple(range(0, 360, 15)))
+        self.assertEqual(len(PHASES_DEG), 24)
+        self.assertAlmostEqual(m0[0, 0], 1.0)
+        self.assertAlmostEqual(m90[0, 0], 2.0)
+        self.assertAlmostEqual(m180[0, 0], 1.0)
+        self.assertAlmostEqual(a180[0, 0, 0], -a0[0, 0, 0])
+        self.assertAlmostEqual(a90[1, 0, 0], -2.0)
+        self.assertIn('frame.hidden=i!==idx', PLAYER_JS)
+        self.assertIn('clearInterval(interval)', PLAYER_JS)
 
     def test_no_silent_off_grid_sheet(self):
         g, mesh, settings = fixture()
