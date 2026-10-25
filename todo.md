@@ -1,5 +1,9 @@
 # TODO — PCB: aktualny stan i następne kroki
 
+## stripline4_004: wizualizacja raportu przyjęta (2026-10-25)
+
+Z otrzymanego `stripline4_004__003.html` potwierdzono **16 zapisanych wykresów K_est (4 warstwy × 2 częstotliwości × 2 style)**, brak wyjątku TypeError i czytelne lokalne rozkłady prądu. **VISUAL PASS**, ale `K_est` nadal **UNVERIFIED**; brak dostarczonych NPZ uniemożliwia sprawdzenie prądu z całek i faz. Następna porcja, bez FDTD: odczytać `currents/metadata.json` i `currents/*.npz` z ukończonego `stripline4_004`, sprawdzić amplitudy/wektory oraz metodę względem jednostronnych H; odrębnie wyjaśnić brak `openEMS_stats.txt`. Zwrócić uwagę na **tanδ=1.001** dla trzech dielektryków przed ewentualnym kolejnym solve. Zapisana starsza instrukcja ponawiania raportu niżej jest już wykonana.
+
 ## PILNE: hotfix TypeError w raporcie (2026-10-25)
 
 Zgłoszony rzeczywisty regresyjny wyjątek `TypeError: 'str' object is not callable` w `pcb_currents.py`, `fig.suptitle` po dodaniu lokalnego kontrastu. Kod poprawiony przez jawny `view_label`, test weryfikuje tytuł obu trybów. **Wymagany odbiór na Windows:** aktualizacja, cztery testy prądu, potem samo generowanie raportu `stripline4_004` (bez nowego FDTD). Brak zmiany modelu i danych.

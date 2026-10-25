@@ -11,6 +11,16 @@
 **Potwierdzony opublikowany checkpoint przed aktualizacją:** `8bef03fc42ac774e6051a5325ccb3ce7832cf83d`
 **Uwaga:** ten SHA jest punktem historycznym, nie obietnicą, że nadal jest HEAD. Każde wznowienie rozpoczyna się sprawdzeniem Git.
 
+## 2026-10-25 — stripline4_004: nowy HTML po hotfiksie, odbiór map (VISUAL PASS)
+
+**Dostarczony dowód:** użytkownik przesłał `stripline4_004__003.html`, wygenerowany z rzeczywistego `stripline4_004` po naprawie TypeError (`68db056`). W kompletnym pliku HTML stwierdzono: **16 obrazów prądu** (TOP, Inner1, Inner2, BOTTOM × 1 GHz / 2 GHz × globalna skala liniowa / kontrast lokalny log-p99,5), wszystkie osiem sekcji `Kontrast lokalny`, bez tracebacku. Wynik **akceptacji wizualizacji: PASS**; kod testów po hotfiksie nie był ponownie potwierdzony w osobnym logu unittest i **nie jest równoznaczny z walidacją fizyki**. Raport nadal `finished_unverified`, `temporal_completion: unconfirmed` z brakiem `openEMS_stats.txt`, mimo natywnego komunikatu o osiągnięciu kryterium wygaszania w poprzednim logu.
+
+**Maksima z raportu, A/m przy 1 V port (niezweryfikowane `K_est`):** TOP: 207,889 przy 1 GHz; 142,201 przy 2 GHz. Inner1: 459,697 / 317,901. Inner2: 139,073 / 96,4736. BOTTOM: 52,1976 / 35,9828. Każdy kontrast lokalny nasyca około 0,5% próbek (p99,5), a odpowiadające mu barwy i skala wektorów nie są porównywalne pomiędzy warstwami. Fazy 0° i 90° mają **tę samą kolorową mapę modułu fazora** z założenia, zmieniają się strzałki chwilowego wektora. W kontrastowych obrazach widać ścieżkę prądu Inner2, silne wartości lokalne Inner1 i słabszą rozłożoną mapę BOTTOM. Maksimum lokalne nie jest prądem całkowitym przez przekrój.
+
+**Granice danych:** przesłano samodzielny HTML, nie `currents/*.npz`; niemożliwe pełne ilościowe sprawdzenie spójności faz, całki prądu, continuity lub porównanie z jednostronnymi H. Wpisano εr=4 / **tanδ=1.001** na wszystkich trzech dielektrykach — przed kolejnym FDTD wymaga potwierdzenia użytkownika, nie auto-poprawki. PEC/PTH idealne oraz grubości miedzi nie oznaczają strat realnej folii. Nie deklarować ilościowej dokładności K, strat AC ani ładunku ρs.
+
+**Następna mała porcja:** kontrola fazowych wektorów i estymaty K z surowych `currents/metadata.json` + czterech `currents/pcb_curlH_XXX.npz` z `stripline4_004`, wraz z porównaniem pola przy via i portach. Odrębnie rozwiązać brak `openEMS_stats.txt` na podstawie natywnego logu / wywołania `DumpStatistics` bez zmiany fizyki. Nie ponawiać 88-minutowego FDTD tylko na potrzeby prezentacji. **Nie wymagamy kolejnego audytu `.epro`.**
+
 ## 2026-10-25 — hotfix raportu stripline4 po zgłoszonym TypeError
 
 **Błąd potwierdzony z tracebacku użytkownika:** po aktualizacji raportu o widok `Kontrast lokalny`, `visualization/pcb_currents.py:124` miał dwa sąsiadujące f-stringi i bezpośrednio po nich nawias z wyrażeniem warunkowym bez `+`/interpolacji. Python parsował `"..." (...)` jako wywołanie napisu, powodując `SyntaxWarning: 'str' object is not callable` i `TypeError` przy `fig.suptitle`. **To regresja w mojej poprzedniej zmianie; FDTD, HDF5 i NPZ są nienaruszone.** Poprawka: obliczyć `view_label` jawnie i interpolować w f-stringu; rozbudowano test regresji, aby wymagał wygenerowania wykresów globalnego i kontrastowego i poprawnych tytułów obu trybów.
