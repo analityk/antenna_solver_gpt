@@ -374,6 +374,8 @@ def _pcb_metadata(data):
     body+='<p>Chropowatość miedzi: pominięta. Soldermask, paste i silkscreen pominięto. PTH/NPTH są modelowane tylko gdy zapisane w sekcji Drills / vias; brak wierceń nie dowodzi kompletności modelu. E/H, NF2FF i bilans mocy: not recorded.</p>'
     if (data['root']/'fields/metadata.json').exists():
         body = body.replace('E/H, NF2FF i bilans mocy: not recorded.', 'E/H: zapisane przekroje poniżej. NF2FF i bilans mocy: not recorded.')
+    if (data['root']/'currents/metadata.json').exists():
+        body += '<p>Wyniki prądów powierzchniowych: rot(H) → K estymowane (niezweryfikowane); mapy poniżej.</p>'
     if s.get('stages'):
         body += '<h3>Etapy wykonania i analizy</h3>'+table(
             ['Etap','Stan','Dowód / ograniczenie'],
@@ -409,6 +411,9 @@ def render_html(data, *, plots_path=None, phase_step=None, field_components=None
         extra_sections = geometry + stackup_section(data, plots_path, figure_image, table) + drill_section(data["geometry"],table, data["summary"].get("geometry_resolution")) + component_section(data,table) + _pcb_metadata(data)
         if (data["root"] / "fields" / "metadata.json").exists():
             extra_sections += field_section(data, figure_image, plots_path, phase_step, field_components, field_crop=field_crop)
+        if (data["root"] / "currents" / "metadata.json").exists():
+            from .pcb_currents import pcb_current_section
+            extra_sections += pcb_current_section(data, figure_image, plots_path)
         zeros = _pcb_diagnostics(data)
     else:
         extra_sections = (_power_section(data) + _far_field(data, plots_path / 'pattern_cuts.png' if plots_path else None)
