@@ -9,6 +9,7 @@ import hashlib
 import json
 from pathlib import Path
 import shutil
+import numpy as np
 from types import UnionType
 from typing import get_args, get_origin, get_type_hints, Union
 
@@ -144,12 +145,13 @@ def process_results(manifest, native, output, *, port=None, execution=None):
     result = dict(manifest.get('context', {}).get('summary', {}))
     for key in ('frequency_hz','reference_impedance_ohm','resistance_ohm','reactance_ohm',
                 's11_real','s11_imag','s11_magnitude','s11_db','swr','fields',
-                'field_port_reference','native_statistics','stages'):
+                'field_port_reference','native_statistics','currents','stages'):
         result.pop(key, None)
     result.update(status='postprocess_failed', validation_status='unverified',
                   preparation=manifest['preparation'], simulation_settings=manifest['simulation_settings'])
     stages = {'engine': execution or {'status':'not_recorded'}, 'port': {'status':'pending'},
-              'fields': {'status':'not_requested'}, 'report': {'status':'not_requested'}}
+              'fields': {'status':'not_requested'}, 'currents': {'status':'not_requested'},
+              'report': {'status':'not_requested'}}
     statistics, termination = pcb_termination_evidence(settings, native)
     if statistics is not None:
         result['native_statistics'] = statistics
@@ -207,6 +209,50 @@ def process_results(manifest, native, output, *, port=None, execution=None):
                     stages['fields']['reason'] = str(failures)
             except Exception as exc:
                 stages['fields'] = {'status':'failed', 'reason':f'{type(exc).__name__}: {exc}'}
+    current_data = manifest['preparation'].get('surface_currents', {})
+    current_frequencies = current_data.get('frequency_hz', ())
+    if current_frequencies:
+        if stages['port']['status'] != 'processed':
+            stages['currents'] = {'status': 'blocked',
+                                  'reason': 'No valid port-voltage phase reference.'}
+        elif not current_data.get('planes'):
+            stages['currents'] = {'status': 'unavailable',
+                                  'reason': 'No populated modeled copper layers.'}
+        else:
+            try:
+                from tempfile import TemporaryDirectory
+                from antenna_lab.solvers.pcb_currents import finish_pcb_currents
+                if (output/'currents').exists():
+                    raise ConfigurationError(
+                        'Refusing to overwrite existing copper-current artifacts.')
+                combined, failures = None, {}
+                for plane in current_data['planes']:
+                    try:
+                        with TemporaryDirectory(dir=output, prefix='current-processing-') as tmp:
+                            result_one = finish_pcb_currents(
+                                geometry, mesh, [plane], current_frequencies,
+                                result['field_port_reference'], tmp, native_dir=native)
+                            if combined is None:
+                                combined = dict(result_one, planes=[],
+                                                empty_layers=current_data.get('empty_layers', []))
+                                (output/'currents').mkdir()
+                            combined['planes'].extend(result_one['planes'])
+                            shutil.move(str(Path(tmp)/'currents'/(plane['name']+'.npz')),
+                                        str(output/'currents'/(plane['name']+'.npz')))
+                    except Exception as exc:
+                        failures[plane['name']] = f'{type(exc).__name__}: {exc}'
+                if combined is not None:
+                    combined['failed_planes'] = failures
+                    write_json(output/'currents/metadata.json', combined)
+                    result['currents'] = combined
+                stages['currents'] = {
+                    'status': 'partial' if failures and combined else
+                              'failed' if failures else 'processed'}
+                if failures:
+                    stages['currents']['reason'] = str(failures)
+            except Exception as exc:
+                stages['currents'] = {
+                    'status': 'failed', 'reason': f'{type(exc).__name__}: {exc}'}
     if result.get('status') == 'completed' and stages['engine'].get('status') != 'returned':
         result['status'] = 'finished_unverified'
     result['stages'] = stages
@@ -214,7 +260,9 @@ def process_results(manifest, native, output, *, port=None, execution=None):
     for name, state in stages.items():
         if state.get('reason'):
             result['warnings'].append(f"{name}: {state['reason']}")
-    if stages['port']['status']=='processed' and stages['fields']['status'] in ('failed','partial'):
+    if (stages['port']['status']=='processed' and
+            (stages['fields']['status'] in ('failed','partial') or
+             stages['currents']['status'] in ('failed','partial','blocked','unavailable'))):
         result['status']='postprocess_partial'
     write_json(output/'summary.json', result)
     return result
@@ -256,13 +304,35 @@ def recover_run(run_dir, *, render=True, reuse=True, report_options=None):
                     load_plane(root/'fields'/(plane['name']+'.npz'), plane, requested)
             except (OSError, ValueError, KeyError):
                 complete_fields = False
-        if summary.get('frequency_hz') and complete_fields:
+        current_request = summary.get('preparation', {}).get('surface_currents', {})
+        requested_current_planes = {
+            p['name'] for p in current_request.get('planes', ())}
+        current_metadata = root/'currents/metadata.json'
+        complete_currents = not current_request.get('frequency_hz')
+        if requested_current_planes and current_metadata.is_file():
+            metadata_currents = read_json(current_metadata)
+            complete_currents = {
+                p['name'] for p in metadata_currents.get('planes', ())} == requested_current_planes
+            if complete_currents:
+                try:
+                    for plane in metadata_currents['planes']:
+                        with np.load(root/'currents'/(plane['name']+'.npz'),
+                                     allow_pickle=False) as array:
+                            if (array['K_estimated_a_per_m'].shape[:2] !=
+                                    (len(current_request['frequency_hz']), 2)):
+                                raise ValueError('Incomplete saved copper-current data.')
+                except (OSError, ValueError, KeyError):
+                    complete_currents = False
+        if not requested_current_planes and current_request.get('frequency_hz'):
+            complete_currents = False
+        if summary.get('frequency_hz') and complete_fields and complete_currents:
             from antenna_lab.visualization.report_data import load_report_data
             load_report_data(root)  # Validate saved spectrum before treating it as reusable.
             destination = allocate_output_dir(Path('postprocess'), root/'postprocessed')
             for name in ('impedance.csv','summary.json','geometry.json','import.json'):
                 if (root/name).is_file(): shutil.copy2(root/name, destination/name)
             if field_meta.is_file(): shutil.copytree(root/'fields', destination/'fields')
+            if current_metadata.is_file(): shutil.copytree(root/'currents', destination/'currents')
             summary.setdefault('stages', {})['postprocess']={'status':'reused', 'source':str(root)}
             if render: render_report(destination, summary, report_options=report_options)
             else: write_json(destination/'summary.json', summary)

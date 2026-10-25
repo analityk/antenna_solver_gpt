@@ -103,3 +103,122 @@ def install_pcb_currents(csx, geometry, mesh, settings, frequencies):
                 'Surface-current estimate requires local dual-cell-width '
                 'integration and native solver validation; it is not the '
                 'independently validated jump of H across the sheet.'}
+
+
+
+def _copper_occupancy(geometry, plane, x, y):
+    """Exact 2-D copper footprint mask; never the E/H halo exclusion mask."""
+    from shapely import intersects, points, union_all
+    from shapely.geometry import Point
+    from antenna_lab.pcb.regions import copper_shape
+
+    pieces = [copper_shape(c) for c in geometry.copper
+              if c.layer_role == plane['layer_role'] and
+              abs(c.z_m - plane['z_m']) <= 1e-12]
+    if not pieces:
+        raise ConfigurationError('PCB current: no copper at saved layer.')
+    metal = union_all(pieces)
+    for drill in geometry.drills:
+        if not drill.plated:
+            metal = metal.difference(
+                Point(drill.x_m, drill.y_m).buffer(
+                    drill.drill_diameter_m / 2.0, quad_segs=128))
+    uu, vv = np.meshgrid(x, y, indexing='ij')
+    occupancy = np.asarray(intersects(metal, points(uu.ravel(), vv.ravel())),
+                           dtype=bool).reshape(uu.shape)
+    if not np.any(occupancy):
+        raise ConfigurationError(
+            f"PCB current: no copper samples in layer {plane['layer_role']}; "
+            'increase mesh resolution, do not manufacture interpolated current.')
+    return occupancy
+
+
+def finish_pcb_currents(geometry, mesh, planes, frequencies, reference,
+                        output, *, native_dir=None):
+    """Convert native curl(H) into a tagged sheet-current *estimate*.
+
+    No physical surface-charge/current jump is claimed. Native rot(H) remains
+    preserved in HDF5. One saved NPZ per actual copper plane.
+    """
+    from pathlib import Path
+    from .pcb_fields import voltage_scale
+    from .power import _read_surface
+    from antenna_lab.core.config import write_json
+
+    frequencies = np.asarray(frequencies, dtype=float)
+    if not np.array_equal(frequencies,
+                          np.asarray(reference['frequency_hz'], dtype=float)):
+        raise ConfigurationError('PCB current: phase-reference frequencies differ.')
+    voltage = np.asarray(reference['voltage_real'], dtype=float) + (
+        1j * np.asarray(reference['voltage_imag'], dtype=float))
+    scale = voltage_scale(voltage)
+    output = Path(output)
+    native = Path(native_dir) if native_dir is not None else output / 'native'
+    folder = output / 'currents'
+    folder.mkdir()  # intentionally refuse overwrite
+    axes = [np.asarray(getattr(mesh, a + '_lines_m'), dtype=float) for a in 'xyz']
+
+    for plane in planes:
+        start, stop = plane['start_m'], plane['stop_m']
+        expected = [axis[(axis >= lo) & (axis <= hi)]
+                    for axis, lo, hi in zip(axes, start, stop)]
+        occupied = None
+        data = []
+        xy_ref = None
+        for i, frequency in enumerate(frequencies):
+            lines, density = _read_surface(native / plane['native_file'], frequency)
+            if any(len(found) != len(target) or
+                   not np.allclose(found, target, rtol=1e-6, atol=1e-10)
+                   for found, target in zip(lines, expected)):
+                raise ConfigurationError(
+                    f"PCB current: native rot(H) grid mismatch for {plane['layer_role']}.")
+            if len(lines[2]) != 1 or not np.isclose(
+                    lines[2][0], plane['z_m'], rtol=0, atol=1e-10):
+                raise ConfigurationError('PCB current: dump not on actual copper plane.')
+            if xy_ref is None:
+                xy_ref = (lines[0], lines[1])
+                occupied = _copper_occupancy(geometry, plane, *xy_ref)
+            elif not all(np.array_equal(a, b) for a, b in
+                         zip(xy_ref, (lines[0], lines[1]))):
+                raise ConfigurationError('PCB current: inconsistent frequency grids.')
+            # J_total = curl(H) is A/m².  Multiplication by the local
+            # normal dual-cell width is an UNVERIFIED sheet approximation.
+            k = density[:2, :, :, 0] * scale[i] * plane['dual_width_m']
+            if not np.isfinite(k).all():
+                raise ConfigurationError('PCB current: non-finite complex phasors.')
+            data.append(k)
+        estimated = np.asarray(data)
+        # Only the exact conductor area is a valid surface-current estimate.
+        # Original native J samples remain unchanged in native/*.h5.
+        estimated[:, :, ~occupied] = np.nan + 1j * np.nan
+        np.savez_compressed(
+            folder / (plane['name'] + '.npz'),
+            frequency_hz=frequencies, x_m=xy_ref[0], y_m=xy_ref[1],
+            K_estimated_a_per_m=estimated, on_copper=occupied,
+            dual_width_m=float(plane['dual_width_m']),
+            normalization_factor=scale, port_voltage_phasor=voltage,
+            reference_voltage_v=1.0,
+            array_order='frequency,component_xy,x,y')
+    metadata = {
+        'schema_version': 1, 'quantity': 'K_estimated_from_curl_H',
+        'planes': planes, 'frequency_hz': frequencies.tolist(),
+        'normalization': 'total port voltage = 1∠0 V, not accepted power',
+        'reference_voltage_v': 1.0,
+        'units': {'K_estimate': 'A/m per 1 V port', 'native_curl_H': 'A/m^2',
+                  'coordinates': 'm'},
+        'array_order': 'frequency,component_xy,x,y',
+        'phasor_convention': 'real(K * exp(+j * phase))',
+        'mask_definition': 'exact modeled copper footprint; no artificial metal halo',
+        'conversion': 'K_est = rot(H)_t at sheet * normal Yee dual-cell width',
+        'validation_status': 'unverified',
+        'limitations': [
+            'Surface conversion is not yet cross-checked against one-sided H jumps.',
+            'Node interpolation and finite Yee cells affect PEC/sheet edges.',
+            'Near ports, plated vias and sharp corners requires separate validation.',
+            'Not a finite-foil volumetric J or a validated AC-loss calculation.',
+            'The 1 V terminal normalization inherits the unverified port model.'
+        ],
+        'native_data_preserved': True
+    }
+    write_json(folder / 'metadata.json', metadata)
+    return metadata
