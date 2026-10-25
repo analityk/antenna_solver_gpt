@@ -140,8 +140,13 @@ class CopperCurrentTests(unittest.TestCase):
             geometry = dict(copper=[dict(
                 vertices_xy_m=list(p.vertices_xy_m), holes_xy_m=(),
                 z_m=p.z_m, layer_role=p.layer_role) for p in g.copper])
+            fig_linear = current_figure(
+                record, geometry, layer, 0, 1.0, contrast=False)
+            self.assertIn('wspólna skala', fig_linear._suptitle.get_text())
+            fig_linear.clear()
             fig_local = current_figure(
                 record, geometry, layer, 0, 1.0, contrast=True)
+            self.assertIn('lokalny kontrast', fig_local._suptitle.get_text())
             fig_local.clear()
 
     def test_no_silent_off_grid_sheet(self):

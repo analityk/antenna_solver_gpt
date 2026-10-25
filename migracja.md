@@ -11,6 +11,12 @@
 **Potwierdzony opublikowany checkpoint przed aktualizacją:** `8bef03fc42ac774e6051a5325ccb3ce7832cf83d`
 **Uwaga:** ten SHA jest punktem historycznym, nie obietnicą, że nadal jest HEAD. Każde wznowienie rozpoczyna się sprawdzeniem Git.
 
+## 2026-10-25 — hotfix raportu stripline4 po zgłoszonym TypeError
+
+**Błąd potwierdzony z tracebacku użytkownika:** po aktualizacji raportu o widok `Kontrast lokalny`, `visualization/pcb_currents.py:124` miał dwa sąsiadujące f-stringi i bezpośrednio po nich nawias z wyrażeniem warunkowym bez `+`/interpolacji. Python parsował `"..." (...)` jako wywołanie napisu, powodując `SyntaxWarning: 'str' object is not callable` i `TypeError` przy `fig.suptitle`. **To regresja w mojej poprzedniej zmianie; FDTD, HDF5 i NPZ są nienaruszone.** Poprawka: obliczyć `view_label` jawnie i interpolować w f-stringu; rozbudowano test regresji, aby wymagał wygenerowania wykresów globalnego i kontrastowego i poprawnych tytułów obu trybów.
+
+**Następna praca:** `git pull --ff-only`, `.\\.venv\\Scripts\\python.exe -X utf8 -m unittest discover -s tests -p test_pcb_currents.py -v`; potem ponowić **tylko `antenna_lab report`** dla istniejącego `outcomes/pcb_easyeda/stripline4_004`. Nie uruchamiać nowego FDTD. Nie stwierdzać, że testy po hotfiksie przeszły na Windows, dopóki użytkownik tego nie potwierdzi. Poprzedni HTML można regenerować z zapisanych NPZ.
+
 ## 2026-10-25 — stripline4_004: prawdziwe FDTD i raport (następny etap)
 
 ## Stripline4_004 — prawdziwy przebieg i widoki z kontrastem

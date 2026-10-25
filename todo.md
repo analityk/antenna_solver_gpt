@@ -1,5 +1,9 @@
 # TODO — PCB: aktualny stan i następne kroki
 
+## PILNE: hotfix TypeError w raporcie (2026-10-25)
+
+Zgłoszony rzeczywisty regresyjny wyjątek `TypeError: 'str' object is not callable` w `pcb_currents.py`, `fig.suptitle` po dodaniu lokalnego kontrastu. Kod poprawiony przez jawny `view_label`, test weryfikuje tytuł obu trybów. **Wymagany odbiór na Windows:** aktualizacja, cztery testy prądu, potem samo generowanie raportu `stripline4_004` (bez nowego FDTD). Brak zmiany modelu i danych.
+
 ## stripline4_004: rzeczywisty FDTD i bezkosztowa analiza map
 
 Dostępny raport po 48488 timesteps/5282,8 s (native end criterion −41,29 dB). `currents: processed` cztery warstwy × dwie częstotliwości. **Ważne: tanδ 1,001 na wszystkich dielektrykach; zweryfikować przed nowym solve.** Raport ma `finished_unverified` i `temporal_completion: unconfirmed`, bo brakuje `openEMS_stats.txt`, pomimo jawnego komunikatu o progu wygaszania w logu. Dodano do raportu **Kontrast lokalny** log/p99,5 i statystyki, bez zmiany danych. **Następny krok: test i ponowne renderowanie Raport z istniejących wyników, bez uruchamiania FDTD**. Wciąż wymagana walidacja fizyczna K.

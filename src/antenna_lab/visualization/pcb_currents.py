@@ -121,10 +121,10 @@ def current_figure(data, geometry, plane, index, shared_limit, *, contrast=False
                  label=('|K|, log p99,5 [A/m / 1 V port]'
                         if contrast and stats['has_signal'] else
                         '|K| estymowane [A/m / 1 V port]'))
+    view_label = ('lokalny kontrast (tylko prezentacja) · niewalidowany'
+                  if contrast else 'wspólna skala · niewalidowany')
     fig.suptitle(f"Warstwa {plane['layer_role']} · "
-                 f"{data['frequency_hz'][index] / 1e6:g} MHz · "
-                 ('lokalny kontrast (tylko prezentacja) · niewalidowany'
-                  if contrast else 'wspólna skala · niewalidowany'))
+                 f"{data['frequency_hz'][index] / 1e6:g} MHz · {view_label}")
     return fig
 
 
