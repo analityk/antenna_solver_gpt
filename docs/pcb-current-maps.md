@@ -33,3 +33,12 @@ Nie jest to jeszcze zweryfikowane `K_net = n × (H_plus − H_minus)`, ani osobn
 **Warunek odbioru kolejnego etapu:** użytkownik otwiera raport z natywnego FDTD dla `stripline4` i stwierdza, czy prąd płynie po spodziewanych sieciach, czy cztery warstwy są rozdzielone, czy faza i skala są użyteczne. Następnie porównujemy wyniki na zagęszczonej siatce i metodą granicznych skoków H. Dopiero po takim odbiorze wolno nazywać K wynikami ilościowymi i przejść do ładunku/pól jednostronnych. Gdy dump nie daje użytecznej wartości — zatrzymujemy tę gałąź, zachowujemy dane i wybieramy metodę alternatywną, zamiast rysować fikcyjne prądy.
 
 Źródła: [openEMS: dump_type/dump_mode](https://docs.openems.de/en/latest/python/CSXCAD/CSProperties/CSPropDumpBox.html), [openEMS: HDF5 / siatka](https://docs.openems.de/en/latest/concepts/dump_hdf5.html), [Fairbeam](https://fairbeam.org/docs/bundle.html), [wymaganie docelowe](pcb-current-charge-goal.md).
+
+## Stripline4_004 — prawdziwy przebieg i widoki z kontrastem
+
+Użytkownik przeprowadził 48488 kroków FDTD w 5282,8 s, a openEMS wypisał: `RunFDTD: end-criteria of -40.00dB reached ... (-41.29dB)`. Raport potwierdza pełną ścieżkę danych `currents: processed` dla czterech warstw × 1 i 2 GHz. Jednocześnie `openEMS_stats.txt` nie został znaleziony, dlatego formalny status ukończenia czasowego pozostaje `unconfirmed` mimo informacji w konsoli. Ilościowa dokładność K pozostaje `unverified`.
+
+**Ważne:** dla dielektryków 361/362/363 wpisano εr=4 i **tanδ=1.001**, nie 0.001. To ekstremalnie stratny model w porównaniu z typowym laminatem PCB — trzeba to potwierdzić z kartą materiałową przed nowym kosztownym solve. Grubości miedzi wewnętrznej pokazane w raporcie to ~350 µm, zewnętrznej ~35 µm; obecna miedź PEC ignoruje te grubości.
+
+Dotychczasowe mapy używają wspólnej skali liniowej ~450 A/m/1 V, przez co słabsze struktury są niemal niewidoczne. Raport ma teraz **dodatkową podsekcję „Kontrast lokalny”** dla każdej warstwy i f: logarytmiczną skalę ograniczoną percentilem 99,5 dodatnich wartości, jawne realne maksimum i liczbę pikseli o nasyconym kolorze. To wyłącznie transformacja WIZUALIZACJI, nie danych K i nie nowa analiza fizyczna. **Dla porównań ilościowych nadal używać mapy z globalną skalą!** W GUI otworzyć zakładkę **Raport** dla już istniejącego `outcomes/pcb_easyeda/stripline4_004` i wygenerować widok ponownie. Nie uruchamiać powtórnie FDTD. Obecne NPZ/HDF5 pozostają niezmienione. Dodano test kodu, niewykonany jeszcze na Windows.
+

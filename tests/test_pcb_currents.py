@@ -16,7 +16,8 @@ from antenna_lab.pcb.model import CopperLayer, CopperPolygon
 from antenna_lab.solvers.pcb_currents import (
     pcb_current_layout, install_pcb_currents, finish_pcb_currents)
 from antenna_lab.visualization.pcb_currents import (
-    load_copper_current, pcb_current_section)
+    load_copper_current, pcb_current_section, current_contrast_scale,
+    current_figure)
 
 
 F = 1e9
@@ -131,6 +132,17 @@ class CopperCurrentTests(unittest.TestCase):
             self.assertIn('top', body)
             self.assertIn('Gęstość prądu', body)
             self.assertIn('niezweryfikowany', body)
+            self.assertIn('Kontrast lokalny', body)
+            stats = current_contrast_scale(record, 0)
+            self.assertTrue(stats['has_signal'])
+            self.assertGreater(stats['actual_peak'], 0)
+            self.assertLessEqual(stats['scale'], stats['actual_peak'])
+            geometry = dict(copper=[dict(
+                vertices_xy_m=list(p.vertices_xy_m), holes_xy_m=(),
+                z_m=p.z_m, layer_role=p.layer_role) for p in g.copper])
+            fig_local = current_figure(
+                record, geometry, layer, 0, 1.0, contrast=True)
+            fig_local.clear()
 
     def test_no_silent_off_grid_sheet(self):
         g, mesh, settings = fixture()

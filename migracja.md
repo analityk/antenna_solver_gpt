@@ -11,6 +11,18 @@
 **Potwierdzony opublikowany checkpoint przed aktualizacją:** `8bef03fc42ac774e6051a5325ccb3ce7832cf83d`
 **Uwaga:** ten SHA jest punktem historycznym, nie obietnicą, że nadal jest HEAD. Każde wznowienie rozpoczyna się sprawdzeniem Git.
 
+## 2026-10-25 — stripline4_004: prawdziwe FDTD i raport (następny etap)
+
+## Stripline4_004 — prawdziwy przebieg i widoki z kontrastem
+
+Użytkownik przeprowadził 48488 kroków FDTD w 5282,8 s, a openEMS wypisał: `RunFDTD: end-criteria of -40.00dB reached ... (-41.29dB)`. Raport potwierdza pełną ścieżkę danych `currents: processed` dla czterech warstw × 1 i 2 GHz. Jednocześnie `openEMS_stats.txt` nie został znaleziony, dlatego formalny status ukończenia czasowego pozostaje `unconfirmed` mimo informacji w konsoli. Ilościowa dokładność K pozostaje `unverified`.
+
+**Ważne:** dla dielektryków 361/362/363 wpisano εr=4 i **tanδ=1.001**, nie 0.001. To ekstremalnie stratny model w porównaniu z typowym laminatem PCB — trzeba to potwierdzić z kartą materiałową przed nowym kosztownym solve. Grubości miedzi wewnętrznej pokazane w raporcie to ~350 µm, zewnętrznej ~35 µm; obecna miedź PEC ignoruje te grubości.
+
+Dotychczasowe mapy używają wspólnej skali liniowej ~450 A/m/1 V, przez co słabsze struktury są niemal niewidoczne. Raport ma teraz **dodatkową podsekcję „Kontrast lokalny”** dla każdej warstwy i f: logarytmiczną skalę ograniczoną percentilem 99,5 dodatnich wartości, jawne realne maksimum i liczbę pikseli o nasyconym kolorze. To wyłącznie transformacja WIZUALIZACJI, nie danych K i nie nowa analiza fizyczna. **Dla porównań ilościowych nadal używać mapy z globalną skalą!** W GUI otworzyć zakładkę **Raport** dla już istniejącego `outcomes/pcb_easyeda/stripline4_004` i wygenerować widok ponownie. Nie uruchamiać powtórnie FDTD. Obecne NPZ/HDF5 pozostają niezmienione. Dodano test kodu, niewykonany jeszcze na Windows.
+
+**Następne działania:** zaktualizować kod, przeprowadzić unittest oraz TYLKO RE-RENDER `Raport` z `stripline4_004`; spojrzeć na mapy kontrastu, potwierdzić sensowność dielektryków, przekazać NPZ do analizy ilościowej. Nie zaczynać nowego 88-minutowego FDTD. Ten wpis zastępuje starszy punkt oczekiwania na PREPARE-ONLY dla tego już uruchomionego wariantu.
+
 ## 2026-10-25 — stripline4: odbiór testów offline przez użytkownika (4/4 PASS)
 
 **Rzeczywisty wynik z CMD na Windows użytkownika:** `python.exe -X utf8 -m unittest discover -s tests -p test_pcb_currents.py -v` — 4 testy przeszły (`Ran 4 tests in 0.163s; OK`): pięć warstw i dualny Yee-width, natywny dump `rot(H)`, błąd sheetu poza siatką, konwersja/maska/HTML. Jeden `PendingDeprecationWarning` Matplotlib dotyczył `cmap.set_bad` w `visualization/pcb_currents.py`; zastąpiono wywołaniem `colormaps['viridis'].with_extremes(bad=...)` w osobnym małym commicie, **zamieniony fragment wymaga następnego pobrania kodu**. Zalogowane testy potwierdzają poprzedni kod; nie deklarować, że nowa wersja jest już przetestowana.

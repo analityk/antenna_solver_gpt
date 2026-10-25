@@ -39,9 +39,28 @@ def _magnitude(k):
     return np.sqrt(np.abs(k[0]) ** 2 + np.abs(k[1]) ** 2)
 
 
-def current_figure(data, geometry, plane, index, shared_limit):
-    """Fixed magnitude scale; phasor-vector snapshots at 0 and 90 degrees."""
-    from matplotlib.colors import Normalize
+def current_contrast_scale(data, index, percentile=99.5):
+    """Presentation-only robust local scale on physical copper samples."""
+    magnitude = _magnitude(data['k'][index])[data['on_copper']]
+    if magnitude.size == 0 or not np.isfinite(magnitude).all():
+        raise ValueError('Brak skończonych próbek prądu na miedzi.')
+    positive = magnitude[magnitude > 0]
+    peak = float(magnitude.max())
+    if not positive.size:
+        return dict(has_signal=False, scale=1.0, floor=0.0,
+                    actual_peak=0.0, clipped=0, count=int(magnitude.size))
+    local = float(np.percentile(positive, percentile))
+    if local <= 0 or not np.isfinite(local):
+        raise ValueError('Błędny percentyl prądu.')
+    return dict(has_signal=True, scale=local, floor=local * 0.001,
+                actual_peak=peak, clipped=int((magnitude > local).sum()),
+                count=int(magnitude.size))
+
+
+def current_figure(data, geometry, plane, index, shared_limit, *, contrast=False):
+    """Global absolute linear or local logarithmic *presentation* of the same K."""
+
+    from matplotlib.colors import Normalize, LogNorm
     from matplotlib.cm import ScalarMappable
 
     x, y = data['x_m'] * 1e3, data['y_m'] * 1e3
@@ -51,7 +70,19 @@ def current_figure(data, geometry, plane, index, shared_limit):
     fig = Figure(figsize=(11, 4.5), layout='constrained')
     axes = fig.subplots(1, 2, sharex=True, sharey=True)
     cmap = colormaps['viridis'].with_extremes(bad='#d2d5db')
-    norm = Normalize(vmin=0.0, vmax=max(shared_limit, 1e-30))
+    if contrast:
+        stats = current_contrast_scale(data, index)
+        arrow_limit = stats['scale']
+        if stats['has_signal']:
+            norm = LogNorm(vmin=stats['floor'], vmax=stats['scale'], clip=True)
+            amplitude = np.ma.array(
+                np.maximum(amplitude.filled(0), stats['floor']),
+                mask=~data['on_copper'].T)
+        else:
+            norm = Normalize(vmin=0, vmax=1)
+    else:
+        arrow_limit = shared_limit
+        norm = Normalize(vmin=0.0, vmax=max(shared_limit, 1e-30))
     gx, gy = np.meshgrid(x, y)
     # At most 20x20 arrows, display-only thinning; NPZ remains full resolution.
     ix = np.unique(np.linspace(0, len(x)-1, min(len(x), 20), dtype=int))
@@ -82,15 +113,18 @@ def current_figure(data, geometry, plane, index, shared_limit):
         u[~valid] = np.nan
         v[~valid] = np.nan
         ax.quiver(px, py, u, v, color='#151515', angles='xy', scale_units='width',
-                  scale=max(shared_limit, 1e-30)*26, width=.003)
+                  scale=max(arrow_limit, 1e-30)*26, width=.003)
         ax.set(xlabel='X [mm]', ylabel='Y [mm]',
                title=f'Wektor K — faza {phase}°')
         ax.set_aspect('equal', adjustable='box')
     fig.colorbar(ScalarMappable(norm=norm, cmap=cmap), ax=list(axes),
-                 label='|K| estymowane [A/m / 1 V port]')
+                 label=('|K|, log p99,5 [A/m / 1 V port]'
+                        if contrast and stats['has_signal'] else
+                        '|K| estymowane [A/m / 1 V port]'))
     fig.suptitle(f"Warstwa {plane['layer_role']} · "
                  f"{data['frequency_hz'][index] / 1e6:g} MHz · "
-                 'rot(H) · wynik niewalidowany')
+                 ('lokalny kontrast (tylko prezentacja) · niewalidowany'
+                  if contrast else 'wspólna skala · niewalidowany'))
     return fig
 
 
@@ -127,8 +161,12 @@ def pcb_current_section(data, figure_image, plots_path):
             'folii, rozkład J przez jej grubość ani obliczenie strat AC. '
             'Punkty przy portach, krawędziach i przelotkach wymagają '
             'kontroli zbieżności i warunków brzegowych.</p>'
-            '<p>Kolory: moduł zespolonego wektora K, wspólna skala '
-            'dla wszystkich warstw i częstotliwości; strzałki: '
+            '<p>Kolory pierwszej mapy: moduł wektora K, wspólna liniowa '
+            'skala dla wszystkich warstw i częstotliwości. Dodatkowa mapa '
+            'stosuje skalę logarytmiczną i percentyl 99,5 dodatnich wartości '
+            'na danej warstwie i częstotliwości, z obcięciem ekstremów. '
+            'Jej barwy i długości strzałek NIE służą do porównań '
+            'bezwzględnych między warstwami. Strzałki: '
             'chwilowy kierunek i wartość w fazach 0°/90°. '
             'Źródło: 1∠0 V na porcie (nie 1 W). Szare: poza rzeczywistą '
             'powierzchnią miedzi. Surowe HDF5 i pełne NPZ '
@@ -145,6 +183,25 @@ def pcb_current_section(data, figure_image, plots_path):
                      '><summary>'+escape(title)+'</summary>')
             body += figure_image(fig, title, path) + '</details>'
             fig.clear()
+            stats = current_contrast_scale(record, index)
+            body += ('<details><summary>Kontrast lokalny · ' + escape(title) +
+                     ' (log, p99,5)</summary>'
+                     '<p>Maksimum bezwzględne: ' +
+                     f"{stats['actual_peak']:.6g}" +
+                     ' A/m / 1 V; granica koloru p99,5: ' +
+                     f"{stats['scale']:.6g}" +
+                     ' A/m / 1 V; nasycone: ' +
+                     str(stats['clipped']) + ' / ' +
+                     str(stats['count']) +
+                     ' próbek. Bez przeliczenia pierwotnych fazorów.</p>')
+            fig_contrast = current_figure(record, data['geometry'],
+                                          plane, index, limit, contrast=True)
+            contrast_path = (Path(plots_path) /
+                             f"current_contrast_{plane['name']}_{index}.png"
+                             ) if plots_path else None
+            body += figure_image(fig_contrast, 'Kontrast '+title,
+                                 contrast_path) + '</details>'
+            fig_contrast.clear()
     for missing in metadata.get('empty_layers', ()):
         body += ('<p>Brak modelowanej miedzi na warstwie '+
                  escape(str(missing['layer_role']))+'.</p>')

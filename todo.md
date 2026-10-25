@@ -1,5 +1,9 @@
 # TODO — PCB: aktualny stan i następne kroki
 
+## stripline4_004: rzeczywisty FDTD i bezkosztowa analiza map
+
+Dostępny raport po 48488 timesteps/5282,8 s (native end criterion −41,29 dB). `currents: processed` cztery warstwy × dwie częstotliwości. **Ważne: tanδ 1,001 na wszystkich dielektrykach; zweryfikować przed nowym solve.** Raport ma `finished_unverified` i `temporal_completion: unconfirmed`, bo brakuje `openEMS_stats.txt`, pomimo jawnego komunikatu o progu wygaszania w logu. Dodano do raportu **Kontrast lokalny** log/p99,5 i statystyki, bez zmiany danych. **Następny krok: test i ponowne renderowanie Raport z istniejących wyników, bez uruchamiania FDTD**. Wciąż wymagana walidacja fizyczna K.
+
 ## Wynik testów przekazany przez użytkownika — 2026-10-25
 
 **PASS 4/4**, `Ran 4 tests in 0.163s; OK` dla `test_pcb_currents.py` na Windows użytkownika. Ostrzeżenie Matplotlib (`set_bad`) nie dotyczyło fizyki i zostało usunięte w kodzie przez `with_extremes` — jeszcze nieprzetestowane lokalnie po poprawce. **Następna porcja: PREPARE-ONLY `gerbs/stripline4/stripline4.epro`** po synchronizacji repozytorium, z materiałami i PTH jawnie wybranymi. Nie uruchamiać FDTD przed oceną przygotowanego modelu. Wyniki fizyczne nadal niezweryfikowane.
