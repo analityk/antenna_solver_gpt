@@ -22,6 +22,10 @@ aby zobaczyć błąd uruchamiania; launcher korzysta z `pythonw.exe`
 w lokalnym `.venv`. Dla natywnego solvera sprawdź pole
 `CSXCAD_INSTALL_PATH` (zwykle `C:\dev\openems\openEMS`).
 
+## Eksperymentalna mapa prądu na miedzi — stripline4
+
+W eksperymencie można opcjonalnie zaznaczyć **Mapa prądu na wszystkich warstwach miedzi (rot H; wynik eksperymentalny)**. Funkcja wymaga włączonych częstotliwości pól i używa tych samych punktów MHz. PREPARE-ONLY tworzy natywne monitory curl(H) na każdej obsadzonej płaszczyźnie; FDTD i postprocessing generują `currents/*.npz`, a raport pokazuje mapę K estymowanego dla każdej warstwy. Próbki nie są domyślnie ukrywane w halo miedzi. Stare raporty E/H, portu i anten pozostają bez zmian. **Wyniki nie są jeszcze fizycznie zwalidowane** i nie zastępują gęstości J w grubości miedzi ani strat AC. [Pełna instrukcja dla stripline4](pcb-current-maps.md).
+
 ## Obsługa
 
 1. **Wybierz projekt**: dowolne dostępne lokalnie `.epro`. GUI sam

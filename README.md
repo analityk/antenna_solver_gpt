@@ -16,7 +16,11 @@ i pola, uruchom PREPARE-ONLY/FDTD, a następnie wygeneruj raport E/H
 z fazami co 15° i kadrowaniem `active+geometry`. GUI pokazuje
 polecenia CMD i log na żywo, a konfiguracja elektryczna jest domyślnie
 wyprowadzana z `.epro`. Bez osobnego solvera i bez powtórnego FDTD
-przy zmianie raportu. Szczegóły: [GUI PCB](docs/pcb-gui.md).
+przy zmianie raportu. Opcjonalny zapis map powierzchniowej gęstości prądu
+na każdej warstwie miedzi (rot(H), diagnostyczny, niezweryfikowany)
+ma osobny checkbox w zakładce eksperymentu. Zobacz
+[instrukcję stripline4 i ograniczenia fizyczne](docs/pcb-current-maps.md).
+Szczegóły: [GUI PCB](docs/pcb-gui.md).
 
 Po wskazaniu `.epro` GUI automatycznie tworzy i pokazuje katalog
 `parameters/<folder_projektu>/`, a wszystkie pliki `.epro` w tym samym

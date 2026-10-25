@@ -2,6 +2,10 @@
 
 **Status:** plan produktu i bramki odbioru. M0 — import i audyt danych źródłowych EasyEDA — był realizowany i testowany w poprzednich etapach; nie jest ponownym zadaniem. Pierwszy nowy etap to M1. Dalsze etapy nie są jeszcze zaimplementowane. Uzgodniony kierunek na 2026-10-25; każda bramka fizyczna wymaga rzeczywistego wyniku zweryfikowanego przez użytkownika na jego Windows. Dokument jest nadrzędną mapą kierunku; `migracja.md` służy do wznowienia pracy, a `todo.md` do śledzenia aktualnego zadania. Plan nie upoważnia do zmiany fizyki, danych ani konfiguracji bez jawnego wyboru użytkownika.
 
+## Punkt operacyjny — stripline4 (2026-10-25)
+
+Na żądanie użytkownika prace przeskoczyły z ogólnego M1 do **ściśle ograniczonego eksperymentu mapy prądu dla `gerbs/stripline4/stripline4.epro`**, bez ponawiania importu i bez porzucania przyszłych etapów. Dodano opcjonalny zapis `rot(H)`, przeliczenie na diagnostyczne `K_est` oraz raporty dla wszystkich warstw; są to **częściowe narzędzia M4, a nie zaliczony M3/M4**. Nie ma jeszcze rzeczywistego przebiegu openEMS na Windows ani zweryfikowanego K. Najbliższa bramka: lokalny unittest, PREPARE-ONLY z jawnymi materiałami/PTH na stripline4, potem natywne widma i ocena rozkładu/zbieżności. Szczegóły: [docs/pcb-current-maps.md](docs/pcb-current-maps.md). Nie naruszać solvera antenowego.
+
 ## 1. Konstytucja produktu — źródło prawdy
 
 > **Pliki `.epro`, będące archiwami ZIP projektu EasyEDA Pro, zawierają wszystkie informacje istotne z punktu widzenia topologii PCB — także MPN komponentów. Dane te są podstawą modelu i nie wolno ich odtwarzać z Gerberów ani zgadywać. Elementy spoza projektu PCB, na przykład bryłę rdzenia magnetycznego i jego właściwości, użytkownik może dostarczyć osobno. Ta zdolność importu `.epro` została już dowieziona; rozwijamy ją i sprawdzamy kompletność jej udostępnienia, zamiast pisać importer na nowo.**

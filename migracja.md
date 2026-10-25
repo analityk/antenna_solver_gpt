@@ -11,6 +11,16 @@
 **Potwierdzony opublikowany checkpoint przed aktualizacją:** `8bef03fc42ac774e6051a5325ccb3ce7832cf83d`
 **Uwaga:** ten SHA jest punktem historycznym, nie obietnicą, że nadal jest HEAD. Każde wznowienie rozpoczyna się sprawdzeniem Git.
 
+## 2026-10-25 — stripline4: pierwszy tor map prądu na miedzi (etapy 1–4, NATIVE OPEN)
+
+**Prośba użytkownika:** dla rzeczywistego `gerbs/stripline4/stripline4.epro` uzyskać rozkład gęstości prądu na miedzi. Pracować **porcjami, osobne commity i punkty odbioru**, nie przebudowywać równocześnie GUI/solverów/reportów. Inspekcja rzeczywistych bajtów ZIP wykazała 4 fizyczne warstwy miedzi (TOP / Inner1 / Inner2 / BOTTOM), 3 dielektryki ID 361–363 bez zdefiniowanych poprawnych εr, 5 netów TX/GND/+5V/3V/1V, 8 komponentów, 10 VIA. Nie zgadywać εr/tanδ, ani plating PTH.
+
+**Zaimplementowane w odrębnych checkpointach:** `solvers/pcb_currents.py` rejestruje na każdej obsadzonej warstwie częstotliwościowy rot(H), `dump_type=13`, `dump_mode=1` (bez limitu czterech warstw); przełącznik `--surface-current` i checkbox w GUI są dobrowolne i wymagają częstotliwości pól; postprocessing tworzy `currents/*.npz` i `currents/metadata.json` bez nadpisywania natywnych HDF5, `K_est = curl(H)_t * dual_width_z` w A/m z 1 V odniesienia portu; raport HTML ma sekcję map |K| dla każdej warstwy i faz 0/90. Testy syntetyczne zapisano w `tests/test_pcb_currents.py`, ale **nie uruchomiono ich w tym środowisku**. Pełne instrukcje, nazwy artefaktów i ograniczenia: [docs/pcb-current-maps.md](docs/pcb-current-maps.md).
+
+**Stan i blocker:** **native Windows PREPARE-ONLY / FDTD na stripline4 NIEURUCHOMIONE**; mapy nie istnieją, ilościowe K jest tylko estymatą opartą o rot(H), **UNVERIFIED**, nie zwalidowanym skokiem H. Eksperyment może zostać zatrzymany przez brak materiału albo brak jednoznacznego modelu pasywnego komponentu. Pierwszy następny krok to odczyt przez użytkownika `git pull --ff-only`, lokalny targeted unittest, GUI z jawnie podanymi εr/tanδ/PTH i **PREPARE-ONLY**; następnie dopiero FDTD i mapa HTML, przesłanie komunikatu/statusu oraz ocena zbieżności i fizyki. Nie ogłaszać PASS od samych sztucznych danych. Nie ruszać toru antenowego.
+
+**Commity robocze kolejnych porcji:** `2a4b123` (pasywne monitory), `2017047` (GUI/CLI), `8af7777` (postprocess), `1650cbb` (HTML); potwierdzić aktualny HEAD na Git. Dokumentacja i testy to osobny końcowy checkpoint.
+
 ## 2026-10-25 — korekta pierwszego etapu: audyt PSU już wykonany
 
 **Decyzja użytkownika:** nie powtarzać audytu ani testów importu `.epro`. Duży `test_psu.epro` był już analizowany i testowany wcześniej. Dane: 291/291 komponentów, 906/906 PAD_NET, 288 PCB footprintów + 3 przez Device, 257 bibliotek zewnętrznych + 34 embedded; wyniki źródłowe w `docs/pcb-easyeda.md`, `todo.md` i `history.md`. Rozróżniać: **identity PASS** oraz historycznie **physical canonical UNSUPPORTED dla pełnego PSU**; nie oznacza to nowego obowiązku obsługi każdego rekordu PSU ani potwierdzonego FDTD. Testy canonical dla obsługiwanego przypadku `spirala.epro` istnieją. Nie mylić poprzednich ograniczeń z nakazem powrotu do importera.

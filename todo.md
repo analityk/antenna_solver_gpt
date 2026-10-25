@@ -1,5 +1,11 @@
 # TODO — PCB: aktualny stan i następne kroki
 
+## Bieżący eksperyment — stripline4: prąd powierzchniowy, status PARTIAL
+
+**Kod zapisany:** osobny wielowarstwowy dump `rot(H)`, dane zespolone `K_est` w [A/m / 1V], GUI `--surface-current` i checkbox, opcjonalna sekcja raportu HTML, bez wpływu na wcześniejsze FDTD i anteny. Każda część ma oddzielny checkpoint. **Nie ma jeszcze natywnego wyniku FDTD ani oceny numerycznej**; stąd `K_est` oznaczone `unverified`, bez deklaracji prawdziwych strat AC lub rozdzielenia prądu obu stron folii.
+
+**Najbliższy odbiór użytkownika, nie kolejny audyt .epro:** `git pull --ff-only`, `.\\.venv\\Scripts\\python.exe -X utf8 -m unittest discover -s tests -p test_pcb_currents.py -v`; wskazać w GUI `gerbs/stripline4/stripline4.epro`, ustawić jawne εr/tanδ dla 361/362/363, plating PTH i częstotliwości, zaznaczyć mapę prądu, wykonać **PREPARE-ONLY**. Zgłosić wynik przygotowania, przed pełnym FDTD. Później wynik natywnego rot(H), mapy czterech warstw, analiza portu/siatki i porównanie z warunkiem skoku H. **Brak materiałów, sygnału lub wsparcia geometrii → status blocked z przyczyną, nie fikcyjne obrazy.** Instrukcja: [docs/pcb-current-maps.md](docs/pcb-current-maps.md).
+
 ## Nowy nadrzędny kierunek — patrz [plan.md](plan.md) (2026-10-25)
 
 **Konstytucja:** rzeczywiste `.epro`/ZIP to dostarczone źródło topologii, obejmujące także MPN komponentów; zewnętrzne bryły rdzeni, fizyka materiałów i warunki pracy są jawnie dodawane. Nie pisać importera ani solvera na nowo. Zajmujemy się platformą analiz rzeczywistych PCB i **utrzymujemy funkcje antenowe**. Poszczególne starsze zadania poniżej zachowują znaczenie historyczne, ale nie wyznaczają już automatycznie priorytetu produktu.
