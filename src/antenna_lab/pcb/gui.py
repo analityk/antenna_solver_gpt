@@ -28,6 +28,7 @@ DEFAULTS = {
     'quality': 'design', 'geometry_um': '10', 'center_mhz': '1500',
     'cutoff_mhz': '1400', 'start_mhz': '1000', 'stop_mhz': '2000',
     'step_mhz': '100', 'fields_enabled': True, 'fields_mhz': '1000 2000',
+    'surface_current': False,
     'csxcad_path': r'C:\dev\openems\openEMS', 'overrides': '',
     'run_dir': '', 'field_view': 'active+geometry', 'threshold_db': '-40',
     'margin_mm': '1', 'phase_step': '15', 'open_after_run': True,
@@ -213,8 +214,11 @@ class PcbDesktop(tk.Tk):
         ttk.Checkbutton(frame, text='Zapisz pola E i H', variable=self.var['fields_enabled']).grid(
             row=3, column=0, columnspan=2, sticky='w', pady=5)
         self._field(frame, 'Pola przy', 'fields_mhz', 3, 1, width=20, help_text='MHz, np. 1000 2000')
+        ttk.Checkbutton(frame, text='Mapa prądu na wszystkich warstwach miedzi (rot H; wynik eksperymentalny)',
+                        variable=self.var['surface_current']).grid(
+            row=4, column=0, columnspan=6, sticky='w', pady=5)
         ttk.Label(frame, text='Zakres i częstotliwości dobierasz do projektu. Użyteczny zakres pobudzenia to środek ± 0,8 × odcięcie.',
-                  foreground='#666').grid(row=4, column=0, columnspan=6, sticky='w', pady=(4, 0))
+                  foreground='#666').grid(row=5, column=0, columnspan=6, sticky='w', pady=(4, 0))
 
     def _match_excitation(self):
         if self._busy:

@@ -157,6 +157,10 @@ def command_for(action, values, *, interpreter=None):
         cmd += ['--fields-mhz', *(str(f) for f in fields)]
     else:
         cmd.append('--no-fields')
+    if values.get('surface_current', False):
+        if not values.get('fields_enabled', True):
+            raise ValueError('Mapa prądów wymaga włączonych częstotliwości pól.')
+        cmd.append('--surface-current')
     overrides = []
     for line in str(values.get('overrides', '')).splitlines():
         item = line.strip()

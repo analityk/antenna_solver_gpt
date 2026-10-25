@@ -44,7 +44,7 @@ def _write_json(path, value):
 
 def run_easyeda_control(project_path, output_dir, *, source_config=None, source_pcb_id=None,
                        pth_plating_um=None, dielectric_materials=None, prepare_only=False, quality=None, geometry_resolution_um=10,
-                       resolved_profile=None, sweep_request=None, **frequency_settings):
+                       resolved_profile=None, sweep_request=None, surface_current=False, **frequency_settings):
     """Use D4 unchanged; all electrical overrides are explicit source-config data."""
     if isinstance(geometry_resolution_um, bool) or geometry_resolution_um not in (100,10,1,.1):
         raise ConfigurationError('Geometry resolution requires 100, 10, 1 or 0.1 um.')
@@ -53,7 +53,11 @@ def run_easyeda_control(project_path, output_dir, *, source_config=None, source_
     settings=profile.settings
     validate_pcb_simulation_settings(settings)
     fields=validate_field_frequencies(profile.field_frequency_hz,settings)
+    if surface_current and not fields:
+        raise ConfigurationError('PCB current maps require enabled field frequencies (--fields-mhz).')
     field_options={'field_frequency_hz':fields} if fields else {}
+    if surface_current:
+        field_options['surface_current_frequency_hz'] = fields
     frequencies=settings.result_frequency_hz
     sweep=dict(mode='explicit',start_hz=frequencies[0],stop_hz=frequencies[-1],point_count=len(frequencies))
     if sweep_request is not None:
@@ -164,6 +168,12 @@ def run_easyeda_control(project_path, output_dir, *, source_config=None, source_
                   '\nField planes: xy_air, xz_feed, yz_feed'+
                   f"\nField DFT samples: {6*len(fields)*sum(prod(p['shape_xyz']) for p in planes)} complex components"+
                   '\nMesh changed by fields: no\nAdditional FDTD runs: 0',flush=True)
+        if surface_current:
+            from antenna_lab.solvers.pcb_currents import pcb_current_layout
+            current_layout=pcb_current_layout(geometry, mesh, settings, fields)
+            print('Copper current planes: '+', '.join(p['layer_role'] for p in current_layout['planes'])+
+                  f"\nrot(H) samples: {current_layout['sample_count']} across {len(fields)} frequencies"+
+                  '\nMethod: sheet-plane total J=rot(H); K estimate unverified', flush=True)
         stage='native_preparation' if prepare_only else 'native_run'
         if prepare_only:
             native=output/'native';native.mkdir()
@@ -235,6 +245,8 @@ def main(argv=None):
     parser.add_argument('--yes',action='store_true')
     parser.add_argument('--no-fields',action='store_true')
     parser.add_argument('--fields-mhz',type=float,nargs='+')
+    parser.add_argument('--surface-current',action='store_true',
+                        help='Dump rot(H) at every populated copper plane; needs --fields-mhz.')
     parser.add_argument('--prepare-only',action='store_true')
     add_frequency_arguments(parser);parser.set_defaults(frequencies_mhz=None)
     for name in ('start','stop','step'):parser.add_argument(f'--sweep-{name}-mhz',type=float)
@@ -259,6 +271,7 @@ def main(argv=None):
         result=run_easyeda_control(args.easyeda_project,output,source_config=args.source_config,
             source_pcb_id=args.source_pcb_id,pth_plating_um=args.pth_plating_um,
             dielectric_materials=dielectric_materials,prepare_only=args.prepare_only,
+            surface_current=args.surface_current,
             geometry_resolution_um=args.geometry_resolution_um,resolved_profile=profile,
             sweep_request=request if sweep and tuple(profile.settings.result_frequency_hz)==tuple(band['result_frequency_hz']) else None)
         print(f"Status: {result['status']}; validation_status: unverified\n{output.resolve()/'summary.json'}")
