@@ -4,6 +4,7 @@ These tests check implementation contracts, not physical openEMS validation.
 """
 from pathlib import Path
 from io import BytesIO
+import base64
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 import unittest
@@ -11,6 +12,8 @@ from unittest.mock import patch
 
 import h5py
 import numpy as np
+from PIL import Image
+from matplotlib.figure import Figure
 
 from antenna_lab.core.config import ConfigurationError
 from antenna_lab.pcb.model import CopperLayer, CopperPolygon
@@ -19,8 +22,8 @@ from antenna_lab.solvers.pcb_currents import (
 from antenna_lab.visualization.pcb_currents import (
     load_copper_current, pcb_current_section, current_contrast_scale)
 from antenna_lab.visualization.pcb_current_frames import (
-    PHASES_DEG, current_at_phase, frame_figure, png_phase_player,
-    PLAYER_JS)
+    PHASES_DEG, GIF_DURATION_MS, current_at_phase, frame_figure,
+    gif_current_bytes, gif_phase_image)
 
 
 F = 1e9
@@ -124,26 +127,30 @@ class CopperCurrentTests(unittest.TestCase):
                 ((2+3j) * scale * layer['dual_width_m']).real)
             self.assertTrue(
                 np.isnan(record['k'][0, 0, 0, 0].real))
-            with patch('antenna_lab.visualization.pcb_current_frames.frame_figure') as figure:
-                figure.return_value = SimpleNamespace(clear=lambda: None)
+            with patch('antenna_lab.visualization.pcb_current_frames.gif_phase_image',
+                       return_value='<img src="data:image/gif;base64,R0lGODlh">') as gif:
                 body = pcb_current_section(
                     dict(root=path, geometry=dict(copper=[
                         dict(vertices_xy_m=list(p.vertices_xy_m),
                              holes_xy_m=(), z_m=p.z_m,
                              layer_role=p.layer_role)
                         for p in g.copper])),
-                    lambda fig, description, path=None: '<img alt="mapa prądu">',
+                    lambda fig, description, path=None: '<img alt="stary PNG">',
                     None)
-                self.assertEqual(figure.call_count, 24)
+                self.assertEqual(gif.call_count, 1)
             self.assertIn('top', body)
             self.assertIn('Gęstość prądu', body)
             self.assertIn('niezweryfikowany', body)
             self.assertIn('Kontrast lokalny', body)
-            self.assertIn('class="pcb-current-player"', body)
-            self.assertEqual(body.count('class="pcb-current-frame"'), 24)
-            self.assertIn('class="pcb-current-play"', body)
-            self.assertIn('class="pcb-current-slider"', body)
-            self.assertIn('setInterval', body)
+            self.assertIn('<details open>', body)
+            self.assertIn('<summary>', body)
+            self.assertIn('GIF, 24 klatki po 15°', body)
+            self.assertEqual(body.count('data:image/gif;base64,'), 1)
+            self.assertNotIn('data:image/png;base64,', body)
+            self.assertNotIn('class="pcb-current-player"', body)
+            self.assertNotIn('pcb-current-slider', body)
+            self.assertNotIn('Play</button>', body)
+            self.assertNotIn('<canvas', body)
             self.assertNotIn('wspólna skala', body)
             stats = current_contrast_scale(record, 0)
             self.assertTrue(stats['has_signal'])
@@ -173,8 +180,49 @@ class CopperCurrentTests(unittest.TestCase):
         self.assertAlmostEqual(m180[0, 0], 1.0)
         self.assertAlmostEqual(a180[0, 0, 0], -a0[0, 0, 0])
         self.assertAlmostEqual(a90[1, 0, 0], -2.0)
-        self.assertIn('frame.hidden=i!==idx', PLAYER_JS)
-        self.assertIn('clearInterval(interval)', PLAYER_JS)
+        self.assertEqual(GIF_DURATION_MS, 180)
+
+    def test_gif_encoding_24_frames_and_exact_loop(self):
+        g, mesh, settings = fixture()
+        plane = pcb_current_layout(g, mesh, settings, (F,))['planes'][0]
+        data = dict(frequency_hz=np.asarray([F]),
+                    x_m=np.linspace(-.005, .005, 5),
+                    y_m=np.linspace(-.005, .005, 5),
+                    k=np.ones((1, 2, 5, 5), dtype=complex),
+                    on_copper=np.ones((5, 5), dtype=bool))
+        # Keep this test focused on the GIF encoder rather than repeated
+        # Matplotlib surface plots; other tests exercise real frame_figure.
+        def little_figure(data, plane, index, phase, contrast, outlines):
+            fig = Figure(figsize=(1.3, 1), dpi=70)
+            ax = fig.subplots()
+            ax.text(.3, .5, str(phase), fontsize=14)
+            ax.axis('off')
+            return fig
+        contrast = current_contrast_scale(data, 0)
+        with patch('antenna_lab.visualization.pcb_current_frames.frame_figure',
+                   side_effect=little_figure) as mocked:
+            image = gif_current_bytes(data, {'copper': []},
+                                      plane, 0, contrast)
+        self.assertEqual(mocked.call_count, 24)
+        self.assertTrue(image.startswith((b'GIF89a', b'GIF87a')))
+        with Image.open(BytesIO(image)) as gif:
+            self.assertEqual(gif.format, 'GIF')
+            self.assertEqual(gif.n_frames, 24)
+            self.assertEqual(gif.info.get('loop'), 0)
+            for i in range(24):
+                gif.seek(i)
+                self.assertEqual(gif.info.get('duration'), GIF_DURATION_MS)
+        with TemporaryDirectory() as directory:
+            with patch('antenna_lab.visualization.pcb_current_frames.gif_current_bytes',
+                       return_value=image):
+                html = gif_phase_image(data, {'copper': []}, plane, 0,
+                                       contrast, plots_path=directory)
+            self.assertIn('data:image/gif;base64,', html)
+            self.assertEqual(html.count('<img '), 1)
+            encoded = html.split('data:image/gif;base64,', 1)[1].split('"', 1)[0]
+            self.assertEqual(base64.b64decode(encoded), image)
+            saved = Path(directory) / f"current_phase_{plane['name']}_00.gif"
+            self.assertEqual(saved.read_bytes(), image)
 
     def test_no_silent_off_grid_sheet(self):
         g, mesh, settings = fixture()
